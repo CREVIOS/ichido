@@ -7,26 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { Mark } from "@/components/mark";
+export { Mark } from "@/components/mark";
 import { STATUS, STAFF, type Lang, type Status } from "@/content/catalogue";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon; count?: number };
 
-// The mark: two points joined by one stroke — 一 ("one"), and tsunagu ("connect").
-export function Mark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 22 12" fill="none" className={cn("h-3 w-[22px]", className)} aria-hidden>
-      <circle cx="3.5" cy="6" r="2.5" fill="currentColor" />
-      <path d="M6 6h9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="18.25" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
 export function Logo({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("inline-flex items-center gap-1.5 text-foreground", className)} aria-label="Ichido">
+      <Mark />
       <span className="text-[17px] leading-none tracking-[-0.035em]">Ichido</span>
-      <Mark className="mt-px" />
     </Link>
   );
 }

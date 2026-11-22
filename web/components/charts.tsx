@@ -37,11 +37,15 @@ export function LineChart({ series, labels, height = 300, format = (n: number) =
   const left = compact ? 4 : 44;
   const pad = 10;
   const all = series.flatMap((s) => s.values.filter((v): v is number => v != null));
-  const max = Math.max(1, ...all) * 1.1;
+  // Round the axis to a clean step (1, 2, 5 × 10ⁿ) so ticks read as whole numbers.
+  const raw = Math.max(1, ...all);
+  const mag = 10 ** Math.floor(Math.log10(raw / 4));
+  const step = [1, 2, 5, 10].map((k) => k * mag).find((k) => k >= raw / 4) ?? raw / 4;
+  const max = Math.max(step, Math.ceil(raw / step) * step);
   const n = Math.max(1, labels.length - 1);
   const x = (i: number) => left + (i / n) * (w - left - pad);
   const y = (v: number) => pad + (1 - v / max) * (height - pad * 2);
-  const ticks = compact ? [0, 0.25, 0.5, 0.75, 1] : [0, 0.2, 0.4, 0.6, 0.8, 1];
+  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => (i * step) / max);
   const every = Math.ceil(labels.length / 6);
   return (
     <div className="flex flex-col gap-2">

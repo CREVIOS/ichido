@@ -3,6 +3,8 @@ import { ArrowRight, ChevronRight } from "lucide-react";
 import { Logo } from "@/components/kit";
 import { HeroPreview } from "@/components/hero-preview";
 import { HowDiagram } from "@/components/how-diagram";
+import { People } from "@/components/people";
+import { MeasurePreview } from "@/components/measure-preview";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HOME } from "@/content/catalogue";
@@ -16,6 +18,8 @@ export default function Home() {
       <TopNav />
       <Hero />
       <How />
+      <PeopleSection />
+      <Measure />
       <Screens />
       <Rules />
       <Cta />
@@ -63,12 +67,13 @@ function Hero() {
   );
 }
 
-function Section({ id, title, aside, children }: { id: string; title: string; aside?: string; children: React.ReactNode }) {
+function Section({ id, title, tag, children }: { id: string; title: string; tag?: { left: string; right: string }; children: React.ReactNode }) {
   return (
     <section id={id} className="mx-auto max-w-[1440px] scroll-mt-20 px-6 py-20 lg:px-12 lg:py-28">
-      <div className="mb-12 flex items-baseline justify-between border-t pt-5">
+      <div className="mb-12 grid grid-cols-[1fr_auto] items-baseline gap-4 border-t pt-5 lg:grid-cols-[1fr_minmax(0,0.45fr)_auto]">
         <h2 className="text-[28px] leading-[1.2] tracking-[-0.03em]">{title}</h2>
-        {aside && <span className="mono hidden text-muted-foreground sm:inline">{aside}</span>}
+        {tag && <span className="mono hidden text-[11px] tracking-[0.06em] text-muted-foreground uppercase lg:inline">{tag.left}</span>}
+        {tag && <span className="mono text-[11px] text-muted-foreground">{tag.right}</span>}
       </div>
       {children}
     </section>
@@ -78,20 +83,39 @@ function Section({ id, title, aside, children }: { id: string; title: string; as
 function How() {
   const steps = HOME.how.steps;
   return (
-    <Section id="how" title={HOME.how.title} aside={`${String(steps.length).padStart(2, "0")} STEPS`}>
-      <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
-        <div className="lg:sticky lg:top-24"><HowDiagram labels={steps.map((s) => s.k.split(" ")[0])} /></div>
-        <ol className="flex flex-col">
+    <Section id="how" title={HOME.how.title} tag={HOME.howTag}>
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-16">
+        <HowDiagram labels={steps.map((s) => s.k)} />
+        <ol className="flex flex-col gap-14 lg:gap-24">
           {steps.map((s) => (
-            <li key={s.k} className="flex flex-col gap-2 border-t py-7 first:border-t-0 first:pt-0">
-              <span className="mono text-muted-foreground">{s.k}</span>
-              <span className="text-[18px] leading-snug tracking-[-0.02em] text-foreground">{s.t}</span>
-              <span className="max-w-md text-[14px] leading-6">{s.b}</span>
+            <li key={s.k} className="flex max-w-md flex-col gap-2">
+              <span className="mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase">{s.k}</span>
+              <span className="text-[17px] leading-snug tracking-[-0.01em] text-foreground">{s.t}</span>
+              <span className="text-[15px] leading-6">{s.b}</span>
             </li>
           ))}
         </ol>
       </div>
     </Section>
+  );
+}
+
+function PeopleSection() {
+  return <Section id="people" title={HOME.people.title} tag={HOME.people.tag}><People /></Section>;
+}
+
+function Measure() {
+  return (
+    <section id="measure" className="mx-auto grid max-w-[1440px] items-center gap-10 px-6 py-20 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:gap-20 lg:px-12 lg:py-28">
+      <div className="flex flex-col gap-2 self-stretch">
+        <div className="my-auto flex flex-col gap-2">
+          <h3 className="text-[17px] tracking-[-0.01em]">{HOME.measure.title}</h3>
+          <p className="text-[15px] leading-6 text-muted-foreground">{HOME.measure.body}</p>
+        </div>
+        <p className="text-[13px] leading-5 text-muted-foreground">{HOME.measure.note}</p>
+      </div>
+      <MeasurePreview />
+    </section>
   );
 }
 
