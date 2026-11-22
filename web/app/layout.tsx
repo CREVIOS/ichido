@@ -3,6 +3,7 @@ import { Inter, DM_Mono, IBM_Plex_Sans_JP, Hind_Siliguri, Noto_Sans_Devanagari }
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { META } from "@/content/catalogue";
+import { Splash, SPLASH_GATE } from "@/components/splash";
 import "./globals.css";
 
 const sans = Inter({ variable: "--font-sans", subsets: ["latin", "vietnamese"] });
@@ -16,8 +17,10 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${sans.variable} ${mono.variable} ${jp.variable} ${bn.variable} ${ne.variable}`}>
+    <html lang="ja" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${jp.variable} ${bn.variable} ${ne.variable}`}>
+      <head><script dangerouslySetInnerHTML={{ __html: SPLASH_GATE }} /></head>
       <body>
+        <Splash />
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster position="bottom-right" />
       </body>

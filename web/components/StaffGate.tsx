@@ -2,11 +2,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChartNoAxesColumn, GraduationCap, LogOut, MapPin, RadioTower, Router, Rows3 } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
-import { Logo, Notice, type NavItem } from "@/components/kit";
+import { Notice, type NavItem } from "@/components/kit";
+import { Mark } from "@/components/mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { STAFF, NAV } from "@/content/catalogue";
+import { ART, STAFF, NAV } from "@/content/catalogue";
 
 export type Role = "operator" | "field" | "manager";
 export type Me = { uid: string; role: Role; name: string };
@@ -73,26 +73,30 @@ export function StaffGate({ allow, title, children }: { allow: Role[]; title: st
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
-      <div className="flex w-full max-w-[360px] flex-col gap-6">
-        <Logo />
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[28px] leading-tight">{title}</h1>
-          <p className="text-[14px]">{STAFF.signInLead}</p>
-        </div>
-        {me && <Notice tone="warn">{STAFF.noAccess(STAFF.roleName[me.role] ?? me.role)}</Notice>}
-        <form className="flex flex-col gap-4" onSubmit={signIn}>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="email">{STAFF.email}</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required className="h-9 bg-card" />
+    <main className="grid min-h-dvh grid-rows-[auto_1fr] bg-white lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:grid-rows-1">
+      <figure className="relative h-[38dvh] overflow-hidden lg:h-auto">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a fixed decorative asset, not content */}
+        <img src="/art/pines-tall.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_35%]" />
+        {/* Ink fading into the paper: downward on phones, rightward beside the form. */}
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white lg:bg-gradient-to-r" />
+        <figcaption className="absolute bottom-4 left-5 hidden text-[11px] text-black/45 lg:block">{ART.credit}</figcaption>
+      </figure>
+      <div className="grid justify-items-center px-6 pt-2 pb-10 lg:place-items-center lg:py-10">
+        <form className="flex w-full max-w-[320px] flex-col gap-7" onSubmit={signIn}>
+          <div className="flex flex-col items-start gap-5">
+            <Mark className="h-8 w-10 text-foreground" strokeWidth={1.3} />
+            <h1 className="text-[32px] leading-none tracking-[-0.04em]">{title}</h1>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">{STAFF.password}</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required className="h-9 bg-card" />
+          {me && <Notice tone="warn">{STAFF.noAccess(STAFF.roleName[me.role] ?? me.role)}</Notice>}
+          <div className="flex flex-col gap-3">
+            <Input aria-label={STAFF.email} placeholder={STAFF.email} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required className="h-11 rounded-lg bg-secondary/60 px-3.5 text-[15px] shadow-none" />
+            <Input aria-label={STAFF.password} placeholder={STAFF.password} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required className="h-11 rounded-lg bg-secondary/60 px-3.5 text-[15px] shadow-none" />
           </div>
           {error && <Notice tone="warn">{error}</Notice>}
-          <Button type="submit" size="lg" disabled={busy}>{STAFF.signIn}</Button>
-          {me && <Button type="button" variant="secondary" onClick={signOut}>{STAFF.otherAccount}</Button>}
+          <div className="flex flex-col gap-2">
+            <Button type="submit" size="lg" className="h-11 rounded-lg text-[14px]" disabled={busy}>{STAFF.signIn}</Button>
+            {me && <Button type="button" variant="ghost" onClick={signOut}>{STAFF.otherAccount}</Button>}
+          </div>
         </form>
       </div>
     </main>

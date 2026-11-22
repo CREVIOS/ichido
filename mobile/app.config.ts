@@ -39,7 +39,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
-    ["expo-splash-screen", { backgroundColor: "#F5F5F5", image: "./assets/images/splash-icon.png", imageWidth: 76 }],
+    ["expo-splash-screen", { backgroundColor: "#FFFFFF", image: "./assets/images/splash-icon.png", imageWidth: 64 }],
     ["@livekit/react-native-expo-plugin", { android: { audioType: "communication" } }],
     "@config-plugins/react-native-webrtc",
   ],
