@@ -5,7 +5,7 @@ When an ATM keeps your card, the monitoring centre already knows the machine fai
 Ichido joins three things into one case, in the caller's language:
 
 1. **The machine's alert** — an ESP32 "Help Point" prop (or an on-screen action) reports the fault.
-2. **The caller's own words** — in Bengali, English or easy Japanese, typed or spoken to a LiveKit voice agent. The assistant reads back what it understood; the caller corrects it and confirms.
+2. **The caller's own words** — in Bengali, Vietnamese, Indonesian, Nepali, English or easy Japanese, typed or spoken to a LiveKit voice agent (Nepali is typed only: Soniox has no Nepali model). Vietnam, Indonesia and Nepal are the three largest foreign-worker nationalities in Nagasaki Prefecture (3,018, 2,342 and 1,753 at end-October 2025). The assistant reads back what it understood; the caller corrects it and confirms.
 3. **The operator's decision** — chosen from the bank's approved replies, dispatched to a security guard, and returned to the caller as their real options (wait, with the guard's own estimate, or leave and be contacted). The caller then says the next step in their own words before the case closes.
 
 Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, ATM, security company and all data are **fictional**.
@@ -39,11 +39,11 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
 - **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
-- **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers. Background voice cancellation (LiveKit Cloud) cleans the caller's audio; a multilingual turn detector ends Japanese and English turns, and Bengali uses VAD endpointing.
+- **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers. Background voice cancellation (LiveKit Cloud) cleans the caller's audio; a multilingual turn detector ends Japanese, English and Indonesian turns, and Bengali and Vietnamese use VAD endpointing.
 - **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
-- **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
+- **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Bengali, Vietnamese, Indonesian, Nepali, English and Japanese (staff screens Japanese only). `L10n` makes TypeScript refuse a caller string missing any language. The database holds codes and data only.
 
 ## MCP server
 
@@ -150,7 +150,7 @@ cd agent && uv run python -m unittest   # only server-signed speech, per-languag
 |---|---|---|
 | Case flow across caller, operator and guard screens with live updates | The ATM (ESP32 prop or on-screen action) | Real telephony and the ATM's own handset |
 | Row-level security and single-use pairing | The bank, branch, security company and manual | Connection to a monitoring system |
-| Voice agent code (LiveKit, Soniox STT, ElevenLabs TTS) | Synthetic history in the insights page (local only, optional) | Native review of all Bengali and Japanese wording |
+| Voice agent code (LiveKit, Soniox STT, ElevenLabs TTS) | Synthetic history in the insights page (local only, optional) | Native review of all Bengali, Vietnamese, Indonesian, Nepali and Japanese wording |
 | ESP32 firmware | | |
 
 ## How AI tools were used

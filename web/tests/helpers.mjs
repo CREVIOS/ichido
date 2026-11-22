@@ -36,15 +36,15 @@ export const device = (key, secret = "local-device-secret") =>
 
 export const newKey = () => randomBytes(16).toString("hex");
 
-// Open a fresh case at TABLE-A, claimed by `op`, with `who` paired to it.
-export async function openPairedCase(op, who) {
+// Open a fresh case at TABLE-A, claimed by `op`, with `who` paired to it in `lang`.
+export async function openPairedCase(op, who, lang = "bn") {
   assert.equal((await device(newKey())).status, 204);
   const { data: open } = await op.c.from("desk").select("id").is("finished_at", null);
   assert.equal(open.length, 1);
   const incident = open[0].id;
   await ok(cmd(op, "claim", { incident }));
   const { code } = await ok(cmd(op, "issue_code", { incident }));
-  await ok(cmd(who, "pair", { station: "TABLE-A", code, lang: "bn" }));
+  await ok(cmd(who, "pair", { station: "TABLE-A", code, lang }));
   return incident;
 }
 

@@ -340,11 +340,11 @@ export const UI = {
   },
 } satisfies Record<string, L10n>;
 
-export * from "./staff";
-import { HANDOFF } from "./staff";
-export * from "./numbers";
-export * from "./home";
-export * from "./mobile";
+export * from "./staff.ts";
+import { HANDOFF } from "./staff.ts";
+export * from "./numbers.ts";
+export * from "./home.ts";
+export * from "./mobile.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {
