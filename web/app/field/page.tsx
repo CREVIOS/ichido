@@ -18,7 +18,7 @@ const NEXT: Partial<Record<FieldState, (typeof STEPS)[number]>> = { requested: "
 const LABEL: Record<(typeof STEPS)[number], string> = { on_way: FIELD.onWay, arrived: FIELD.arrived, done: FIELD.done };
 
 export default function FieldPage() {
-  return <StaffGate allow={["field"]} title={FIELD.title}>{(me) => <Jobs me={me} />}</StaffGate>;
+  return <StaffGate need="field:act" title={FIELD.title}>{(me) => <Jobs me={me} />}</StaffGate>;
 }
 
 // Only this guard's open assignments (row-level security). No identity checks or card handback here.

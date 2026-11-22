@@ -33,7 +33,7 @@ function current(steps: BotStep[]) {
 const faultName = (f: string) => (isFault(f) ? STAFF_JA.fault[f] : DESK.unknownFault);
 
 export default function AutomationPage() {
-  return <StaffGate allow={["operator"]} title={BOT.automation.title}>{(me) => <Sequence me={me} />}</StaffGate>;
+  return <StaffGate need="case:act" title={BOT.automation.title}>{(me) => <Sequence me={me} />}</StaffGate>;
 }
 
 // The Ichido Bot workflow as a sequence: what it does, in which order, and how it has done (bot_step, case_record; live).

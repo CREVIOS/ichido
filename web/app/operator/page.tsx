@@ -25,7 +25,7 @@ function watchHash(change: () => void) {
 }
 
 export default function OperatorPage() {
-  return <StaffGate allow={["operator"]} title={DESK.title}>{(me) => <Console me={me} />}</StaffGate>;
+  return <StaffGate need="case:act" title={DESK.title}>{(me) => <Console me={me} />}</StaffGate>;
 }
 
 type Snapshot = {

@@ -13,7 +13,7 @@ import { METRICS, type Insights, type MetricKey } from "./metrics";
 const PERIODS = [7, 14, 30];
 
 export default function InsightsPage() {
-  return <StaffGate allow={["operator", "manager"]} title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
+  return <StaffGate need="insights:read" title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
 }
 
 function Board({ me }: { me: Me }) {

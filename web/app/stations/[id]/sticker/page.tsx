@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { LANGS, STATION, STATIONS, type L10n } from "@/content/catalogue";
 
 export default function StickerPage() {
-  return <StaffGate allow={["operator"]} title={STATIONS.openSticker}>{() => <Suspense fallback={null}><Sticker /></Suspense>}</StaffGate>;
+  return <StaffGate need="case:act" title={STATIONS.openSticker}>{() => <Suspense fallback={null}><Sticker /></Suspense>}</StaffGate>;
 }
 
 // The printable Help Point sticker: a QR to the neutral pairing page and the promise that it holds no personal data.

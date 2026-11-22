@@ -13,7 +13,7 @@ import { allCases, historyCsv, PAGE_SIZE, readHistory, type Filters, type Histor
 import { CaseTable } from "./table";
 
 export default function CasesPage() {
-  return <StaffGate allow={["operator"]} title={NAV.cases}>{(me) => <History me={me} />}</StaffGate>;
+  return <StaffGate need="case:read" title={NAV.cases}>{(me) => <History me={me} />}</StaffGate>;
 }
 
 function History({ me }: { me: Me }) {

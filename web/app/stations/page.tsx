@@ -10,6 +10,7 @@ import { AppShell } from "@/components/kit";
 import { Pill, SegBar } from "@/components/charts";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { can } from "@/lib/rbac";
 import { DISASTER_STAFF, PACKS, PACK_DESK, PACK_IDS, STATIONS, packOfKind, type L10n, type PackId } from "@/content/catalogue";
 import { PACK_ICON } from "@/components/pack-icon";
 import type { MapStation } from "@/components/station-map";
@@ -25,7 +26,7 @@ type Health = { station: string; last_seen: string; rssi: number; firmware: stri
 const bars = (rssi: number) => Math.max(0, Math.min(6, Math.round(((rssi + 95) / 45) * 6)));
 
 export default function StationsPage() {
-  return <StaffGate allow={["operator", "manager"]} title={STATIONS.title}>{(me) => <Board me={me} />}</StaffGate>;
+  return <StaffGate need="stations:read" title={STATIONS.title}>{(me) => <Board me={me} />}</StaffGate>;
 }
 
 function useNow(ms: number) {
@@ -72,7 +73,7 @@ function Board({ me }: { me: Me }) {
           disaster: Boolean(s.disaster), mobile: s.kind === "mobile_branch", pack: packOfKind(s.kind), selected: picked.includes(s.id),
         };
       })} />
-      <DisasterPanel selected={picked} all={stations.map((s) => s.id)} onSelect={setPicked} label={Object.fromEntries(stations.map((s) => [s.id, s.label.ja]))} />
+      {can(me.role, "stations:disaster") && <DisasterPanel selected={picked} all={stations.map((s) => s.id)} onSelect={setPicked} label={Object.fromEntries(stations.map((s) => [s.id, s.label.ja]))} />}
       <div className="overflow-x-auto">
         <div className="min-w-[1130px]">
           <div className="flex h-10 items-center border-b text-[13px] text-muted-foreground">

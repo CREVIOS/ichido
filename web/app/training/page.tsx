@@ -23,7 +23,7 @@ function watchHash(change: () => void) {
 }
 
 export default function TrainingPage() {
-  return <StaffGate allow={["operator"]} title={TRAINING.title}>{(me) => <Trainer me={me} />}</StaffGate>;
+  return <StaffGate need="training:use" title={TRAINING.title}>{(me) => <Trainer me={me} />}</StaffGate>;
 }
 
 // The operator's own sessions only (row-level security).

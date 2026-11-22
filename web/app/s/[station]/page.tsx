@@ -3,6 +3,7 @@ import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
+import { authClient } from "@/lib/auth-client";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ function StationForm() {
       {staffSession ? (
         <div className="flex flex-col gap-3">
           <Notice tone="warn">{STATION.staffSession[lang]}</Notice>
-          <Button size="lg" onClick={async () => { await sb().auth.signOut(); setStaffSession(false); }}>{STATION.signOutStaff[lang]}</Button>
+          <Button size="lg" onClick={async () => { await authClient.signOut(); setStaffSession(false); }}>{STATION.signOutStaff[lang]}</Button>
         </div>
       ) : (
         <form className="flex flex-col gap-4" onSubmit={connect}>
