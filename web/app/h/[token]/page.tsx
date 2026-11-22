@@ -3,7 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { admin } from "@/lib/server";
 import { openHandoff } from "@/lib/handoff";
 import { Mark } from "@/components/mark";
-import { ACTOR, DESK, FACT_STAFF, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status, STAFF_JA } from "@/content/catalogue";
+import { ACTOR, CALLER_FLAGS, DESK, FACT_STAFF, FAULT_DESK, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, bankStatusStaff, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status, STAFF_JA } from "@/content/catalogue";
 import { PrintButton } from "./print";
 
 export const metadata: Metadata = { title: HANDOFF.doc.title, robots: { index: false, follow: false } };
@@ -22,11 +22,11 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
   if (!h) return <main className="grid min-h-dvh place-items-center p-6"><p className="max-w-sm text-center text-[14px]">{D.gone}</p></main>;
   const id = h.incident;
   const [{ data: d }, { data: events }, { data: replies }, { data: job }, { data: card }] = await Promise.all([
-    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at").eq("id", id).single(),
+    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at, stated_amount").eq("id", id).single(),
     admin.from("case_event").select("id, at, actor, actor_name, kind, data").eq("incident", id).order("id"),
     admin.from("reply").select("intent, sent_at").eq("incident", id).order("sent_at"),
     admin.from("field_job").select("state, eta").eq("incident", id).maybeSingle(),
-    admin.from("caller_card").select("choice, teachback_result, rating").eq("id", id).maybeSingle(),
+    admin.from("caller_card").select("choice, teachback_result, rating, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
   ]);
   if (!d) return null;
   const { data: st } = await admin.from("station").select("label, branch").eq("id", d.station).maybeSingle();
@@ -65,6 +65,13 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
             <li>{FACT_STAFF.cash_received[d.cash_received as Fact]}</li>
           </ul>
         )}
+        {/* Typed by the operator from what the caller said on the handset, never from the caller's phone. */}
+        {d.stated_amount != null && <p className="text-[15px] text-foreground">{FAULT_DESK.amount}：{FAULT_DESK.yen(d.stated_amount)}</p>}
+        {card?.flags?.length ? (
+          <ul className="flex flex-col gap-1 text-[14px] text-foreground">
+            {card.flags.map((f: string) => <li key={f}>{CALLER_FLAGS[f]?.staff ?? f}</li>)}
+          </ul>
+        ) : null}
       </Section>
 
       <Section title={D.decisions}>
@@ -75,6 +82,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
           [D.choice, card?.choice ? DESK.choiceText[card.choice] : D.none],
           [D.outcome, card?.teachback_result === "understood" ? STATUS.guided.ja : card?.teachback_result ? DESK.teach.clarify : D.none],
           [D.rating, card?.rating ? RATING[card.rating].ja : D.none],
+          [FAULT_DESK.bank, card?.bank_status ? bankStatusStaff(card.bank_status, card.bank_due) : FAULT_DESK.bankNone],
         ]} />
       </Section>
 

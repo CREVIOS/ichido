@@ -4,11 +4,12 @@ export type Station = { id: string; label: L10n };
 export type Desk = {
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
-  remote_release: string | null; abandoned: boolean; text_only?: boolean; created_at: string; finished_at: string | null;
+  remote_release: string | null; abandoned: boolean; text_only?: boolean; created_at: string; finished_at: string | null; stated_amount?: number | null;
 };
 export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
   teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
+  flags: string[]; bank_status: string | null; bank_due: string | null;
 };
 export type OpenDesk = Desk & {
   case_event: { at: string }[]; reply: { id: string }[]; escalation: { reason: string }[];

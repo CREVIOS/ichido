@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
+import { DESK, DEVICE_FAULT, FAULT_DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
 
 // Seconds left on a single-use code, ticking once a second.
@@ -46,15 +46,21 @@ export function PairCard({ incident }: { incident: string }) {
 const INTENTS = Object.keys(REPLIES);
 
 // practice: the training console, where the held-card rule is scored in the debrief instead of hinted here.
-export function ReplyCard({ d, lang, replies, run, bundleTo, practice }: {
-  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release">; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean;
+// flags: the caller's own taps, which some replies need (content/faults.ts REPLY_RULES).
+export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [] }: {
+  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; flags?: string[];
 }) {
   const [intent, setIntent] = useState(INTENTS[0]);
   const r = replyOf(intent) ?? REPLIES[INTENTS[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
-  // Mirrors the server rule: "card is still inside" only when the caller confirmed it and no release succeeded.
-  const blocked = d.confirmed_rev == null ? DESK.reply.awaiting
-    : !practice && r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? DESK.reply.mismatch : "";
+  // Mirrors the server rules: "card is still inside" only when the caller confirmed it and no release succeeded,
+  // and each reply only for its own fault types and caller statements.
+  const ctx = { fault: d.fault ?? DEVICE_FAULT, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release };
+  const blockOf = (k: string) => replyBlock(k, REPLIES[k].needsHeld, ctx);
+  const block = blockOf(intent);
+  const blocked = block === "awaiting" ? DESK.reply.awaiting
+    : practice || !block ? "" : block === "held" ? DESK.reply.mismatch : FAULT_DESK.blocked[block];
+  const dim = (k: string) => !practice && ![null, "awaiting"].includes(blockOf(k));
   const send = () => run("send", { incident: d.id, intent }).then((ok) => { if (ok) toast.success(DESK.reply.toast); });
   // One step for the common case: the approved reply, then a site check by the first available guard.
   const sendAndDispatch = async (g: Guard) => {
@@ -66,7 +72,7 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice }: {
       <div className="flex flex-col gap-1" role="radiogroup" aria-label={DESK.reply.title}>
         {INTENTS.map((k) => (
           <button key={k} type="button" role="radio" aria-checked={k === intent} onClick={() => setIntent(k)}
-            className={cn("flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-accent", k === intent ? "border-foreground/30 bg-card" : "border-transparent")}>
+            className={cn("flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-accent", k === intent ? "border-foreground/30 bg-card" : "border-transparent", dim(k) && "opacity-45")}>
             <span className="mono mt-0.5 w-7 shrink-0 text-muted-foreground">{REPLIES[k].code}</span>
             <span className="flex-1 text-[14px] leading-5 text-foreground">{REPLIES[k].title}</span>
             {k === intent && <Check className="mt-0.5 size-4 shrink-0 stroke-[1.5] text-foreground" />}

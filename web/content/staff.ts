@@ -1,4 +1,5 @@
 // Staff screens (Japanese): console, guard, insights, sign-in.
+import { FAULT_STAFF } from "./faults.ts";
 
 // Staff sign-in (staff screens are Japanese).
 export const STAFF = {
@@ -317,7 +318,7 @@ export const STAFF_JA = {
     none: "未依頼", requested: "現地確認を依頼しました", on_way: "警備員が向かっています", arrived: "警備員が到着しました",
     done: "現地対応完了（カードの扱いは銀行所定の手続き）",
   } as Record<string, string>,
-  fault: { card_retained: "取引後にカードが排出されない" } as Record<string, string>,
+  fault: { card_retained: "取引後にカードが排出されない", ...FAULT_STAFF } as Record<string, string>,
 };
 
 // Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.

@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
-  type StyleProp, type TextInputProps, type TextProps, type ViewStyle,
+  type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -28,9 +28,15 @@ export function familyFor(s: string, weight: 400 | 500 = 400, mono = false): str
 type Tone = "ink" | "body" | "muted" | "faint" | "alert" | "warn" | "ok" | "info" | "onPrimary";
 const TONE_FOR: Record<keyof typeof type, Tone> = { h1: "ink", h2: "ink", big: "ink", body: "body", row: "ink", label: "body", small: "muted", tiny: "muted", code: "ink" };
 
+// The caller's "large text" setting scales every T below it.
+export const TextScale = createContext(1);
+
 export function T({ v = "body", tone, weight = 400, mono, style, children, ...rest }: TextProps & { v?: keyof typeof type; tone?: Tone; weight?: 400 | 500; mono?: boolean }) {
+  const k = useContext(TextScale);
+  const base: TextStyle = type[v];
+  const scaled = k === 1 ? base : { ...base, fontSize: (base.fontSize ?? 15) * k, lineHeight: base.lineHeight && base.lineHeight * k };
   return (
-    <Text {...rest} style={[type[v], { color: color[tone ?? TONE_FOR[v]], fontFamily: familyFor(textOf(children), weight, mono || v === "code" || v === "big") }, style]}>
+    <Text {...rest} style={[scaled, { color: color[tone ?? TONE_FOR[v]], fontFamily: familyFor(textOf(children), weight, mono || v === "code" || v === "big") }, style]}>
       {children}
     </Text>
   );

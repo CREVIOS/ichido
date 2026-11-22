@@ -11,6 +11,7 @@ import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
+import { BankStatusCard, CallerFlags, FaultCard } from "./faults";
 import { DeviceCodeCard, TextOnlyBadge, TextOnlyBanner } from "./access";
 import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
 
@@ -33,7 +34,7 @@ function useCase(id: string) {
   const load = useCallback(async () => {
     const db = sb();
     const [c, e, r, j, b, x, p, rec] = await Promise.all([
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
@@ -66,8 +67,10 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
+        <CallerFlags flags={card?.flags ?? []} />
         <Timeline events={events} />
         {d.operator_id && <HandoffPanel incident={d.id} />}
+        {d.operator_id && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
@@ -98,7 +101,8 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
     <>
       {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
-      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
+      <FaultCard d={d} flags={card?.flags ?? []} run={run} />
+      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} flags={card?.flags ?? []} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
     </>

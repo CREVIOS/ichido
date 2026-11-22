@@ -48,6 +48,28 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
 - **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Bengali, Vietnamese, Indonesian, Nepali, English and Japanese (staff screens Japanese only). `L10n` makes TypeScript refuse a caller string missing any language. The database holds codes and data only.
 
+## Real-world fault paths
+
+From 40 sourced caller stories, every reason a card, passbook or cash stays in (or never leaves) the machine is its own fault type in `web/content/faults.ts`, with its own caller taps and approved replies:
+
+| Fault type | Reply the caller can get |
+|---|---|
+| `card_retained` (device default) | A-3 card is inside, wait or leave — only if the caller confirmed it did not come back, no release succeeded, and they did **not** say they forgot it or it was reported lost/expired |
+| `card_forgotten` (取り忘れ), `card_kept` (lost-card report, expired, bank flag) | B-1 / B-2: the bank handles the card by its own procedure; no need to wait. Never A-3 |
+| `card_unreadable` | B-3: take the card to the branch counter |
+| `passbook_stuck` | D-1: passbook is inside, wait or leave (needs the caller's "my passbook did not come back") |
+| `cash_jam` | C-3: the bank counts the cash and corrects the balance, wait or leave (needs the caller's tap) |
+| `cash_left`, `debited_no_cash` | C-2 / C-1: the bank checks the record and corrects the balance; keep the slip; no need to wait |
+| `limit_refused` | C-4: a bank limit, not a fault |
+| any card fault + "the ATM says my card can't be used" | B-4: may be the bank's residence-period rule; bring the new residence card to the branch (hours from the station row); the prefecture's 22-language desk |
+| any card fault + "issued outside Japan" / "I can't come back" | B-5: ask your card issuer to block the card; the bank here follows its own procedure (no promise of return) |
+
+- **The rule is in the database.** `ichido.reply_rule` (migration `20261123110000_faults.sql`) and a trigger on `public.reply` refuse any reply that does not fit the case's fault type and the caller's taps; `tests/faults.test.mjs` checks the table equals `REPLY_RULES` in the catalogue. The console, the mobile console and Gemini's `list_replies` use the same `replyBlock()`.
+- **The operator corrects the fault type** when the caller's story shows the alert was wrong (timeline: 障害の種類を変更). The console suggests a type from the caller's taps. A sent reply that no longer fits is withdrawn from the caller's screen, with its wait/leave choice.
+- **本人申告:** for cash faults the operator types the amount the caller stated on the handset. It lives on the operator-only `desk` row, never on the caller's phone, and appears on the hand-off record labelled 本人申告.
+- **Elderly-friendly caller page:** large text and slower read-aloud toggles (kept in `localStorage`, or AsyncStorage on mobile; the page works without storage), no timers in the caller flow, and a "a family member is helping me" tap recorded as a flag only (no personal details) and shown to the operator.
+- **Follow-up after leaving:** when a case closes with guidance confirmed, the caller's phone can follow it for 30 days (`ichido.follow_up`, `followup` command) after the two-hour pairing expires: case number, what they were told, and the bank's status in their language. The bank's status (受付済み, 取引記録を確認済み, 〜までにご連絡予定, ご本人に連絡済み, 銀行の手続き完了) comes from a fixed list and is recorded **by an operator on the bank's behalf**, from the console, on open or closed cases. We chose this over a write token on the hand-off link: the link stays strictly read-only, there is no unauthenticated write path to defend, and every update is attributed to a signed-in staff member on the timeline. No status tells anyone to collect a card.
+
 ## MCP server
 
 `/api/mcp` serves Ichido over the Model Context Protocol (Streamable HTTP) so an operator's or manager's own AI client can read the desk. Tools: `list_open_cases`, `get_case`, `station_health`, `insights`, `suggest_next_step` (Gemini decision support). Every tool is **read-only** — replies and dispatch stay a person's decision in the console — and every query runs as the signed-in staff member, so row-level security still applies. Guards and callers are refused.
@@ -156,7 +178,7 @@ cd web
 npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health, device-heartbeat, firmware-manifest, text-only (access) and disaster tests
 ```
 
-The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.
+The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits. `faults.test.mjs` covers the real-world fault paths: a forgotten or kept card never gets the held reply, the debited-no-cash reply, the staff-only stated amount, the residence-card and visitor replies, the helper flag, and the follow-up status a caller still sees after the pairing expires.
 
 The Ichido Bot test (`tests/bot.test.mjs`) checks the routing suggestion, the prepared suggestion (or a recorded skip without `GEMINI_API_KEY`), both reminders, the record at close, and that the bot never claims, replies or dispatches. Its reminder checks need a short schedule on the server under test, e.g. `BOT_REMIND_AT=0.02 npm run dev` (reminders after 2% of each target); with the default they are skipped with a note.
 

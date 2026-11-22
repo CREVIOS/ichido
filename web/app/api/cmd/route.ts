@@ -4,6 +4,7 @@ import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
 import * as training from "@/lib/training";
+import * as faults from "@/lib/faults";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
@@ -264,6 +265,13 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   training_reply: (a, b) => training.sendReply(staff(a, "operator"), b),
   training_dispatch: (a, b) => training.dispatch(staff(a, "operator"), b),
   training_end: (a, b) => training.end(staff(a, "operator"), b),
+
+  // Real-world fault paths (lib/faults.ts): fault type, stated amount, bank status, caller taps, follow-up.
+  set_fault: (a, b) => faults.setFault(staff(a, "operator"), b),
+  stated_amount: (a, b) => faults.statedAmount(staff(a, "operator"), b),
+  bank_status: (a, b) => faults.bankStatus(staff(a, "operator"), b),
+  flag: (a, b) => faults.flag(caller(a), b),
+  followup: (a) => faults.followup(caller(a)),
 
   // Field (security guard)
   async field(a, b) {

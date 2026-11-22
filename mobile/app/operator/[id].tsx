@@ -9,7 +9,7 @@ import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
   FACT_STAFF, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
-  eventText, summaryDraft, pick, replyOf,
+  eventText, summaryDraft, pick, replyOf, replyBlock, FAULT_DESK,
   type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
 
@@ -17,6 +17,7 @@ const O = MOBILE.operator;
 type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
   teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
+  flags: string[];
 };
 type Event = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -43,7 +44,7 @@ function CaseView({ me }: { me: Me }) {
     const db = sb();
     const [k, c, e, r, j] = await Promise.all([
       db.from("desk").select("*").eq("id", id).maybeSingle(),
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
@@ -107,7 +108,7 @@ function CaseView({ me }: { me: Me }) {
         <>
           {!paired && <PairCard incident={d.id} />}
           <SuggestCard d={d} run={run} />
-          <ReplyCard d={d} lang={lang} replies={replies} run={run} />
+          <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
       )}
@@ -221,13 +222,14 @@ function PairCard({ incident }: { incident: string }) {
   );
 }
 
-function ReplyCard({ d, lang, replies, run }: { d: Desk; lang: Lang; replies: Reply[]; run: Run }) {
+function ReplyCard({ d, lang, replies, run, flags }: { d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
   const [intent, setIntent] = useState(Object.keys(REPLIES)[0]);
   const r = replyOf(intent) ?? REPLIES[Object.keys(REPLIES)[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
-  // Mirrors the server rule: "card is still inside" only when the caller confirmed it and no release succeeded.
-  const blocked = d.confirmed_rev == null ? O.waitConfirm
-    : r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? O.heldMismatch : "";
+  // Mirrors the server rules (web/content/faults.ts replyBlock): the held-card rule and each reply's fault types and caller taps.
+  const block = replyBlock(intent, r.needsHeld, { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release });
+  const blocked = block === "awaiting" ? O.waitConfirm
+    : block === "held" ? O.heldMismatch : block ? FAULT_DESK.blocked[block] : "";
   return (
     <Card title={O.replies} action={<T v="small" mono>{MANUAL_VERSION}</T>}>
       <View style={{ marginHorizontal: -8 }}>

@@ -3,6 +3,7 @@
 // Bengali, Vietnamese, Indonesian, Nepali and Japanese below are drafts awaiting native review (see README).
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
+import { FAULT_NAMES, FAULT_REPLIES, faultEventText } from "./faults.ts";
 
 export const MANUAL_VERSION = "retained-card/v1";
 
@@ -35,6 +36,7 @@ export const FAULTS: Record<string, L10n> = {
     ja: "ATM を つかった あと、カードが でてこない", bn: "লেনদেনের পরে কার্ড বের হয়নি", en: "Card not returned after the transaction",
     vi: "Thẻ không được trả ra sau giao dịch", id: "Kartu tidak keluar setelah transaksi", ne: "कारोबारपछि कार्ड बाहिर आएन",
   },
+  ...FAULT_NAMES,
 };
 export const DEVICE_FAULT = "card_retained";
 export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
@@ -157,6 +159,7 @@ export const REPLIES: Record<string, Reply> = {
       ne: "बैंकसँग सम्पर्क गर्न बैंकको आधिकारिक सम्पर्क माध्यम प्रयोग गर्नुहोस्।",
     }),
   },
+  ...FAULT_REPLIES,
 };
 
 export const replyOf = (intent: unknown): Reply | undefined =>
@@ -202,7 +205,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
-    default: return accessEventText(kind, d) ?? kind;
+    default: return accessEventText(kind, d) ?? faultEventText(kind, d) ?? kind;
   }
 }
 
@@ -358,6 +361,7 @@ export * from "./home.ts";
 export * from "./mobile.ts";
 export * from "./access.ts";
 import { accessEventText } from "./access.ts";
+export * from "./faults.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {

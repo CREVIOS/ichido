@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { cmd } from "@/lib/supabase";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
@@ -78,14 +78,12 @@ function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; b
   );
 }
 
-const WAITING_HINT_MS = 30_000;
+// No timers in the caller flow: the handset hint is there from the start, so nobody has to wait for it to appear.
 export function Waiting({ lang, textOnly }: { lang: Lang; textOnly: boolean }) {
-  const [late, setLate] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setLate(true), WAITING_HINT_MS); return () => clearTimeout(t); }, []);
   return (
     <section className="surface flex flex-col gap-2 p-5">
       <span className="flex items-center gap-2 text-[18px] text-foreground"><span className="size-2 animate-pulse rounded-full bg-info" aria-hidden />{STATUS.review[lang]}</span>
-      {late && <p className="text-[14px] leading-6">{(textOnly ? ACCESS.waiting : UI.waiting)[lang]}</p>}
+      <p className="text-[14px] leading-6">{(textOnly ? ACCESS.waiting : UI.waiting)[lang]}</p>
     </section>
   );
 }
