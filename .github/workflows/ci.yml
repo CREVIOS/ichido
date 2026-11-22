@@ -95,7 +95,7 @@ jobs:
           path: |
             ~/.arduino15/packages
             ~/Arduino/libraries
-          key: arduino-${{ runner.os }}-${{ runner.arch }}-esp32-${{ env.ESP32_VERSION }}-wifi-${{ env.WIFIMANAGER_VERSION }}-oled-${{ env.U8G2_VERSION }}
+          key: arduino-${{ runner.os }}-${{ runner.arch }}-esp32-${{ env.ESP32_VERSION }}-wifi-${{ env.WIFIMANAGER_VERSION }}-u8g2-${{ env.U8G2_VERSION }}
       - run: arduino-cli core update-index
       - if: steps.cores.outputs.cache-hit != 'true'
         run: |
