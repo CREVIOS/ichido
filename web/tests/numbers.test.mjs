@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { looksLikeNumber } from "../content/catalogue.ts";
+import { looksLikeNumber } from "../content/numbers.ts";
 
 test("withholds digit runs in ASCII, Bengali and full-width digits, with separators", () => {
   for (const s of ["1234", "card 1234-5678", "পিন ১২৩৪", "１２３４", "12 34 56", "০১৭১১-২২৩৩৪৪"]) assert.equal(looksLikeNumber(s), true, s);

@@ -2,9 +2,11 @@
 import { useCallback, useState } from "react";
 import { sb } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
-import { StaffGate, navFor, signOut, type Me } from "@/components/StaffGate";
-import { Shell, Card, More, Tag, Funnel, Dots, Steps, Meter } from "@/components/ui";
-import { FUNNEL, LANG_NAME, type Lang } from "@/content/catalogue";
+import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
+import { AppShell, Big, Chip, Dots, Funnel, Meter, Notice, Panel, Steps } from "@/components/kit";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Separator } from "@/components/ui/separator";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, staffError, type Lang } from "@/content/catalogue";
 
 type Insights = {
   since: string;
@@ -20,12 +22,10 @@ type Insights = {
 
 const PERIODS = [7, 14, 30];
 const HOURS_PER_SLOT = 2;
-const LANG_COLOR: Record<string, string> = { bn: "var(--green)", en: "var(--blue)", ja: "var(--rose)", none: "var(--faint)" };
-const gap = (g: number) => ({ "--gap": `${g}px` }) as React.CSSProperties;
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 
 export default function InsightsPage() {
-  return <StaffGate allow={["operator", "manager"]} hint="manager@ichido.demo" title="インサイト">{(me) => <Board me={me} />}</StaffGate>;
+  return <StaffGate allow={["operator", "manager"]} title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
 }
 
 function Board({ me }: { me: Me }) {
@@ -34,87 +34,105 @@ function Board({ me }: { me: Me }) {
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const { data, error } = await sb().rpc("insights", { p_days: days });
-    if (error) setError(error.message); else { setError(""); setData(data as Insights); }
+    if (error) setError(staffError(error.message)); else { setError(""); setData(data as Insights); }
   }, [days]);
   useLive(["desk"], load);
 
+  return (
+    <AppShell
+      nav={navFor(me.role)}
+      footer={<MeFooter me={me} />}
+      title={INSIGHTS.title}
+      actions={
+        <ToggleGroup value={[String(days)]} onValueChange={(v: string[]) => v[0] && setDays(Number(v[0]))} className="rounded-md bg-secondary p-0.5">
+          {PERIODS.map((p) => <ToggleGroupItem key={p} value={String(p)} className="h-7 rounded-[5px] px-2.5 text-[12px] data-[pressed]:bg-card data-[pressed]:shadow-xs">{INSIGHTS.period(p)}</ToggleGroupItem>)}
+        </ToggleGroup>
+      }
+    >
+      <div className="flex flex-col gap-10 p-5 lg:p-8">
+        {error && <Notice tone="warn">{error}</Notice>}
+        <Overview data={data} />
+        <Separator />
+        <Detail data={data} />
+        <p className="text-[12px] text-muted-foreground">{INSIGHTS.privacy}</p>
+      </div>
+    </AppShell>
+  );
+}
+
+function Overview({ data }: { data: Insights | null }) {
   const f = data?.funnel ?? {};
   const total = f.received ?? 0;
-  // Two-hour slots keep the dot matrix readable on a card.
+  const langs = Object.entries(data?.languages ?? {}).sort((a, b) => b[1] - a[1]);
+  const langMax = Math.max(1, ...langs.map(([, n]) => n));
+  return (
+    <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <Panel title={INSIGHTS.flow}>
+        <p className="max-w-xl text-[14px] leading-6">{INSIGHTS.flowNote}</p>
+        <Funnel steps={FUNNEL.map((s) => ({ label: s.ja, value: f[s.key] ?? 0 }))} conversion={INSIGHTS.conversion} unit={INSIGHTS.count} />
+      </Panel>
+      <Panel title={INSIGHTS.received}>
+        <Big>{total.toLocaleString()}</Big>
+        <div className="mt-4 flex flex-col gap-4">
+          {langs.length === 0 && <span className="text-[13px] text-muted-foreground">{INSIGHTS.noData}</span>}
+          {langs.map(([l, n]) => (
+            <div key={l} className="flex flex-col gap-1.5">
+              <span className="flex justify-between text-[14px]"><span className="text-foreground">{LANG_NAME[l as Lang] ?? INSIGHTS.noLang}</span><span className="num">{n}</span></span>
+              <Meter value={n} max={langMax} />
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function Detail({ data }: { data: Insights | null }) {
+  const f = data?.funnel ?? {};
+  const total = f.received ?? 0;
+  // Two-hour slots keep the dot matrix readable.
   const hours = data?.per_hour ?? [];
   const slots = Array.from({ length: hours.length / HOURS_PER_SLOT }, (_, i) => ({
     hour: i * HOURS_PER_SLOT,
     n: hours.slice(i * HOURS_PER_SLOT, (i + 1) * HOURS_PER_SLOT).reduce((sum, h) => sum + h.n, 0),
   }));
   const peak = slots.reduce((best, h) => (h.n > best.n ? h : best), { hour: 0, n: 0 });
-  const langs = Object.entries(data?.languages ?? {}).sort((a, b) => b[1] - a[1]);
-  const langMax = Math.max(1, ...langs.map(([, n]) => n));
   const median = data?.median_first_reply_s;
   const choices = data?.choices ?? {};
   const chosen = (choices.wait ?? 0) + (choices.leave ?? 0);
-
   return (
-    <Shell
-      nav={navFor(me.role)}
-      title="インサイト"
-      right={<div className="row"><span className="small soft">{me.name}</span><button className="btn ghost" onClick={signOut}>サインアウト</button></div>}
-      aside={
-        <div className="row" style={gap(6)}>
-          {PERIODS.map((p) => <button key={p} className={`btn ${p === days ? "on" : ""}`} onClick={() => setDays(p)}>直近{p}日</button>)}
+    <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-4">
+      <Panel title={INSIGHTS.perDay}>
+        {data && <Steps values={data.per_day.map((d) => d.n)} labels={data.per_day.map((d) => new Date(d.day).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }))} />}
+      </Panel>
+      <Panel title={INSIGHTS.hours} action={peak.n > 0 ? <Chip>{INSIGHTS.peak} {INSIGHTS.hourRange(peak.hour, peak.hour + HOURS_PER_SLOT)}</Chip> : undefined}>
+        <Dots values={slots.map((h) => h.n)} labels={slots.map((h) => INSIGHTS.hour(h.hour))} maxDots={6} />
+        <div className="flex justify-between text-[11px] text-muted-foreground">{slots.filter((_, i) => i % 3 === 0).map((h) => <span key={h.hour}>{INSIGHTS.hour(h.hour)}</span>)}</div>
+      </Panel>
+      <Panel title={INSIGHTS.firstReply}>
+        <Big>{median == null ? "—" : INSIGHTS.duration(median)}</Big>
+        <span className="text-[13px]">{INSIGHTS.firstReplyNote}</span>
+        <div className="mt-2 flex flex-col gap-1.5 text-[14px]">
+          <Row label={INSIGHTS.guidedRate} value={`${pct(f.guided ?? 0, total)}%`} />
+          <Row label={INSIGHTS.dispatched} value={INSIGHTS.count(data?.dispatched ?? 0)} />
+          <Row label={INSIGHTS.abandoned} value={INSIGHTS.count(data?.abandoned ?? 0)} />
         </div>
-      }
-    >
-      {error && <p className="notice" style={{ marginBottom: 16 }}>{error}</p>}
-      <div className="grid insights">
-        <Card title="案件の流れ" action={<More label="表示" items={[{ label: "件数を更新", onClick: load }]} />}>
-          <p className="small soft">障害通知から「お客様が次の手順を自分の言葉で説明」まで。各段階は前の段階を通過した案件のみを数えます。</p>
-          <Funnel steps={FUNNEL.map((s) => ({ label: s.ja, value: f[s.key] ?? 0 }))} />
-        </Card>
-        <Card title="受付件数">
-          <span className="big">{total.toLocaleString()}</span>
-          <hr className="hairline" />
-          <div className="stack" style={gap(14)}>
-            {langs.length === 0 && <span className="small muted">データがありません</span>}
-            {langs.map(([l, n]) => (
-              <div key={l} className="stack" style={gap(6)}>
-                <span className="row between"><span style={{ fontSize: 17 }}>{LANG_NAME[l as Lang] ?? "多言語窓口を使わず"}</span><span className="num soft">{n}</span></span>
-                <Meter value={n} max={langMax} color={LANG_COLOR[l] ?? "var(--faint)"} />
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 22 }}>
-        <Card title="日別の受付">
-          {data && <Steps values={data.per_day.map((d) => d.n)} labels={data.per_day.map((d) => new Date(d.day).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }))} />}
-        </Card>
-        <Card title="時間帯" action={peak.n > 0 ? <Tag label="ピーク：" value={`${peak.hour}〜${peak.hour + HOURS_PER_SLOT}時`} /> : undefined}>
-          <span className="big">{total}</span>
-          <Dots values={slots.map((h) => h.n)} labels={slots.map((h) => `${h.hour}時`)} maxDots={5} />
-          <div className="row between tiny muted">{slots.filter((_, i) => i % 3 === 0).map((h) => <span key={h.hour}>{h.hour}時</span>)}</div>
-        </Card>
-        <Card title="初回返答まで">
-          <span className="big">{median == null ? "—" : median < 90 ? `${Math.round(median)}秒` : `${(median / 60).toFixed(1)}分`}</span>
-          <span className="small soft">障害通知から、承認済み返答を送信するまでの中央値</span>
-          <hr className="hairline" />
-          <div className="row between"><span className="soft">案内確認まで到達</span><span className="mid num">{pct(f.guided ?? 0, total)}%</span></div>
-          <div className="row between small"><span className="soft">警備員の出動依頼</span><span className="num">{data?.dispatched ?? 0}件</span></div>
-          <div className="row between small"><span className="soft">連絡が取れず終了</span><span className="num">{data?.abandoned ?? 0}件</span></div>
-        </Card>
-        <Card title="お客様の選択">
-          <div className="stack" style={gap(14)}>
-            {[["wait", "現地で待つ", "var(--blue)"], ["leave", "帰宅して連絡を待つ", "var(--violet)"]].map(([k, l, c]) => (
-              <div key={k} className="stack" style={gap(6)}>
-                <span className="row between"><span style={{ fontSize: 17 }}>{l}</span><span className="num soft">{pct(choices[k] ?? 0, chosen)}%</span></span>
-                <Meter value={choices[k] ?? 0} max={Math.max(1, chosen)} color={c} />
-              </div>
-            ))}
-          </div>
-          <span className="tiny muted">「待つ／帰る」を選べる返答を受けたお客様のみ</span>
-        </Card>
-      </div>
-      <p className="tiny muted" style={{ marginTop: 18 }}>件数のみを集計しています。お客様の言葉や個人を特定できる情報は表示しません。デモ環境の数値は合成データを含みます。</p>
-    </Shell>
+      </Panel>
+      <Panel title={INSIGHTS.choices}>
+        <div className="flex flex-col gap-4">
+          {Object.keys(DESK.choiceText).map((k) => (
+            <div key={k} className="flex flex-col gap-1.5">
+              <span className="flex justify-between text-[14px]"><span className="text-foreground">{DESK.choiceText[k]}</span><span className="num">{pct(choices[k] ?? 0, chosen)}%</span></span>
+              <Meter value={choices[k] ?? 0} max={Math.max(1, chosen)} />
+            </div>
+          ))}
+        </div>
+        <span className="text-[12px] text-muted-foreground">{INSIGHTS.choiceNote}</span>
+      </Panel>
+    </div>
   );
 }
+
+const Row = ({ label, value }: { label: string; value: string }) => (
+  <span className="flex justify-between border-t pt-1.5"><span>{label}</span><span className="num text-foreground">{value}</span></span>
+);

@@ -122,7 +122,7 @@ export const ACTOR: Record<string, string> = { device: "機械", caller: "お客
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
   switch (kind) {
-    case "fault": return `障害通知：${isFault(d.fault) ? FAULTS[d.fault].ja : "不明な障害"}${d.source === "simulator" ? "（模擬）" : ""}`;
+    case "fault": return `障害通知：${isFault(d.fault) ? FAULTS[d.fault].ja : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
     case "claimed": return "担当者が対応を開始";
     case "remote_release": return `遠隔解除を試行 → ${REMOTE_RELEASE[d.result ?? ""] ?? d.result}`;
@@ -221,32 +221,9 @@ export const UI = {
   },
 } satisfies Record<string, L10n>;
 
-// Staff sign-in (staff screens are Japanese).
-export const STAFF = {
-  email: "メール",
-  password: "パスワード",
-  signIn: "サインイン",
-  signOut: "サインアウト",
-  otherAccount: "別のアカウントで入る",
-  noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
-  demo: "デモ環境・架空のデータ",
-};
-
-// Landing page (English, for judges and visitors).
-export const HOME = {
-  badge: "Hackathon demo",
-  badgeStrong: "fictional bank, synthetic data",
-  title: "Say it once.",
-  lead: "When an ATM keeps your card, nobody in front of it should be left without words or without a next step. Ichido joins the machine's alert, the caller's own words and the operator's decision into one case, in the caller's language.",
-  open: "Open →",
-  footer: "The ATM is simulated by an ESP32 prop or an on-screen action. Nothing here connects to a real bank, ATM or security company. The assistant never asks for a PIN, card, account or ID number.",
-  roles: [
-    { href: "/operator", title: "監視センター", sub: "Operator console", body: "The machine's fault, the caller's own words, approved replies and dispatch on one screen." },
-    { href: "/s/TABLE-A", title: "Help Point", sub: "Caller · বাংলা / English / やさしい日本語", body: "Scan the sticker, enter the operator's code, say what happened in your language." },
-    { href: "/field", title: "警備員", sub: "Security guard", body: "Only your own assignments. One tap for on the way, arrived, done." },
-    { href: "/insights", title: "インサイト", sub: "Insights", body: "How cases flow from the machine alert to a caller who can explain their next step." },
-  ],
-};
+export * from "./staff";
+export * from "./numbers";
+export * from "./home";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {
@@ -268,8 +245,8 @@ export const STATION = {
 
 // Voice intake. Names every service the caller's voice or text can reach.
 export const VOICE = {
-  start: { bn: "🎙 কথা বলুন", en: "🎙 Speak", ja: "🎙 はなす" },
-  stop: { bn: "■ থামুন", en: "■ Stop", ja: "■ とめる" },
+  start: { bn: "কথা বলুন", en: "Speak", ja: "はなす" },
+  stop: { bn: "থামুন", en: "Stop", ja: "とめる" },
   notice: {
     bn: "কথা বললে আপনার কণ্ঠ LiveKit হয়ে Google-এর স্পিচ রিকগনিশনে যায়, আর আমার উত্তর Azure পড়ে শোনায়। লিখলে লেখা আমাদের সার্ভারে যায় (চালু থাকলে OpenAI-ও)। নম্বর বলবেন না।",
     en: "If you speak, your voice goes through LiveKit to Google speech recognition, and Azure reads my replies aloud. If you type, the text goes to our server (and to OpenAI if enabled). Please don't say any numbers.",
@@ -288,29 +265,6 @@ export const ERRORS: Record<string, L10n> = {
   server: { bn: "কিছু একটা ঠিকমতো হয়নি। আবার চেষ্টা করুন।", en: "Something went wrong. Please try again.", ja: "うまく いきませんでした。もう一度 おねがいします。" },
 };
 export const errorText = (code: string, lang: Lang) => (Object.hasOwn(ERRORS, code) ? ERRORS[code] : ERRORS.server)[lang];
-
-// Withhold any text that looks like a PIN, card, account or ID number before it leaves the server.
-// Catches digit runs (ASCII, Bengali, full-width) and four or more number words in a row.
-// ponytail: number words for bn/en/ja only; free speech still reaches the speech provider before this runs.
-const NUMBER_WORDS = new Set([
-  "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-  "শূন্য", "এক", "দুই", "তিন", "চার", "পাঁচ", "ছয়", "সাত", "আট", "নয়",
-  "ゼロ", "れい", "いち", "に", "さん", "よん", "し", "ご", "ろく", "なな", "しち", "はち", "きゅう", "く",
-  "零", "一", "二", "三", "四", "五", "六", "七", "八", "九",
-]);
-export function looksLikeNumber(text: string): boolean {
-  const normalised = text
-    .replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)))
-    .replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
-    .replace(/[\s\-‐-―ー.・,]/g, "");
-  if (/\d{4,}/.test(normalised)) return true;
-  let run = 0;
-  for (const w of text.toLowerCase().split(/[\s,、。.・\-]+/).filter(Boolean)) {
-    run = NUMBER_WORDS.has(w) ? run + 1 : 0;
-    if (run >= 4) return true;
-  }
-  return false;
-}
 
 // The sentence the assistant reads back, built from the current draft facts.
 export function readBackText(lang: Lang, facts: Record<FactKey, Fact>): string | null {

@@ -10,3 +10,5 @@ secrets.h
 __pycache__/
 .venv/
 supabase/.temp/
+.claude/
+.playwright-mcp/

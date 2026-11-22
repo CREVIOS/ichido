@@ -1,11 +1,16 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
+import { Phone } from "@/components/phone";
+import { Chip, Notice } from "@/components/kit";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LANGS, LANG_NAME, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
-const gap = (g: number) => ({ "--gap": `${g}px` }) as React.CSSProperties;
 
 // Neutral landing behind the Help Point sticker: scanning alone reveals nothing.
 export default function StationPage() {
@@ -48,34 +53,29 @@ function StationForm() {
   }
 
   return (
-    <main className="phone" lang={lang} style={{ justifyContent: "center" }}>
-      <div className="row">
-        <span className="row" style={gap(8)}><span className="brand-mark" aria-hidden>一</span><span style={{ fontWeight: 500 }}>ichido</span></span>
-        <span className="grow" />
-        <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} style={{ width: "auto" }} aria-label={LANG_NAME[lang]}>
-          {LANGS.map((l) => <option key={l} value={l}>{LANG_NAME[l]}</option>)}
-        </select>
-      </div>
-      <span className="tag">Help Point · <b className="mono">{station}</b></span>
-      <h1>{STATION.title[lang]}</h1>
+    <Phone lang={lang} center right={<Chip>Help Point · <span className="mono">{station}</span></Chip>}>
+      <ToggleGroup value={[lang]} onValueChange={(v: string[]) => v[0] && setLang(v[0] as Lang)} className="w-full rounded-lg bg-secondary p-0.5">
+        {LANGS.map((l) => <ToggleGroupItem key={l} value={l} lang={l} className="h-9 flex-1 rounded-md text-[14px] data-[pressed]:bg-card data-[pressed]:text-foreground data-[pressed]:shadow-xs">{LANG_NAME[l]}</ToggleGroupItem>)}
+      </ToggleGroup>
+      <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (
-        <section className="card">
-          <p>{STATION.staffSession[lang]}</p>
-          <button className="btn dark block" onClick={async () => { await sb().auth.signOut(); setStaffSession(false); }}>{STATION.signOutStaff[lang]}</button>
-        </section>
+        <div className="flex flex-col gap-3">
+          <Notice tone="warn">{STATION.staffSession[lang]}</Notice>
+          <Button size="lg" onClick={async () => { await sb().auth.signOut(); setStaffSession(false); }}>{STATION.signOutStaff[lang]}</Button>
+        </div>
       ) : (
-        <form className="card" onSubmit={connect}>
-          <label className="stack" style={gap(6)}>
-            <span className="field-label">{STATION.code[lang]}</span>
-            <input type="text" inputMode="text" autoCapitalize="characters" autoComplete="off" value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())} className="mono"
-              style={{ fontSize: 30, letterSpacing: "0.2em", textAlign: "center" }} maxLength={CODE_LENGTH} required />
-          </label>
-          {error && <p className="notice">{error}</p>}
-          <button className="btn dark block" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</button>
+        <form className="flex flex-col gap-4" onSubmit={connect}>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="code">{STATION.code[lang]}</Label>
+            <input id="code" type="text" inputMode="text" autoCapitalize="characters" autoComplete="one-time-code" value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={CODE_LENGTH} required
+              className="h-16 w-full rounded-xl border bg-card text-center font-mono text-[32px] tracking-[0.3em] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40" />
+          </div>
+          {error && <Notice tone="warn">{error}</Notice>}
+          <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
         </form>
       )}
-      <p className="small soft">{STATION.why[lang]}</p>
-    </main>
+      <p className="flex gap-2 text-[13px] leading-5"><ShieldCheck className="mt-0.5 size-4 shrink-0 stroke-[1.5]" />{STATION.why[lang]}</p>
+    </Phone>
   );
 }

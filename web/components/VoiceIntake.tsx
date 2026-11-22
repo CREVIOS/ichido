@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
+import { Mic, Square } from "lucide-react";
 import { sb } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 import { VOICE, type Lang } from "@/content/catalogue";
 
 export type SignedSpeech = { text: string; sig: string };
@@ -85,17 +87,17 @@ export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text
   }
 
   return (
-    <div className="stack" style={{ "--gap": "6px" } as React.CSSProperties}>
-      <p className="tiny muted">{VOICE.notice[lang]}</p>
+    <div className="flex flex-col gap-2">
       {state === "live" ? (
-        <button className="btn dark block" onClick={stop}>{VOICE.stop[lang]}</button>
+        <Button size="lg" className="h-12 text-[16px]" onClick={stop}><Square className="fill-current" />{VOICE.stop[lang]}</Button>
       ) : (
-        <button className="btn blue block" disabled={state === "connecting"} onClick={start}>
-          {state === "connecting" ? VOICE.connecting[lang] : VOICE.start[lang]}
-        </button>
+        <Button size="lg" className="h-12 text-[16px]" disabled={state === "connecting"} onClick={start}>
+          <Mic className="stroke-[1.5]" />{state === "connecting" ? VOICE.connecting[lang] : VOICE.start[lang]}
+        </Button>
       )}
-      {state === "live" && <p className="small soft">{partial || VOICE.hearing[lang]}</p>}
-      {state === "unavailable" && <p className="small soft">{VOICE.unavailable[lang]}</p>}
+      {state === "live" && <p className="flex items-center gap-2 text-[15px] text-foreground"><span className="dot" data-s="live" />{partial || VOICE.hearing[lang]}</p>}
+      {state === "unavailable" && <p className="text-[14px]">{VOICE.unavailable[lang]}</p>}
+      <p className="text-[12px] leading-5 text-muted-foreground">{VOICE.notice[lang]}</p>
       <div ref={audio} hidden />
     </div>
   );

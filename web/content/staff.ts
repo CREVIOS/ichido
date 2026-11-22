@@ -1,0 +1,162 @@
+// Staff screens (Japanese): console, guard, insights, sign-in.
+
+// Staff sign-in (staff screens are Japanese).
+export const STAFF = {
+  email: "メール",
+  password: "パスワード",
+  signIn: "サインイン",
+  signOut: "サインアウト",
+  otherAccount: "別のアカウントで入る",
+  noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
+  signInLead: "スタッフ用アカウントでサインインしてください。アカウントは管理者が発行します。",
+  menu: "メニュー",
+  roleName: { operator: "オペレーター", field: "警備員", manager: "マネージャー" } as Record<string, string>,
+};
+
+// Staff navigation, per role.
+export const NAV = {
+  operator: "監視センター",
+  insights: "インサイト",
+  field: "割当",
+};
+
+// Errors staff can see, by the stable code the server returns.
+export const STAFF_ERRORS: Record<string, string> = {
+  conflict: "状態が変わったか、条件を満たしていません。画面を更新しました。",
+  forbidden: "この操作はできません。",
+  not_found: "案件が見つかりません。",
+  bad_request: "入力が正しくありません。",
+  rate_limited: "操作が多すぎます。しばらく待ってから再度お試しください。",
+  server: "サーバーエラーが発生しました。",
+};
+export const staffError = (code: string) => (Object.hasOwn(STAFF_ERRORS, code) ? STAFF_ERRORS[code] : STAFF_ERRORS.server);
+
+// Operator console.
+export const DESK = {
+  title: "監視センター",
+  queue: "対応中",
+  recent: "最近の案件",
+  empty: "対応中の案件はありません。Help Point のボタンが押されるか、受話器での申告を手動で登録すると、ここに表示されます。",
+  pickCase: "左の一覧から案件を選んでください。",
+  manualFault: "障害を手動登録",
+  manualFaultAt: (label: string) => `受話器での申告を登録：${label}`,
+  minutesAgo: (n: number) => (n < 1 ? "たった今" : n < 60 ? `${n}分前` : `${Math.floor(n / 60)}時間前`),
+  open: (n: number) => `${n}件`,
+  facts: { atm: "ATM", fault: "障害", release: "遠隔解除", source: "経路", at: "受付" },
+  source: { device: "Help Point", simulator: "手動登録" } as Record<string, string>,
+  releaseNone: "未実施",
+  caseMenu: "案件の操作",
+  recordRelease: { failed: "遠隔解除の結果を記録：失敗", released: "遠隔解除の結果を記録：成功" } as Record<string, string>,
+  resetCaller: "お客様の接続をリセット",
+  abandon: "案件を終了（お客様と連絡が取れない）",
+  callerWords: "お客様のことば",
+  wantsHuman: "担当者との会話を希望",
+  awaitingConfirm: "お客様が内容を確認しています。確認後にここに表示されます。",
+  notPaired: "お客様はまだ多言語窓口に接続していません。",
+  clarifying: "AI が確認の質問をしています。",
+  original: (lang: string) => `原文 · ${lang}`,
+  choiceOnly: "（選択肢で回答）",
+  confirmed: "お客様が確認した内容",
+  rev: (n: number) => `版 ${n}`,
+  choice: "お客様の選択",
+  choiceText: { wait: "現地で待つ", leave: "帰宅し連絡を待つ" } as Record<string, string>,
+  timeline: "経過",
+  record: "対応記録",
+  recordDraft: "自動作成・要確認",
+  closed: "完了",
+  closedAbandoned: "お客様と連絡が取れないため終了しました。",
+  closedDone: "この案件は完了しています。",
+  abandonedChip: "終了（連絡なし）",
+  unclaimed: "未担当",
+  unclaimedBody: "担当すると、多言語窓口のコード発行と返答の送信ができます。",
+  claim: "この案件を担当する",
+  otherOperator: "他の担当者が対応中",
+  otherOperatorBody: "この案件は別のオペレーターが担当しています。",
+  unknownFault: "不明な障害",
+  teach: {
+    title: "お客様が説明した「次の手順」",
+    mt: "機械翻訳",
+    noMt: (lang: string) => `翻訳なし：${lang}が分かる担当者に確認してください。`,
+    stale: "この説明は以前の返答に対するものです。",
+    understood: "理解を確認できた",
+    clarify: "再案内が必要",
+  },
+  pair: {
+    title: "多言語窓口",
+    validity: "5分・1回",
+    body: "日本語で説明が難しいお客様に、このコードを伝えます。お客様は Help Point の QR から入力します。",
+    issue: "接続コードを発行",
+    reissue: "コードを再発行",
+    expires: (s: number) => `あと ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`,
+  },
+  reply: {
+    title: "承認済み返答",
+    slotsNote: (lang: string) => `支店名と窓口時間は、送信時にこのATMの登録情報から差し込まれます。お客様には ${lang} で届きます。`,
+    send: "お客様へ送信",
+    awaiting: "お客様の確認待ち",
+    mismatch: "お客様の申告または遠隔解除の結果と合いません",
+    sent: (n: number) => `送信済み ${n}件`,
+    toast: "お客様へ送信しました",
+  },
+  dispatch: {
+    title: "取次・出動依頼",
+    guard: "警備員",
+    eta: (eta: string) => `到着目安 ${eta.replace("-", "〜")}分（警備員の見込み）`,
+    etaUnknown: "到着目安：未定",
+    body: "警備会社へ現地確認を依頼します。カードの扱いは銀行所定の手続きによります。",
+    assign: (name: string, again: boolean) => `${name} へ${again ? "再依頼" : "依頼"}`,
+    callerSees: (t: string) => `お客様の画面：${t}`,
+    noGuards: "依頼できる警備員が登録されていません。",
+  },
+  device: {
+    title: "Help Point",
+    online: "オンライン",
+    offline: "応答なし",
+    never: "未接続",
+    lastSeen: (m: number) => `最終通信 ${m < 1 ? "1分以内" : `${m}分前`}`,
+    signal: (rssi: number) => `電波 ${rssi} dBm`,
+  },
+};
+
+// Security guard's assignments.
+export const FIELD = {
+  title: "割当",
+  none: "現在、割当はありません。新しい依頼はここに自動で表示されます。",
+  etaLabel: "到着目安（あなたの見込み）",
+  etaUnknown: "未定",
+  etaOption: (v: string) => `${v.replace("-", "〜")}分`,
+  etaTag: "到着目安",
+  onWay: "向かっています",
+  arrived: "到着",
+  done: "対応完了",
+  note: "本人確認・カードの返却はこの画面では扱いません。カードの扱いは銀行所定の手続きによります。",
+  changed: "この割当は変更されました。",
+  failed: "更新できませんでした。",
+};
+
+// Insights board (counts only).
+export const INSIGHTS = {
+  title: "インサイト",
+  period: (d: number) => `直近${d}日`,
+  flow: "案件の流れ",
+  flowNote: "障害通知から「お客様が次の手順を自分の言葉で説明」まで。各段階は前の段階を通過した案件のみを数えます。",
+  conversion: "通過率",
+  count: (n: number) => `${n.toLocaleString()}件`,
+  received: "受付件数",
+  noData: "まだデータがありません",
+  noLang: "多言語窓口を使わず",
+  perDay: "日別の受付",
+  hours: "時間帯",
+  peak: "ピーク",
+  hour: (h: number) => `${h}時`,
+  hourRange: (a: number, b: number) => `${a}〜${b}時`,
+  firstReply: "初回返答まで",
+  firstReplyNote: "障害通知から、承認済み返答を送信するまでの中央値",
+  duration: (s: number) => (s < 90 ? `${Math.round(s)}秒` : `${(s / 60).toFixed(1)}分`),
+  guidedRate: "案内確認まで到達",
+  dispatched: "警備員の出動依頼",
+  abandoned: "連絡が取れず終了",
+  choices: "お客様の選択",
+  choiceNote: "「待つ／帰る」を選べる返答を受けたお客様のみ",
+  privacy: "件数のみを集計しています。お客様の言葉や個人を特定できる情報は表示しません。",
+};
