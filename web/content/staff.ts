@@ -54,8 +54,6 @@ export const staffError = (code: string) => (Object.hasOwn(STAFF_ERRORS, code) ?
 
 // Response-time targets for the queue. Amber at WARN of the target, red once it passes.
 export const SLA = {
-  claimS: 60,
-  firstReplyS: 180,
   warn: 0.75,
   label: { claim: "担当まで", reply: "初回返答まで" } as Record<string, string>,
   late: (m: number) => `${m}分超過`,
@@ -66,6 +64,8 @@ export const SLA = {
 export const DESK = {
   title: "監視センター",
   alerts: "新着案件の通知",
+  escalations: (n: number) => `エスカレーション ${n}件`,
+  escalationReason: { unclaimed: "担当者未決定", no_reply: "初回返答の遅れ", guard_late: "警備員の出発連絡待ち" } as Record<string, string>,
   newCase: (station: string) => `新しい案件：${station}`,
   alertsStorage: "通知設定を保存できません。このタブにのみ適用します。",
   alertsSound: "通知音を再生できません。",

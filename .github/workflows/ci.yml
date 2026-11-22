@@ -1,0 +1,120 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
+      SUPABASE_SECRET_KEY: placeholder
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx next typegen && npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run check:ja
+      - run: npm run build
+
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.114.0
+      - run: supabase start -x studio,mailpit,storage-api,imgproxy,postgres-meta,edge-runtime,logflare,vector,supavisor > /dev/null
+      - name: Configure local test credentials
+        run: |
+          umask 077
+          supabase status -o json | jq -er '
+            "NEXT_PUBLIC_SUPABASE_URL=" + .API_URL,
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=" + .PUBLISHABLE_KEY,
+            "SUPABASE_SECRET_KEY=" + .SECRET_KEY' > web/.env.local
+          echo 'DEVICE_SECRETS_JSON={"TABLE-A":"local-device-secret"}' >> web/.env.local
+      - run: npm ci
+        working-directory: web
+      - name: Run web integration tests
+        working-directory: web
+        env:
+          APP: http://localhost:3127
+        run: |
+          npm run dev -- --hostname 127.0.0.1 --port 3127 > "$RUNNER_TEMP/ichido-dev.log" 2>&1 &
+          curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 2 "$APP/api/health"
+          npm test
+      - name: Show web log on failure
+        if: failure()
+        run: test ! -f "$RUNNER_TEMP/ichido-dev.log" || tail -100 "$RUNNER_TEMP/ichido-dev.log"
+
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: agent/uv.lock
+      - run: uv sync --locked
+      - run: uv run python -m unittest
+
+  firmware:
+    runs-on: ubuntu-latest
+    env:
+      ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      ESP32_VERSION: 3.3.9
+      WIFIMANAGER_VERSION: 2.0.17
+    steps:
+      - uses: actions/checkout@v6
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: 1.6.0
+      - uses: actions/cache@v4
+        id: cores
+        with:
+          path: |
+            ~/.arduino15/packages
+            ~/Arduino/libraries
+          key: arduino-${{ runner.os }}-${{ runner.arch }}-esp32-${{ env.ESP32_VERSION }}-wifi-${{ env.WIFIMANAGER_VERSION }}
+      - run: arduino-cli core update-index
+      - if: steps.cores.outputs.cache-hit != 'true'
+        run: |
+          arduino-cli core install "esp32:esp32@$ESP32_VERSION"
+          arduino-cli lib install "WiFiManager@$WIFIMANAGER_VERSION"
+      - run: |
+          cp firmware/help_point/secrets.example.h firmware/help_point/secrets.h
+          arduino-cli compile --fqbn esp32:esp32:esp32 firmware/help_point
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit

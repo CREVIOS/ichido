@@ -6,11 +6,12 @@ import { useLive } from "@/lib/live";
 import { usePresence } from "@/lib/presence";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Dot, MoreMenu, Notice } from "@/components/kit";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CASES, DESK, DEVICE_FAULT, FAULTS, STAFF, isFault, staffError } from "@/content/catalogue";
 import { CaseAlerts } from "./alerts";
 import { CaseView } from "./case";
 import { Peers, Queue, useClock, useQueueKeys } from "./queue";
-import type { Desk, Run, Station } from "./types";
+import type { Desk, OpenDesk, Run, Station, Targets } from "./types";
 
 const HISTORY = 12;
 const hashId = () => window.location.hash.slice(1);
@@ -26,7 +27,7 @@ export default function OperatorPage() {
 }
 
 type Snapshot = {
-  open: Desk[]; done: Desk[]; stations: Station[]; replied: Set<string>; selection: string; archived: Desk | null;
+  open: OpenDesk[]; done: Desk[]; stations: Station[]; targets: Targets; selection: string; archived: Desk | null;
 };
 
 function useDesk(sel: string) {
@@ -36,17 +37,18 @@ function useDesk(sel: string) {
   // Open cases are fetched on their own so no amount of history can push one out of the queue.
   const load = useCallback(async (signal: AbortSignal) => {
     const db = sb();
-    const [o, h, s] = await Promise.all([
-      db.from("desk").select("*").is("finished_at", null).order("created_at").abortSignal(signal),
+    const [o, h, s, t] = await Promise.all([
+      db.from("desk").select("*, escalation(reason), reply(id), case_event(at)").is("finished_at", null)
+        .eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
+        .limit(1, { referencedTable: "case_event" }).limit(1, { referencedTable: "reply" }).order("created_at").abortSignal(signal),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY).abortSignal(signal),
       db.from("station").select("id, label").order("id").abortSignal(signal),
+      db.schema("ichido").from("sla_target").select("reason, seconds").abortSignal(signal),
     ]);
     if (signal.aborted) return;
-    if (o.error || h.error || s.error) { setFailed(true); return; }
-    const queue = o.data as Desk[];
+    if (o.error || h.error || s.error || t.error) { setFailed(true); return; }
+    const queue = o.data as OpenDesk[];
     const recent = h.data as Desk[];
-    // Which open cases already have a reply, for the first-reply target.
-    const r = queue.length ? await db.from("reply").select("incident").in("incident", queue.map((c) => c.id)).abortSignal(signal) : { data: [], error: null };
     let archived: Desk | null = null;
     if (sel && ![...queue, ...recent].some((row) => row.id === sel)) {
       const valid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(sel);
@@ -56,11 +58,11 @@ function useDesk(sel: string) {
       archived = (row?.data ?? null) as Desk | null;
     }
     if (signal.aborted) return;
-    const replied = new Set(((r.data ?? []) as { incident: string }[]).map((x) => x.incident));
-    setSnapshot({ open: queue, done: recent, stations: s.data as Station[], replied, selection: sel, archived });
+    const targets: Targets = Object.fromEntries(t.data.map((row) => [row.reason, row.seconds]));
+    setSnapshot({ open: queue, done: recent, stations: s.data as Station[], targets, selection: sel, archived });
     setFailed(false);
   }, [sel]);
-  useLive(["desk", "reply"], load);
+  useLive(["desk", "reply", "escalation"], load);
 
   return { snapshot, failed };
 }
@@ -70,6 +72,7 @@ function Console({ me }: { me: Me }) {
   const { snapshot, failed } = useDesk(sel);
   const now = useClock();
   const open = snapshot?.open ?? null;
+  const escalated = open?.filter((c) => c.escalation.length) ?? [];
   const label = useMemo<Record<string, string>>(() => Object.fromEntries((snapshot?.stations ?? []).map((s) => [s.id, s.label.ja])), [snapshot]);
   const listed = snapshot && [...snapshot.open, ...snapshot.done].find((row) => row.id === sel);
   const current = sel ? listed ?? (snapshot?.selection === sel ? snapshot.archived : null) : open?.[0];
@@ -93,10 +96,20 @@ function Console({ me }: { me: Me }) {
       commands={commands}
       nav={navFor(me.role, { "/operator": open?.length })}
       footer={<><Peers peers={peers} /><MeFooter me={me} /></>}
-      side={snapshot && <Queue open={snapshot.open} done={snapshot.done} replied={snapshot.replied} now={now} label={label} current={current?.id} onPick={select} />}
+      side={snapshot && <Queue open={snapshot.open} done={snapshot.done} targets={snapshot.targets} now={now} label={label} current={current?.id} onPick={select} />}
       crumb={DESK.title}
       title={current ? (label[current.station] ?? current.station) : DESK.queue}
       actions={<>
+        {escalated.length > 0 && <DropdownMenu>
+          <DropdownMenuTrigger className="rounded-md border border-alert px-2 py-1 text-sm font-medium text-alert">
+            {DESK.escalations(escalated.length)}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-max max-w-screen">
+            {escalated.map((c) => <DropdownMenuItem key={c.id} onClick={() => select(c.id)}>
+              {label[c.station] ?? c.station} · {c.escalation.map((e) => DESK.escalationReason[e.reason]).join("・")}
+            </DropdownMenuItem>)}
+          </DropdownMenuContent>
+        </DropdownMenu>}
         {watching.length > 0 && <span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:inline-flex"><Dot s="live" />{DESK.alsoViewing(watching.join("・"))}</span>}
         <CaseAlerts open={open} labels={label} />
         <MoreMenu label={DESK.manualFault} items={stations.map((s) => ({ label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) }))} />

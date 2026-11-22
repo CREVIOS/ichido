@@ -2,6 +2,9 @@
 // Operators can send only intents in REPLIES; callers see the pre-written text in their language.
 // Bengali and Japanese below are drafts awaiting native review (see README).
 
+import { MOBILE_STAFF } from "./mobile.ts";
+import { DESK } from "./staff.ts";
+
 export const MANUAL_VERSION = "retained-card/v1";
 
 export const LANGS = ["bn", "en", "ja"] as const;
@@ -16,15 +19,15 @@ export const LANG_LOCALE: L10n = { bn: "bn-BD", en: "en-US", ja: "ja-JP" };
 export const pick = (v: unknown, lang: Lang): string => (v && typeof v === "object" ? (v as L10n)[lang] ?? "" : "");
 
 export const STATUS: Record<Status, L10n> = {
-  received: { ja: "お問い合わせを受け付けました", bn: "আপনার অনুরোধ পাওয়া গেছে", en: "Request received" },
-  review: { ja: "担当者が確認中です", bn: "একজন কর্মী দেখছেন", en: "An operator is reviewing" },
-  field: { ja: "現地確認を依頼しました", bn: "ঘটনাস্থলে পরীক্ষার অনুরোধ পাঠানো হয়েছে", en: "Site check requested" },
-  guided: { ja: "案内を確認しました", bn: "নির্দেশনা নিশ্চিত হয়েছে", en: "Guidance confirmed" },
+  received: { ja: "そうだんを うけつけました", bn: "আপনার অনুরোধ পাওয়া গেছে", en: "Request received" },
+  review: { ja: "係の 人が しらべて います", bn: "একজন কর্মী দেখছেন", en: "An operator is reviewing" },
+  field: { ja: "けいびの 人に ATM に 来て たしかめるよう たのみました", bn: "ঘটনাস্থলে পরীক্ষার অনুরোধ পাঠানো হয়েছে", en: "Site check requested" },
+  guided: { ja: "つぎに することを いっしょに たしかめました", bn: "নির্দেশনা নিশ্চিত হয়েছে", en: "Guidance confirmed" },
 };
 
 // Machine faults the monitoring side can report. The device button sends DEVICE_FAULT.
 export const FAULTS: Record<string, L10n> = {
-  card_retained: { ja: "取引後にカードが排出されない", bn: "লেনদেনের পরে কার্ড বের হয়নি", en: "Card not returned after the transaction" },
+  card_retained: { ja: "ATM を つかった あと、カードが でてこない", bn: "লেনদেনের পরে কার্ড বের হয়নি", en: "Card not returned after the transaction" },
 };
 export const DEVICE_FAULT = "card_retained";
 export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
@@ -35,15 +38,15 @@ export const REMOTE_RELEASE: Record<string, string> = { failed: "失敗", releas
 export const FACTS = {
   card_back: {
     question: { bn: "কার্ড কি ফেরত এসেছে?", en: "Did the card come back out?", ja: "カードは でてきましたか？" },
-    yes: { ja: "カードは戻ってきたとのこと", bn: "কার্ড ফেরত এসেছে", en: "The card came back" },
-    no: { ja: "カードは戻ってきていないとのこと", bn: "কার্ড ফেরত আসেনি", en: "The card did not come back" },
-    unknown: { ja: "不明", bn: "জানা নেই", en: "Unknown" },
+    yes: { ja: "カードは でてきた と ききました", bn: "কার্ড ফেরত এসেছে", en: "The card came back" },
+    no: { ja: "カードは でてこなかった と ききました", bn: "কার্ড ফেরত আসেনি", en: "The card did not come back" },
+    unknown: { ja: "わからない", bn: "জানা নেই", en: "Unknown" },
   },
   cash_received: {
     question: { bn: "টাকা কি পেয়েছেন?", en: "Did you get the cash?", ja: "お金は うけとりましたか？" },
-    yes: { ja: "現金は受け取ったとのこと（本人申告）", bn: "টাকা পেয়েছেন", en: "The cash was received" },
-    no: { ja: "現金は受け取っていないとのこと（本人申告）", bn: "টাকা পাননি", en: "The cash was not received" },
-    unknown: { ja: "不明", bn: "জানা নেই", en: "Unknown" },
+    yes: { ja: "お金は うけとった と ききました", bn: "টাকা পেয়েছেন", en: "The cash was received" },
+    no: { ja: "お金は うけとって いない と ききました", bn: "টাকা পাননি", en: "The cash was not received" },
+    unknown: { ja: "わからない", bn: "জানা নেই", en: "Unknown" },
   },
 } as const;
 export type FactKey = keyof typeof FACTS;
@@ -56,11 +59,11 @@ export const ANSWER: Record<Fact, L10n> = {
 export const SENTENCE_SEP: L10n = { bn: "। ", en: ". ", ja: "。" };
 
 export const FIELD_STATE: Record<FieldState, L10n> = {
-  none: { ja: "未依頼", bn: "", en: "" },
-  requested: { ja: "現地確認を依頼しました", bn: "নিরাপত্তাকর্মী পাঠানোর অনুরোধ করা হয়েছে", en: "A security staff visit was requested" },
-  on_way: { ja: "警備員が向かっています", bn: "নিরাপত্তাকর্মী আসছেন", en: "Security staff are on the way" },
-  arrived: { ja: "警備員が到着しました", bn: "নিরাপত্তাকর্মী পৌঁছেছেন", en: "Security staff have arrived" },
-  done: { ja: "現地対応完了（カードの扱いは銀行所定の手続き）", bn: "ঘটনাস্থলের কাজ শেষ। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে", en: "On-site work is finished. The card is handled by the bank's own procedure" },
+  none: { ja: "まだ たのんで いません", bn: "", en: "" },
+  requested: { ja: "けいびの 人に ATM に 来て たしかめるよう たのみました", bn: "নিরাপত্তাকর্মী পাঠানোর অনুরোধ করা হয়েছে", en: "A security staff visit was requested" },
+  on_way: { ja: "けいびの 人が こちらに むかって います", bn: "নিরাপত্তাকর্মী আসছেন", en: "Security staff are on the way" },
+  arrived: { ja: "けいびの 人が つきました", bn: "নিরাপত্তাকর্মী পৌঁছেছেন", en: "Security staff have arrived" },
+  done: { ja: "けいびの 人の しごとは おわりました。カードは 銀行の きまりに そって あつかいます", bn: "ঘটনাস্থলের কাজ শেষ। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে", en: "On-site work is finished. The card is handled by the bank's own procedure" },
 };
 
 // The guard's own estimate. Options the guard can pick; empty = unknown.
@@ -68,9 +71,9 @@ export const ETA_OPTIONS = ["10-20", "20-30", "30-45", "45-60", ""];
 const BN_DIGITS = "০১২৩৪৫৬৭৮৯";
 export const toBn = (s: string) => s.replace(/[0-9]/g, (d) => BN_DIGITS[Number(d)]);
 export function etaText(eta: string | null | undefined, lang: Lang): string {
-  if (!eta) return { ja: "到着目安は未定です", bn: "আনুমানিক সময় এখনো জানা নেই", en: "Arrival time is not known yet" }[lang];
+  if (!eta) return { ja: "いつ つくかは まだ わかりません", bn: "আনুমানিক সময় এখনো জানা নেই", en: "Arrival time is not known yet" }[lang];
   return {
-    ja: `到着目安 ${eta.replace("-", "〜")}分（警備員の見込み・変わることがあります）`,
+    ja: `あと ${eta.replace("-", "〜")}分くらいで つきます（けいびの 人の よそうです。かわる ことも あります）`,
     bn: `আনুমানিক ${toBn(eta)} মিনিট (কর্মীর নিজের অনুমান, বদলাতে পারে)`,
     en: `About ${eta.replace("-", "–")} minutes (the guard's own estimate; it may change)`,
   }[lang];
@@ -88,7 +91,7 @@ export const REPLIES: Record<string, Reply> = {
     offersChoice: true,
     needsHeld: true,
     text: (s) => ({
-      ja: `カードは機械の中にあります。ここでお待ちいただくか、お帰りいただくかを選べます。お帰りの場合は銀行からご連絡します。カードの扱いは銀行所定の手続きによります。${s.branch?.ja}の窓口（${s.hours?.ja}）でもご案内できます。`,
+      ja: `カードは ATM の 中に あります。ここで まっても、かえっても いいです。かえった ときは 銀行から れんらくします。カードは 銀行の きまりに そって あつかいます。${s.branch?.ja} の まどぐちでも きけます。あいて いるのは ${s.hours?.ja} です。`,
       bn: `আপনার কার্ড মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${s.branch?.bn}-এর কাউন্টারেও (${s.hours?.bn}) জানতে পারবেন।`,
       en: `Your card is inside the machine. You can wait here, or you can leave. If you leave, the bank will contact you. The card is handled under the bank's own procedure. The ${s.branch?.en} counter (${s.hours?.en}) can also help.`,
     }),
@@ -97,7 +100,7 @@ export const REPLIES: Record<string, Reply> = {
     code: "A-6",
     title: "ATMの受話器で状況を確認",
     text: () => ({
-      ja: "ここで状況を確認したいときは、ATMに備え付けの受話器をお使いください。",
+      ja: "いま どうなって いるか ききたい ときは、ATM に ついて いる 電話を つかって ください。",
       bn: "এখানে পরিস্থিতির খবর জানতে চাইলে এটিএমে লাগানো ফোনের রিসিভারটি ব্যবহার করুন।",
       en: "To ask for an update here, use the handset built into the ATM.",
     }),
@@ -106,7 +109,7 @@ export const REPLIES: Record<string, Reply> = {
     code: "A-7",
     title: "銀行の公式窓口へ",
     text: () => ({
-      ja: "銀行に問い合わせるときは、銀行の公式窓口をご利用ください。",
+      ja: "銀行に ききたい ときは、銀行が きめた まどぐちに れんらくして ください。",
       bn: "ব্যাংকের সঙ্গে যোগাযোগ করতে হলে ব্যাংকের অফিসিয়াল যোগাযোগের মাধ্যম ব্যবহার করুন।",
       en: "To contact the bank, use the bank's official contact channel.",
     }),
@@ -134,6 +137,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "fault": return `障害通知：${isFault(d.fault) ? FAULTS[d.fault].ja : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
     case "claimed": return "担当者が対応を開始";
+    case "escalated": return `エスカレーション（レベル${d.level}）：${DESK.escalationReason[d.reason ?? ""] ?? "対応期限を超過"}`;
     case "remote_release": return `遠隔解除を試行 → ${REMOTE_RELEASE[d.result ?? ""] ?? d.result}`;
     case "confirmed": return `お客様が内容を確認（${FACTS.card_back[(d.card_back ?? "unknown") as Fact].ja}／${FACTS.cash_received[(d.cash_received ?? "unknown") as Fact].ja}）`;
     case "reply": return `承認済み返答を送信：${replyOf(d.intent)?.code ?? ""} ${replyOf(d.intent)?.title ?? d.intent}`;
@@ -178,12 +182,12 @@ export const UI = {
   aiNotice: {
     bn: "আমি একটি AI সহকারী। আপনার কথা জাপানি অপারেটরের কাছে পৌঁছে দেব। সিদ্ধান্ত নেবেন একজন মানুষ।",
     en: "I'm an AI assistant. I pass what you say to a Japanese operator. A person makes every decision.",
-    ja: "わたしは AI の アシスタントです。あなたの 話を 係の 人に つたえます。決めるのは 人です。",
+    ja: "わたしは AI です。あなたの 話を 日本語を 話す 係の 人に つたえます。どうするかは 人が 決めます。",
   },
   neverAsk: {
     bn: "আমি কখনো PIN, কার্ড নম্বর, অ্যাকাউন্ট নম্বর বা আইডি নম্বর জিজ্ঞাসা করব না।",
     en: "I will never ask for your PIN, card number, account number or ID number.",
-    ja: "暗証番号・カード番号・口座番号・身分証の番号は ききません。",
+    ja: "暗証番号（あんしょうばんごう）は ききません。カードや 銀行の こうざの 番号、身分を しめす ものの 番号も ききません。",
   },
   whatHappened: { bn: "কী হয়েছে, নিজের ভাষায় লিখুন", en: "Tell us what happened, in your own words", ja: "なにが あったか 書いてください" },
   understood: { bn: "আমি যা বুঝেছি", en: "What I understood", ja: "わかったこと" },
@@ -199,7 +203,7 @@ export const UI = {
     en: "That looked like a number, so it was not sent. Please try again without numbers.",
     ja: "番号のような ものが あったので おくっていません。番号なしで もう一度 おねがいします。",
   },
-  approved: { bn: "অপারেটর · ব্যাংকের অনুমোদিত বার্তা", en: "Operator · the bank's approved message", ja: "係の 人 ・ 銀行の きまった 文" },
+  approved: { bn: "অপারেটর · ব্যাংকের অনুমোদিত বার্তা", en: "Operator · the bank's approved message", ja: "係の 人からの おしらせ（銀行が きめた 文）" },
   listen: { bn: "শুনুন", en: "Listen", ja: "きく" },
   waitOrLeave: { bn: "আপনি কী করবেন?", en: "What would you like to do?", ja: "どうしますか？" },
   wait: { bn: "অপেক্ষা করব", en: "I'll wait", ja: "まつ" },
@@ -214,9 +218,9 @@ export const UI = {
     ja: "係の 人に つたえました。いま はなしたい ときは ATM の 受話器を つかって ください。",
   },
   rateTitle: { bn: "আজকের সাহায্য কেমন ছিল?", en: "How was the help today?", ja: "きょうの たすけは どうでしたか？" },
-  rateThanks: { bn: "ধন্যবাদ। আপনার উত্তর সংরক্ষিত হয়েছে।", en: "Thank you. Your answer has been saved.", ja: "ありがとう ございました。" },
+  rateThanks: { bn: "ধন্যবাদ। আপনার উত্তর সংরক্ষিত হয়েছে।", en: "Thank you. Your answer has been saved.", ja: "こたえて くれて ありがとう。あなたの こたえを 記録しました。" },
   showStaff: { bn: "জাপানি কর্মীকে দেখান", en: "Show to staff", ja: "係の 人に みせる" },
-  caseNo: { bn: "কেস নম্বর", en: "Case", ja: "案件番号" },
+  caseNo: { bn: "কেস নম্বর", en: "Case", ja: "この そうだんの 番号" },
   waiting: {
     bn: "অপারেটর এখনো আপনার বিষয়টি দেখছেন। জরুরি হলে এটিএমে লাগানো ফোনের রিসিভারটি ব্যবহার করুন।",
     en: "The operator is still looking at your case. If it is urgent, use the handset built into the ATM.",
@@ -230,14 +234,30 @@ export const UI = {
   helpDesk: {
     bn: "আরও সাহায্য: নাগাসাকি প্রিফেকচারের বিদেশি বাসিন্দা পরামর্শ কেন্দ্র — বাংলাসহ ২২টি ভাষায়, সোম–শুক্র ৯:০০–১৬:০০ (জাপান সময়)।",
     en: "More help: Nagasaki Prefecture's foreign residents' consultation desk — 22 languages including Bengali, weekdays 9:00–16:00 (Japan time).",
-    ja: "そのほかの そうだん：長崎県外国人相談窓口（22言語・平日 9:00〜16:00）。",
+    ja: "長崎県には 外国から 来た 人の そうだん まどぐちも あります。ベンガル語など 22の ことばで 話せます。げつようびから きんようびの 9時から 16時までです（日本の 時間）。",
   },
 } satisfies Record<string, L10n>;
 
-export * from "./staff";
-export * from "./numbers";
-export * from "./home";
-export * from "./mobile";
+export * from "./staff.ts";
+export * from "./numbers.ts";
+export * from "./home.ts";
+export const MOBILE_CALLER = {
+  entry: {
+    caller: { ja: "そうだんする 人", en: "Caller" },
+    staff: { ja: "ここで はたらく 人", en: "Staff" },
+    signedIn: (name: string) => `${name} としてサインイン中`,
+  },
+  station: {
+    label: { bn: "Help Point-এর নাম বা লিংক", en: "Help Point name or link", ja: "Help Point の なまえか URL" },
+    hint: { bn: "স্টিকারে লেখা আছে, যেমন TABLE-A", en: "It is printed on the sticker, for example TABLE-A", ja: "シールに 書いて あります（れい：TABLE-A）" },
+    open: { bn: "খুলুন", en: "Open", ja: "ひらく" },
+  },
+  back: { bn: "ফিরে যান", en: "Back", ja: "もどる" },
+  speak: { bn: "কথা বলুন", en: "Speak", ja: "はなす" },
+  stopSpeaking: { bn: "থামুন", en: "Stop", ja: "とめる" },
+};
+
+export const MOBILE = { ...MOBILE_STAFF, ...MOBILE_CALLER };
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {
@@ -247,14 +267,14 @@ export const STATION = {
   why: {
     bn: "এই স্টিকারে কোনো ব্যক্তিগত তথ্য নেই। অপারেটরের দেওয়া কোড ছাড়া কেউ আপনার কেস দেখতে পারবে না।",
     en: "This sticker holds no personal information. Nobody can open your case without the code the operator gives you.",
-    ja: "このページには 個人の 情報は ありません。コードが ないと 案件は ひらけません。",
+    ja: "この シールには あなたの 名前や そうだんの 中身は 書いて ありません。係の 人が つたえる コードが ないと そうだんの 中身は 見られません。",
   },
   staffSession: {
     bn: "এই ব্রাউজারে একজন কর্মী সাইন ইন করা আছেন। কলারের জন্য একটি প্রাইভেট উইন্ডো ব্যবহার করুন।",
     en: "A staff member is signed in on this browser. Use a private window for the caller.",
-    ja: "この ブラウザには 係の 人が サインイン しています。お客様には プライベート ウィンドウを つかって ください。",
+    ja: "いまは 係の 人として つながって います。そうだんする 人は、見た 記録を のこさない 新しい 画面を ひらいて ください。",
   },
-  signOutStaff: { bn: "কর্মীকে সাইন আউট করে চালিয়ে যান", en: "Sign the staff member out and continue", ja: "係の 人を サインアウト して つづける" },
+  signOutStaff: { bn: "কর্মীকে সাইন আউট করে চালিয়ে যান", en: "Sign the staff member out and continue", ja: "係の 人の 接続を おえて つづける" },
 } satisfies Record<string, L10n>;
 
 // Voice intake. Names every service the caller's voice or text can reach.
@@ -264,7 +284,7 @@ export const VOICE = {
   notice: {
     bn: "কথা বললে আপনার কণ্ঠ LiveKit হয়ে Soniox-এর স্পিচ রিকগনিশনে যায়, আর আমার উত্তর ElevenLabs পড়ে শোনায়। লিখলে লেখা আমাদের সার্ভারে যায় (চালু থাকলে OpenAI-ও)। অপারেটরের সহায়তার জন্য Google Gemini শুধু নিশ্চিত তথ্য দেখে, আপনার কথা নয়। নম্বর বলবেন না।",
     en: "If you speak, your voice goes through LiveKit to Soniox speech recognition, and ElevenLabs reads my replies aloud. If you type, the text goes to our server (and to OpenAI if enabled). Google Gemini helps the operator using only the facts you confirmed, never your words. Please don't say any numbers.",
-    ja: "はなすと 声は LiveKit を とおって Soniox の 音声認識に おくられ、ElevenLabs が こたえを よみあげます。書くと 文字は サーバーに おくられます（設定に よっては OpenAI にも）。係の 人を たすける Google Gemini は、あなたが かくにんした 内容だけを 見ます。番号は いわないで ください。",
+    ja: "話すと 声は LiveKit を とおって Soniox に とどきます。Soniox が 声を 文字に します。ElevenLabs が こたえを よみます。書いた ことばは わたしたちの 機械に とどきます。設定に よっては OpenAI にも とどきます。係の 人を たすける Google Gemini は、あなたが たしかめた 内容だけを 見ます。あなたの ことばは 見ません。番号は いわないで ください。",
   },
   connecting: { bn: "সংযোগ হচ্ছে…", en: "Connecting…", ja: "つないで います…" },
   hearing: { bn: "শুনছি…", en: "Listening…", ja: "きいています…" },
