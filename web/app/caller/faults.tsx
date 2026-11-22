@@ -6,7 +6,7 @@ import { Phone } from "@/components/phone";
 import { Notice } from "@/components/kit";
 import { LangSelect } from "@/components/lang-select";
 import { cn } from "@/lib/utils";
-import { CALLER_FLAGS, EXCLUSIVE_GROUPS, FAULTS, FAULT_UI, GROUP_TITLE, REPLY_RULES, UI, bankStatusText, errorText, flagsFor, intentsOf, isUrgentTap, packOfFault, pick, replyOf, type L10n, type Lang } from "@/content/catalogue";
+import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, replyOf, urgentText, type L10n, type Lang } from "@/content/catalogue";
 import { PrefsBar, type Prefs } from "./prefs";
 import type { CallerCase } from "./types";
 
@@ -16,16 +16,14 @@ import type { CallerCase } from "./types";
 export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
   const [note, setNote] = useState("");
   const tap = async (flag: string, on: boolean) => {
-    const group = CALLER_FLAGS[flag].group;
-    const off = on && group && EXCLUSIVE_GROUPS.has(group) ? card.flags.filter((f) => f !== flag && CALLER_FLAGS[f]?.group === group) : [];
     try {
-      for (const f of off) await cmd("flag", { flag: f, on: false });
+      for (const f of on ? exclusiveOff(flag, card.flags) : []) await cmd("flag", { flag: f, on: false });
       await cmd("flag", { flag, on });
       setNote("");
     } catch (e) { setNote(errorText((e as Error).message, lang)); }
   };
   const taps = flagsFor(card.fault, card.flags);
-  const urgent = urgentText(card, lang);
+  const urgent = urgentText(card.fault, card.flags, lang);
   return (
     <section className="flex flex-col gap-2.5">
       {urgent && <p role="alert" className="rounded-xl border border-alert bg-[oklch(0.98_0.02_25)] p-4 text-[17px] leading-7 text-foreground">{urgent}</p>}
@@ -46,13 +44,6 @@ export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
       {note && <Notice tone="warn">{note}</Notice>}
     </section>
   );
-}
-
-// The pack's urgent approved reply (the one that needs a red-flag tap), while such a tap is on.
-function urgentText(card: CallerCase, lang: Lang): string | null {
-  if (!card.flags.some(isUrgentTap)) return null;
-  const intent = intentsOf(packOfFault(card.fault)).find((k) => REPLY_RULES[k]?.needsFlags?.some(isUrgentTap));
-  return intent ? replyOf(intent)!.text({})[lang] : null;
 }
 
 // The bank's latest status, in the caller's language; stays on the page after the case closes.

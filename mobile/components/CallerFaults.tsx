@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cmd } from "@/lib/supabase";
 import { Brand, Card, LangPicker, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
 import { color, radius, space } from "@/theme";
-import { CALLER_FLAGS, FAULTS, FAULT_UI, UI, bankStatusText, errorText, flagsFor, pick, replyOf, type L10n, type Lang } from "@content/catalogue";
+import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, replyOf, urgentText, type L10n, type Lang } from "@content/catalogue";
 
 // Caller additions for the real-world fault paths (web/app/caller/faults.tsx and prefs.tsx on the web).
 
@@ -37,16 +37,32 @@ export function PrefsBar({ prefs, onChange, lang }: { prefs: Prefs; onChange: (p
   );
 }
 
-// The caller's own taps about what happened and who is with them.
+// The caller's own taps about what happened and who is with them. A scenario pack groups them under headings, a
+// one-answer group turns the others off, and a red-flag tap shows the pack's urgent approved text at once.
 export function CallerFlags({ fault, flags, lang }: { fault: string; flags: string[]; lang: Lang }) {
   const [note, setNote] = useState("");
+  const tap = async (flag: string, on: boolean) => {
+    try {
+      for (const f of on ? exclusiveOff(flag, flags) : []) await cmd("flag", { flag: f, on: false });
+      await cmd("flag", { flag, on });
+      setNote("");
+    } catch (e) { setNote(errorText((e as Error).message, lang)); }
+  };
+  const taps = flagsFor(fault, flags);
+  const urgent = urgentText(fault, flags, lang);
   return (
     <View style={{ gap: 8 }}>
-      <T v="label" tone="muted">{FAULT_UI.flagsTitle[lang]}</T>
-      {flagsFor(fault).map((f) => {
+      {urgent ? <Notice tone="alert">{urgent}</Notice> : null}
+      {taps.map((f, i) => {
         const on = flags.includes(f);
-        return <Toggle key={f} on={on} label={CALLER_FLAGS[f].label[lang]} block
-          onPress={() => { cmd("flag", { flag: f, on: !on }).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang))); }} />;
+        const g = CALLER_FLAGS[f].group;
+        const heading = i === 0 || g !== CALLER_FLAGS[taps[i - 1]].group ? (g && GROUP_TITLE[g]) ?? FAULT_UI.flagsTitle : null;
+        return (
+          <View key={f} style={{ gap: 8 }}>
+            {heading ? <T v="label" tone="muted">{heading[lang]}</T> : null}
+            <Toggle on={on} label={CALLER_FLAGS[f].label[lang]} block onPress={() => { void tap(f, !on); }} />
+          </View>
+        );
       })}
       {note ? <Notice tone="alert">{note}</Notice> : null}
     </View>
@@ -79,7 +95,7 @@ export function FollowUp({ f, prefs, onPrefs, onRefresh }: { f: FollowUpCase; pr
         <T v="label" tone="muted">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</T>
         <T v="h1">{FAULT_UI.followTitle[lang]}</T>
         <T v="body">{FAULT_UI.followLead[lang]}</T>
-        <BankStatus status={f.bank_status} due={f.bank_due} lang={lang} />
+        {packOfFault(f.fault) === "atm" ? <BankStatus status={f.bank_status} due={f.bank_due} lang={lang} /> : null}
         {told ? <View style={{ gap: 6 }}><T v="label" tone="muted">{FAULT_UI.lastReply[lang]}</T><T v="body" tone="ink">{told}</T></View> : null}
         <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
           <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.caseNo[lang]}</T>

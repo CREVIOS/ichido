@@ -8,7 +8,7 @@ import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, T
 import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
-  FACT_STAFF, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
+  FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
   eventText, summaryDraft, pick, replyOf, replyBlock, FAULT_DESK,
   type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
@@ -113,10 +113,10 @@ function CaseView({ me }: { me: Me }) {
         </>
       )}
 
-      <Timeline events={events} />
+      <Timeline events={events} fault={d.fault} />
       {closed && d.status === "guided" && (
         <Card title={O.record} action={<Tag value={O.recordDraft} />}>
-          <T v="body" tone="ink">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</T>
+          <T v="body" tone="ink">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null, fault: d.fault, flags: card?.flags })}</T>
         </Card>
       )}
     </Screen>
@@ -137,14 +137,14 @@ function Machine({ d }: { d: Desk }) {
   );
 }
 
-function Timeline({ events }: { events: Event[] }) {
+function Timeline({ events, fault }: { events: Event[]; fault: string }) {
   return (
     <Card title={O.timeline}>
       {events.map((e) => (
         <View key={e.id} style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
           <T v="small" mono style={{ width: 40 }}>{hhmm(e.at)}</T>
           <T v="small" weight={500} tone="body" style={{ width: 56 }}>{e.actor_name ?? ACTOR[e.actor]}</T>
-          <T v="label" tone="ink" style={{ flex: 1 }}>{eventText(e.kind, e.data)}</T>
+          <T v="label" tone="ink" style={{ flex: 1 }}>{eventText(e.kind, e.data, fault)}</T>
         </View>
       ))}
     </Card>
@@ -167,8 +167,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </Inset>
           <Inset>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}><T v="small">{O.confirmed}</T><T v="small" mono>{O.rev(d.confirmed_rev)}</T></View>
-            <T v="body" tone="ink">{FACT_STAFF.card_back[d.card_back]}</T>
-            <T v="body" tone="ink">{FACT_STAFF.cash_received[d.cash_received]}</T>
+            {packOfFault(d.fault) === "atm" ? <><T v="body" tone="ink">{FACT_STAFF.card_back[d.card_back]}</T>
+            <T v="body" tone="ink">{FACT_STAFF.cash_received[d.cash_received]}</T></>
+              : (card?.flags ?? []).map((f) => <T key={f} v="body" tone="ink">{CALLER_FLAGS[f]?.staff ?? f}</T>)}
           </Inset>
         </>
       )}
@@ -223,8 +224,10 @@ function PairCard({ incident }: { incident: string }) {
 }
 
 function ReplyCard({ d, lang, replies, run, flags }: { d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
-  const [intent, setIntent] = useState(Object.keys(REPLIES)[0]);
-  const r = replyOf(intent) ?? REPLIES[Object.keys(REPLIES)[0]];
+  // Only the case's pack's replies (content/packs).
+  const intents = intentsOf(packOfFault(d.fault));
+  const [intent, setIntent] = useState(intents[0]);
+  const r = replyOf(intent) ?? REPLIES[intents[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
   // Mirrors the server rules (web/content/faults.ts replyBlock): the held-card rule and each reply's fault types and caller taps.
   const block = replyBlock(intent, r.needsHeld, { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release });
@@ -233,7 +236,7 @@ function ReplyCard({ d, lang, replies, run, flags }: { d: Desk; lang: Lang; repl
   return (
     <Card title={O.replies} action={<T v="small" mono>{MANUAL_VERSION}</T>}>
       <View style={{ marginHorizontal: -8 }}>
-        {Object.entries(REPLIES).map(([k, x]) => (
+        {intents.map((k) => [k, REPLIES[k]] as const).map(([k, x]) => (
           <Row key={k} label={x.title} meta={x.code} selected={k === intent} onPress={() => setIntent(k)} />
         ))}
       </View>
@@ -258,7 +261,7 @@ function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job |
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T v="body" tone="ink">{guards.find((g) => g.uid === job.assignee)?.display_name ?? O.guard}</T>
-            <Pill tone="field">{STAFF_JA.field[job.state]}</Pill>
+            <Pill tone="field">{(packStaffField(packOfFault(d.fault)) ?? STAFF_JA.field)[job.state]}</Pill>
           </View>
           <T v="label">{job.eta ? O.eta(job.eta) : O.etaUnknown}</T>
         </View>
@@ -268,7 +271,7 @@ function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job |
       <View style={{ gap: 8 }}>
         {others.map((g) => <Button key={g.uid} kind="secondary" label={O.assign(g.display_name, Boolean(job))} onPress={() => run("assign", { incident: d.id, assignee: g.uid })} block />)}
       </View>
-      {card && card.field_state !== "none" && <T v="small">{O.callerScreen(pick(FIELD_STATE[card.field_state], lang))}</T>}
+      {card && card.field_state !== "none" && <T v="small">{O.callerScreen(callerPack(d.fault).field(card.field_state, lang))}</T>}
     </Card>
   );
 }

@@ -12,7 +12,7 @@ import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, 
 import { BankStatus, CallerFlags, FollowUp, PrefsBar, speechRate, textScale, usePrefs, type FollowUpCase } from "@/components/CallerFaults";
 import { color, radius, shadow, space, tint } from "@/theme";
 import {
-  FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
+  FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, callerPack, pick, replyOf, errorText,
   type Lang, type Fact, type Status, type FieldState, type L10n,
 } from "@content/catalogue";
 
@@ -76,16 +76,16 @@ export default function CallerScreen() {
         <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
         <View style={{ gap: 6 }}>
           <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
-          <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
+          <Pill tone={card.status}>{callerPack(card.fault).status(card.status, lang)}</Pill>
         </View>
         {card.notice && OPS_CALLER.notice[card.notice] && (
           <Card title={OPS_CALLER.noticeLabel[lang]}><T v="h2">{OPS_CALLER.notice[card.notice][lang]}</T></Card>
         )}
-        {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
-        {confirmed && !latest && <Waiting lang={lang} />}
+        {!confirmed && draft && <Intake lang={lang} draft={draft} card={card} />}
+        {confirmed && !latest && <Waiting lang={lang} fault={card.fault} />}
         {latest && <Guidance lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
-        {open && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
-        {(card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
+        {open && (callerPack(card.fault).atm || confirmed) && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
+        {callerPack(card.fault).atm && (card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
         <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
           <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.showStaff[lang]}</T>
           <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>
@@ -97,7 +97,10 @@ export default function CallerScreen() {
   );
 }
 
-function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHuman: boolean }) {
+// An ATM caller confirms the read-back of two facts; any other pack's caller confirms their own taps (content/packs).
+function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerCard }) {
+  const P = callerPack(card.fault);
+  const needsHuman = card.needs_human;
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -114,12 +117,14 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
     } finally { setBusy(false); }
   }
   const fail = (e: Error) => setNote(errorText(e.message, lang));
-  const known = FACT_KEYS.filter((k) => draft[k] !== "unknown");
+  const ready = P.atm ? FACT_KEYS.some((k) => draft[k] !== "unknown") : card.flags.length > 0;
 
   return (
     <>
       <T v="h1">{UI.aiNotice[lang]}</T>
-      <Notice>{UI.neverAsk[lang]}</Notice>
+      <Notice>{P.neverAsk[lang]}</Notice>
+      {P.scope ? <Notice>{P.scope[lang]}</Notice> : null}
+      {!P.atm && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
       {hasVoice && VOICE_LANGS.includes(lang) ? <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} /> : <T v="small">{VOICE.unavailable[lang]}</T>}
       <Card>
         <Input label={UI.whatHappened[lang]} value={text} onChangeText={setText} multiline maxLength={MAX_TEXT} />
@@ -130,7 +135,7 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
       {note ? <Notice tone="alert">{note}</Notice> : null}
       {draft.needs_clarification && <Notice>{UI.unsure[lang]}</Notice>}
 
-      <Card title={UI.understood[lang]} action={draft.rev > 0 ? <Tag label="v" value={draft.rev} /> : undefined}>
+      {P.atm ? <Card title={UI.understood[lang]} action={draft.rev > 0 ? <Tag label="v" value={draft.rev} /> : undefined}>
         {draft.words ? <T v="label">“{draft.words}”</T> : null}
         {FACT_KEYS.map((k) => (
           <View key={k} style={{ gap: 8 }}>
@@ -147,17 +152,17 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
             )}
           </View>
         ))}
-      </Card>
-      <Button label={UI.confirm[lang]} block disabled={busy || !known.length} onPress={() => cmd("confirm", { rev: draft.rev }).catch(fail)} />
-      {needsHuman ? <Notice>{UI.humanAsked[lang]}</Notice>
+      </Card> : draft.words ? <T v="label">“{draft.words}”</T> : null}
+      <Button label={UI.confirm[lang]} block disabled={busy || !ready} onPress={() => cmd("confirm", { rev: draft.rev }).catch(fail)} />
+      {needsHuman ? <Notice>{P.humanAsked(lang)}</Notice>
         : <Button kind="ghost" label={UI.human[lang]} onPress={() => cmd("human").catch(fail)} />}
     </>
   );
 }
 
 // No timers in the caller flow: the handset hint is there from the start.
-function Waiting({ lang }: { lang: Lang }) {
-  return <Card><T v="h2">{STATUS.review[lang]}…</T><T v="label">{UI.waiting[lang]}</T></Card>;
+function Waiting({ lang, fault }: { lang: Lang; fault: string }) {
+  return <Card><T v="h2">{STATUS.review[lang]}…</T><T v="label">{callerPack(fault).waiting(lang)}</T></Card>;
 }
 
 // Whether the device has a speech voice for this language (Bengali often has none).
@@ -192,8 +197,8 @@ function Guidance({ lang, card, reply, rate }: { lang: Lang; card: CallerCard; r
 
       {card.field_state !== "none" && (
         <Card style={{ gap: 6 }}>
-          <T v="h2">{FIELD_STATE[card.field_state][lang]}</T>
-          {card.field_state === "on_way" && <T v="label">{etaText(card.eta, lang)}</T>}
+          <T v="h2">{callerPack(card.fault).field(card.field_state, lang)}</T>
+          {card.field_state === "on_way" && <T v="label">{callerPack(card.fault).eta(card.eta, lang)}</T>}
         </Card>
       )}
 

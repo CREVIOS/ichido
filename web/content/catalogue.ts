@@ -4,7 +4,7 @@
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
-import { PACKS, contentPack, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
+import { EXCLUSIVE_GROUPS, PACKS, contentPack, isUrgentTap, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
@@ -474,6 +474,19 @@ export function callerPack(fault: string) {
   };
   const c = packCaller(p);
   return { atm: false, ...c, status: (s: Status, l: Lang) => (s === "field" ? c.field("requested", l) : STATUS[s][l]) };
+}
+
+// The pack's urgent approved reply (the one a red-flag tap allows), shown to the caller at once while such a tap is on:
+// the same words the operator would send. Null for no red flag, or a pack without one.
+export function urgentText(fault: string, flags: readonly string[], lang: Lang): string | null {
+  if (!flags.some(isUrgentTap)) return null;
+  const intent = intentsOf(packOfFault(fault)).find((k) => REPLY_RULES[k]?.needsFlags?.some(isUrgentTap));
+  return intent ? REPLIES[intent].text({})[lang] : null;
+}
+// The taps to turn off when the caller turns `flag` on in a one-answer group (who, since when, how much it hurts…).
+export function exclusiveOff(flag: string, flags: readonly string[]): string[] {
+  const g = CALLER_FLAGS[flag]?.group;
+  return g && EXCLUSIVE_GROUPS.has(g) ? flags.filter((f) => f !== flag && CALLER_FLAGS[f]?.group === g) : [];
 }
 
 // The sentence the assistant reads back, built from the current draft facts.
