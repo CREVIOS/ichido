@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --env-file=.env.local --test tests/*.test.mjs",
+    "test": "node --env-file=.env.local --test --test-concurrency=1 tests/*.test.mjs",
     "test:fresh": "supabase db reset --local --workdir .. && npm test"
   },
   "dependencies": {

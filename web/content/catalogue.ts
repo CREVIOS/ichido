@@ -27,6 +27,7 @@ export const FAULTS: Record<string, L10n> = {
   card_retained: { ja: "取引後にカードが排出されない", bn: "লেনদেনের পরে কার্ড বের হয়নি", en: "Card not returned after the transaction" },
 };
 export const DEVICE_FAULT = "card_retained";
+export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
 
 export const REMOTE_RELEASE: Record<string, string> = { failed: "失敗", released: "成功" };
 
@@ -77,15 +78,19 @@ export function etaText(eta: string | null | undefined, lang: Lang): string {
 
 // Slots are filled on the server from the station row, per language.
 export type ReplySlots = { branch?: L10n; hours?: L10n };
-export const REPLIES: Record<string, { code: string; title: string; text: (s: ReplySlots) => L10n; offersChoice?: boolean }> = {
+// needsHeld: the wording says the card is still inside, so the server sends it only when the caller
+// confirmed the card did not come back and no remote release succeeded.
+type Reply = { code: string; title: string; text: (s: ReplySlots) => L10n; offersChoice?: boolean; needsHeld?: boolean };
+export const REPLIES: Record<string, Reply> = {
   HELD_WAIT_OR_LEAVE: {
     code: "A-3",
     title: "機械障害によりカードを保管中（待つ／帰るを選択）",
     offersChoice: true,
+    needsHeld: true,
     text: (s) => ({
-      ja: `カードは機械の中で保管されています。お待ちいただくか、お帰りいただくかを選べます。お帰りの場合は、銀行からご連絡のうえ、${s.branch?.ja}の窓口（${s.hours?.ja}）で、銀行所定の手続きでお受け取りください。`,
-      bn: `আপনার কার্ড মেশিনের ভেতরে রাখা আছে। আপনি অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে; পরে ${s.branch?.bn}-এ (${s.hours?.bn}) ব্যাংকের নিয়ম অনুযায়ী কার্ড নিতে পারবেন।`,
-      en: `Your card is being held inside the machine. You can wait, or you can leave. If you leave, the bank will contact you, and you can collect it at the ${s.branch?.en} counter (${s.hours?.en}) following the bank's procedure.`,
+      ja: `カードは機械の中にあります。ここでお待ちいただくか、お帰りいただくかを選べます。お帰りの場合は銀行からご連絡します。カードの扱いは銀行所定の手続きによります。${s.branch?.ja}の窓口（${s.hours?.ja}）でもご案内できます。`,
+      bn: `আপনার কার্ড মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${s.branch?.bn}-এর কাউন্টারেও (${s.hours?.bn}) জানতে পারবেন।`,
+      en: `Your card is inside the machine. You can wait here, or you can leave. If you leave, the bank will contact you. The card is handled under the bank's own procedure. The ${s.branch?.en} counter (${s.hours?.en}) can also help.`,
     }),
   },
   HANDSET: {
@@ -108,18 +113,25 @@ export const REPLIES: Record<string, { code: string; title: string; text: (s: Re
   },
 };
 
+export const replyOf = (intent: unknown): Reply | undefined =>
+  typeof intent === "string" && Object.hasOwn(REPLIES, intent) ? REPLIES[intent] : undefined;
+export const CHOICE_INTENTS = Object.keys(REPLIES).filter((k) => REPLIES[k].offersChoice);
+
 export const ACTOR: Record<string, string> = { device: "機械", caller: "お客様", agent: "AI", operator: "担当者", field: "警備員", system: "システム" };
 
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
   switch (kind) {
-    case "fault": return `障害通知：${FAULTS[d.fault ?? ""]?.ja ?? d.fault}${d.source === "simulator" ? "（模擬）" : ""}`;
+    case "fault": return `障害通知：${isFault(d.fault) ? FAULTS[d.fault].ja : "不明な障害"}${d.source === "simulator" ? "（模擬）" : ""}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
     case "claimed": return "担当者が対応を開始";
     case "remote_release": return `遠隔解除を試行 → ${REMOTE_RELEASE[d.result ?? ""] ?? d.result}`;
     case "confirmed": return `お客様が内容を確認（${FACTS.card_back[(d.card_back ?? "unknown") as Fact].ja}／${FACTS.cash_received[(d.cash_received ?? "unknown") as Fact].ja}）`;
-    case "reply": return `承認済み返答を送信：${REPLIES[d.intent ?? ""]?.code ?? ""} ${REPLIES[d.intent ?? ""]?.title ?? d.intent}`;
+    case "reply": return `承認済み返答を送信：${replyOf(d.intent)?.code ?? ""} ${replyOf(d.intent)?.title ?? d.intent}`;
     case "dispatch": return `警備会社へ現地確認を依頼（${d.assignee ?? ""}）`;
+    case "redispatch": return `別の警備員へ再依頼（${d.assignee ?? ""}）`;
+    case "caller_reset": return "お客様の接続をリセット（新しいコードが必要）";
+    case "abandoned": return "案件を終了（お客様と連絡が取れず）";
     case "field": return `${FIELD_STATE[(d.state ?? "none") as FieldState].ja}${d.state === "on_way" ? `（目安 ${d.eta ? d.eta.replace("-", "〜") + "分" : "未定"}）` : ""}`;
     case "choice": return d.choice === "wait" ? "お客様：現地で待つ" : "お客様：帰宅し銀行からの連絡を待つ";
     case "teachback": return "お客様が次の手順を自分の言葉で説明";
@@ -142,12 +154,12 @@ export function summaryDraft(x: { card_back: Fact; cash_received: Fact; remote_r
   ].filter(Boolean).join("");
 }
 
+// Cumulative: each stage counts only cases that passed the previous one.
 export const FUNNEL: { key: string; ja: string; en: string }[] = [
   { key: "received", ja: "受付", en: "Received" },
   { key: "claimed", ja: "担当", en: "Claimed" },
   { key: "confirmed", ja: "申告確認", en: "Caller confirmed" },
   { key: "replied", ja: "返答送信", en: "Reply sent" },
-  { key: "dispatched", ja: "出動依頼", en: "Dispatched" },
   { key: "guided", ja: "案内確認", en: "Guidance confirmed" },
 ];
 
@@ -165,6 +177,11 @@ export const UI = {
   whatHappened: { bn: "কী হয়েছে, নিজের ভাষায় লিখুন", en: "Tell us what happened, in your own words", ja: "なにが あったか 書いてください" },
   understood: { bn: "আমি যা বুঝেছি", en: "What I understood", ja: "わかったこと" },
   confirm: { bn: "হ্যাঁ, ঠিক আছে — পাঠান", en: "Yes, that's right — send", ja: "はい、これで おくる" },
+  unsure: {
+    bn: "আমি ঠিক বুঝতে পারিনি। নিচের প্রশ্নগুলোর উত্তর বেছে নিন।",
+    en: "I wasn't sure what you meant. Please choose the answers below.",
+    ja: "よく わかりませんでした。下の しつもんに こたえて ください。",
+  },
   send: { bn: "পাঠান", en: "Send", ja: "おくる" },
   numbersWithheld: {
     bn: "এখানে নম্বর মনে হচ্ছে, তাই পাঠানো হয়নি। নম্বর ছাড়া আবার লিখুন।",
@@ -180,13 +197,17 @@ export const UI = {
   teachBackSent: { bn: "পাঠানো হয়েছে — অপারেটর দেখছেন", en: "Sent — the operator is checking", ja: "おくりました。係の 人が かくにん しています" },
   clarify: { bn: "যে অংশটি বুঝতে অসুবিধা হয়েছে, সেটি কর্মীকে আবার জিজ্ঞেস করতে পারেন।", en: "You can ask the operator again about anything that is unclear.", ja: "わからない ところは 係の 人に もう一度 きけます。" },
   human: { bn: "এখনই একজন মানুষের সাথে কথা বলুন", en: "Talk to a person now", ja: "人と はなす" },
-  humanAsked: { bn: "অপারেটরকে জানানো হয়েছে", en: "The operator has been told", ja: "係の 人に つたえました" },
+  humanAsked: {
+    bn: "অপারেটরকে জানানো হয়েছে। এখনই কথা বলতে চাইলে এটিএমে লাগানো ফোনের রিসিভারটি ব্যবহার করুন।",
+    en: "The operator has been told. To talk now, use the handset built into the ATM.",
+    ja: "係の 人に つたえました。いま はなしたい ときは ATM の 受話器を つかって ください。",
+  },
   showStaff: { bn: "জাপানি কর্মীকে দেখান", en: "Show to staff", ja: "係の 人に みせる" },
   caseNo: { bn: "কেস নম্বর", en: "Case", ja: "案件番号" },
   waiting: {
-    bn: "এখনো কোনো কর্মীর সঙ্গে সংযোগ হয়নি। এখানে জানতে চাইলে এটিএমে লাগানো ফোনের রিসিভারটি ব্যবহার করুন।",
-    en: "An operator has not joined yet. To ask for help here, use the ATM's built-in handset.",
-    ja: "まだ 係の 人に つながって いません。ATM の 受話器を つかって ください。",
+    bn: "অপারেটর এখনো আপনার বিষয়টি দেখছেন। জরুরি হলে এটিএমে লাগানো ফোনের রিসিভারটি ব্যবহার করুন।",
+    en: "The operator is still looking at your case. If it is urgent, use the handset built into the ATM.",
+    ja: "係の 人が まだ かくにん しています。いそぐ ときは ATM の 受話器を つかって ください。",
   },
   notConnected: {
     bn: "এই ফোনটি কোনো কেসের সাথে যুক্ত নয়। অপারেটরের কাছে কোড চেয়ে Help Point আবার স্ক্যান করুন।",
@@ -200,12 +221,100 @@ export const UI = {
   },
 } satisfies Record<string, L10n>;
 
+// Staff sign-in (staff screens are Japanese).
+export const STAFF = {
+  email: "メール",
+  password: "パスワード",
+  signIn: "サインイン",
+  signOut: "サインアウト",
+  otherAccount: "別のアカウントで入る",
+  noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
+  demo: "デモ環境・架空のデータ",
+};
+
+// Landing page (English, for judges and visitors).
+export const HOME = {
+  badge: "Hackathon demo",
+  badgeStrong: "fictional bank, synthetic data",
+  title: "Say it once.",
+  lead: "When an ATM keeps your card, nobody in front of it should be left without words or without a next step. Ichido joins the machine's alert, the caller's own words and the operator's decision into one case, in the caller's language.",
+  open: "Open →",
+  footer: "The ATM is simulated by an ESP32 prop or an on-screen action. Nothing here connects to a real bank, ATM or security company. The assistant never asks for a PIN, card, account or ID number.",
+  roles: [
+    { href: "/operator", title: "監視センター", sub: "Operator console", body: "The machine's fault, the caller's own words, approved replies and dispatch on one screen." },
+    { href: "/s/TABLE-A", title: "Help Point", sub: "Caller · বাংলা / English / やさしい日本語", body: "Scan the sticker, enter the operator's code, say what happened in your language." },
+    { href: "/field", title: "警備員", sub: "Security guard", body: "Only your own assignments. One tap for on the way, arrived, done." },
+    { href: "/insights", title: "インサイト", sub: "Insights", body: "How cases flow from the machine alert to a caller who can explain their next step." },
+  ],
+};
+
+// Pairing page behind the Help Point sticker.
+export const STATION = {
+  title: { bn: "সহায়তা কেন্দ্রের সাথে যুক্ত হন", en: "Connect to the help desk", ja: "まどぐちに つなぐ" },
+  code: { bn: "অপারেটর যে কোডটি বলেছেন", en: "The code the operator gave you", ja: "係の 人が いった コード" },
+  go: { bn: "যুক্ত হন", en: "Connect", ja: "つなぐ" },
+  why: {
+    bn: "এই স্টিকারে কোনো ব্যক্তিগত তথ্য নেই। অপারেটরের দেওয়া কোড ছাড়া কেউ আপনার কেস দেখতে পারবে না।",
+    en: "This sticker holds no personal information. Nobody can open your case without the code the operator gives you.",
+    ja: "このページには 個人の 情報は ありません。コードが ないと 案件は ひらけません。",
+  },
+  staffSession: {
+    bn: "এই ব্রাউজারে একজন কর্মী সাইন ইন করা আছেন। কলারের জন্য একটি প্রাইভেট উইন্ডো ব্যবহার করুন।",
+    en: "A staff member is signed in on this browser. Use a private window for the caller.",
+    ja: "この ブラウザには 係の 人が サインイン しています。お客様には プライベート ウィンドウを つかって ください。",
+  },
+  signOutStaff: { bn: "কর্মীকে সাইন আউট করে চালিয়ে যান", en: "Sign the staff member out and continue", ja: "係の 人を サインアウト して つづける" },
+} satisfies Record<string, L10n>;
+
+// Voice intake. Names every service the caller's voice or text can reach.
+export const VOICE = {
+  start: { bn: "🎙 কথা বলুন", en: "🎙 Speak", ja: "🎙 はなす" },
+  stop: { bn: "■ থামুন", en: "■ Stop", ja: "■ とめる" },
+  notice: {
+    bn: "কথা বললে আপনার কণ্ঠ LiveKit হয়ে Google-এর স্পিচ রিকগনিশনে যায়, আর আমার উত্তর Azure পড়ে শোনায়। লিখলে লেখা আমাদের সার্ভারে যায় (চালু থাকলে OpenAI-ও)। নম্বর বলবেন না।",
+    en: "If you speak, your voice goes through LiveKit to Google speech recognition, and Azure reads my replies aloud. If you type, the text goes to our server (and to OpenAI if enabled). Please don't say any numbers.",
+    ja: "はなすと 声は LiveKit を とおって Google の 音声認識に おくられ、Azure が こたえを よみあげます。書くと 文字は サーバーに おくられます（設定に よっては OpenAI にも）。番号は いわないで ください。",
+  },
+  connecting: { bn: "সংযোগ হচ্ছে…", en: "Connecting…", ja: "つないで います…" },
+  hearing: { bn: "শুনছি…", en: "Listening…", ja: "きいています…" },
+  unavailable: { bn: "এখন কণ্ঠ চালু নেই — লিখে বলুন।", en: "Voice is not available now — please type.", ja: "いまは 声が つかえません。書いて ください。" },
+} satisfies Record<string, L10n>;
+
+// Errors a caller can see, by the stable code the server returns.
+export const ERRORS: Record<string, L10n> = {
+  conflict: { bn: "অবস্থা বদলে গেছে — স্ক্রিন আপডেট হয়েছে, আবার দেখুন।", en: "Something changed — the screen has been updated, please check again.", ja: "じょうたいが かわりました。画面を もう一度 みてください。" },
+  forbidden: { bn: "এই কেসটি এখন খোলা যাচ্ছে না।", en: "This case cannot be opened now.", ja: "いま この 案件は ひらけません。" },
+  rate_limited: { bn: "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।", en: "Too many tries. Please wait a few minutes.", ja: "なんども ためしました。すこし まってから もう一度。" },
+  server: { bn: "কিছু একটা ঠিকমতো হয়নি। আবার চেষ্টা করুন।", en: "Something went wrong. Please try again.", ja: "うまく いきませんでした。もう一度 おねがいします。" },
+};
+export const errorText = (code: string, lang: Lang) => (Object.hasOwn(ERRORS, code) ? ERRORS[code] : ERRORS.server)[lang];
+
 // Withhold any text that looks like a PIN, card, account or ID number before it leaves the server.
-// ponytail: digit-run heuristic; spelled-out numbers ("one two three four") are not caught — the agent never asks for numbers.
+// Catches digit runs (ASCII, Bengali, full-width) and four or more number words in a row.
+// ponytail: number words for bn/en/ja only; free speech still reaches the speech provider before this runs.
+const NUMBER_WORDS = new Set([
+  "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+  "শূন্য", "এক", "দুই", "তিন", "চার", "পাঁচ", "ছয়", "সাত", "আট", "নয়",
+  "ゼロ", "れい", "いち", "に", "さん", "よん", "し", "ご", "ろく", "なな", "しち", "はち", "きゅう", "く",
+  "零", "一", "二", "三", "四", "五", "六", "七", "八", "九",
+]);
 export function looksLikeNumber(text: string): boolean {
   const normalised = text
     .replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)))
     .replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
     .replace(/[\s\-‐-―ー.・,]/g, "");
-  return /\d{4,}/.test(normalised);
+  if (/\d{4,}/.test(normalised)) return true;
+  let run = 0;
+  for (const w of text.toLowerCase().split(/[\s,、。.・\-]+/).filter(Boolean)) {
+    run = NUMBER_WORDS.has(w) ? run + 1 : 0;
+    if (run >= 4) return true;
+  }
+  return false;
+}
+
+// The sentence the assistant reads back, built from the current draft facts.
+export function readBackText(lang: Lang, facts: Record<FactKey, Fact>): string | null {
+  const known = FACT_KEYS.filter((k) => facts[k] !== "unknown");
+  if (!known.length) return null;
+  return `${UI.understood[lang]}: ${known.map((k) => FACTS[k][facts[k]][lang]).join(SENTENCE_SEP[lang])}`;
 }

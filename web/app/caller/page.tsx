@@ -2,10 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
-import { VoiceIntake } from "@/components/VoiceIntake";
+import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { StatusChip, Tag } from "@/components/ui";
 import {
-  FACTS, FACT_KEYS, ANSWER, REPLIES, STATUS, UI, FIELD_STATE, LANG_NAME, LANG_LOCALE, FAULTS, SENTENCE_SEP, etaText, pick,
+  FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, FIELD_STATE, LANG_NAME, LANG_LOCALE, FAULTS, etaText, pick, replyOf, errorText,
   type Lang, type Fact, type Status, type FieldState, type L10n,
 } from "@/content/catalogue";
 
@@ -24,9 +24,15 @@ export default function CallerPage() {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [station, setStation] = useState<Station | null>(null);
 
+  const [staffSession, setStaffSession] = useState(false);
+
+  // Only the case this phone is bound to; never "the first card visible" (staff can see many).
   const load = useCallback(async () => {
     const db = sb();
-    const { data: c } = await db.from("caller_card").select("*").limit(1).maybeSingle();
+    const mine = await cmd<{ incident: string | null; staff: boolean }>("mine").catch(() => ({ incident: null, staff: false }));
+    setStaffSession(mine.staff);
+    if (!mine.incident) return setCard(null);
+    const { data: c } = await db.from("caller_card").select("*").eq("id", mine.incident).maybeSingle();
     setCard((c as Card) ?? null);
     if (!c) return;
     const [d, r, s] = await Promise.all([
@@ -39,7 +45,12 @@ export default function CallerPage() {
   useLive(["caller_card", "draft", "reply"], load);
 
   if (card === undefined) return null;
-  if (card === null) return <main className="phone" style={{ justifyContent: "center" }}><h1 lang="bn">{UI.notConnected.bn}</h1><p className="soft">{UI.notConnected.en}</p></main>;
+  if (card === null) return (
+    <main className="phone" style={{ justifyContent: "center" }}>
+      <h1 lang="bn">{staffSession ? STATION.staffSession.bn : UI.notConnected.bn}</h1>
+      <p className="soft">{staffSession ? STATION.staffSession.en : UI.notConnected.en}</p>
+    </main>
+  );
 
   const lang: Lang = card.lang ?? "bn";
   const latest = replies.at(-1);
@@ -72,31 +83,33 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [say, setSay] = useState<SignedSpeech | null>(null);
 
   async function send(body: Record<string, unknown>) {
     setBusy(true); setNote("");
     try {
-      const r = await cmd<{ withheld?: boolean }>("draft", { base_rev: draft.rev, ...body });
-      if (r.withheld) setNote(UI.numbersWithheld[lang]); else setText("");
+      const r = await cmd<{ withheld?: boolean; say?: SignedSpeech | null }>("draft", { base_rev: draft.rev, ...body });
+      if (r.withheld) setNote(UI.numbersWithheld[lang]);
+      else { setText(""); setSay(r.say ?? null); }
     } catch (e) {
-      if ((e as Error).message !== "stale") setNote((e as Error).message);
+      setNote(errorText((e as Error).message, lang));
     } finally { setBusy(false); }
   }
 
   const known = FACT_KEYS.filter((k) => draft[k] !== "unknown");
-  const readBack = known.length ? `${UI.understood[lang]}: ${known.map((k) => FACTS[k][draft[k]][lang]).join(SENTENCE_SEP[lang])}` : undefined;
 
   return (
     <>
       <h1>{UI.aiNotice[lang]}</h1>
       <p className="notice">{UI.neverAsk[lang]}</p>
-      <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={readBack} />
+      <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} />
       <form className="askbar stack" style={gap(10)} onSubmit={(e) => { e.preventDefault(); if (text.trim()) send({ text }); }}>
         <label className="small soft" htmlFor="what">✦ {UI.whatHappened[lang]}</label>
         <textarea id="what" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} />
         <div className="row" style={{ justifyContent: "flex-end" }}><button className="btn dark" disabled={busy || !text.trim()}>{UI.send[lang]}</button></div>
       </form>
       {note && <p className="notice">{note}</p>}
+      {draft.needs_clarification && <p className="notice" style={{ background: "var(--blue-soft)", color: "var(--blue)" }}>{UI.unsure[lang]}</p>}
 
       <section className="card">
         <div className="row between"><span className="small soft">{UI.understood[lang]}</span>{draft.rev > 0 && <Tag label="v" value={draft.rev} />}</div>
@@ -114,8 +127,9 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
         ))}
       </section>
       <button className="btn blue block" disabled={busy || !known.length}
-        onClick={() => cmd("confirm", { rev: draft.rev }).catch((e: Error) => setNote(e.message))}>{UI.confirm[lang]}</button>
-      <button className="btn ghost" disabled={needsHuman} onClick={() => cmd("human")}>{needsHuman ? UI.humanAsked[lang] : UI.human[lang]}</button>
+        onClick={() => cmd("confirm", { rev: draft.rev }).catch((e: Error) => setNote(errorText(e.message, lang)))}>{UI.confirm[lang]}</button>
+      {needsHuman ? <p className="notice" style={{ background: "var(--blue-soft)", color: "var(--blue)" }}>{UI.humanAsked[lang]}</p>
+        : <button className="btn ghost" onClick={() => cmd("human").catch((e: Error) => setNote(errorText(e.message, lang)))}>{UI.human[lang]}</button>}
     </>
   );
 }
@@ -131,17 +145,20 @@ function Waiting({ lang }: { lang: Lang }) {
 function useHasVoice(lang: Lang) {
   const [has, setHas] = useState(false);
   useEffect(() => {
-    const check = () => setHas(speechSynthesis.getVoices().some((v) => v.lang.startsWith(lang)));
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const check = () => setHas(window.speechSynthesis.getVoices().some((v) => v.lang.startsWith(lang)));
     const t = setTimeout(check, 0);
-    speechSynthesis.addEventListener("voiceschanged", check);
-    return () => { clearTimeout(t); speechSynthesis.removeEventListener("voiceschanged", check); };
+    window.speechSynthesis.addEventListener("voiceschanged", check);
+    return () => { clearTimeout(t); window.speechSynthesis.removeEventListener("voiceschanged", check); };
   }, [lang]);
   return has;
 }
 
 function Guidance({ lang, card, reply }: { lang: Lang; card: Card; reply: Reply }) {
-  const r = REPLIES[reply.intent];
-  const text = r ? r.text(reply.slots)[lang] : "";
+  const r = replyOf(reply.intent);
+  const text = r ? r.text(reply.slots)[lang] : errorText("server", lang);
+  const done = card.teachback_result === "understood";
+  const act = (name: string, body: Record<string, unknown> = {}) => cmd(name, body).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
   const [teach, setTeach] = useState("");
   const [note, setNote] = useState("");
   const hasVoice = useHasVoice(lang);
@@ -150,7 +167,8 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: Card; reply: Reply 
     <>
       <span className="tiny muted">{UI.approved[lang]}</span>
       <h1>{text}</h1>
-      {hasVoice && <button className="btn" onClick={() => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; speechSynthesis.speak(u); }}>🔊 {UI.listen[lang]}</button>}
+      {hasVoice && <button className="btn" onClick={() => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; window.speechSynthesis.speak(u); }}>🔊 {UI.listen[lang]}</button>}
+      {note && <p className="notice">{note}</p>}
 
       {card.field_state !== "none" && (
         <section className="card" style={{ gap: 6 }}>
@@ -163,8 +181,8 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: Card; reply: Reply 
         <div className="stack" style={gap(8)}>
           <span className="small soft">{UI.waitOrLeave[lang]}</span>
           <div className="row" style={gap(8)}>
-            <button className={`btn grow ${card.choice === "wait" ? "on" : ""}`} aria-pressed={card.choice === "wait"} onClick={() => cmd("choose", { choice: "wait" })}>{UI.wait[lang]}</button>
-            <button className={`btn grow ${card.choice === "leave" ? "on" : ""}`} aria-pressed={card.choice === "leave"} onClick={() => cmd("choose", { choice: "leave" })}>{UI.leave[lang]}</button>
+            <button className={`btn grow ${card.choice === "wait" ? "on" : ""}`} disabled={done} aria-pressed={card.choice === "wait"} onClick={() => act("choose", { choice: "wait" })}>{UI.wait[lang]}</button>
+            <button className={`btn grow ${card.choice === "leave" ? "on" : ""}`} disabled={done} aria-pressed={card.choice === "leave"} onClick={() => act("choose", { choice: "leave" })}>{UI.leave[lang]}</button>
           </div>
         </div>
       )}
@@ -176,7 +194,7 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: Card; reply: Reply 
       ) : (
         <form className="askbar stack" style={gap(10)} onSubmit={(e) => {
           e.preventDefault();
-          cmd<{ withheld?: boolean }>("teachback", { text: teach }).then((x) => setNote(x.withheld ? UI.numbersWithheld[lang] : "")).catch((er: Error) => setNote(er.message));
+          cmd<{ withheld?: boolean }>("teachback", { text: teach }).then((x) => setNote(x.withheld ? UI.numbersWithheld[lang] : "")).catch((er: Error) => setNote(errorText(er.message, lang)));
         }}>
           <label className="small soft" htmlFor="teach">✦ {UI.teachBack[lang]}</label>
           {card.teachback_result === "clarify" && <p className="small soft">{UI.clarify[lang]}</p>}

@@ -9,6 +9,8 @@ import { FUNNEL, LANG_NAME, type Lang } from "@/content/catalogue";
 type Insights = {
   since: string;
   funnel: Record<string, number>;
+  dispatched: number;
+  abandoned: number;
   per_day: { day: string; n: number }[];
   per_hour: { hour: number; n: number }[];
   languages: Record<string, number>;
@@ -65,7 +67,7 @@ function Board({ me }: { me: Me }) {
       {error && <p className="notice" style={{ marginBottom: 16 }}>{error}</p>}
       <div className="grid insights">
         <Card title="案件の流れ" action={<More label="表示" items={[{ label: "件数を更新", onClick: load }]} />}>
-          <p className="small soft">障害通知から「お客様が次の手順を自分の言葉で説明」まで。列にカーソルを合わせると前の段階からの通過率を表示します。</p>
+          <p className="small soft">障害通知から「お客様が次の手順を自分の言葉で説明」まで。各段階は前の段階を通過した案件のみを数えます。</p>
           <Funnel steps={FUNNEL.map((s) => ({ label: s.ja, value: f[s.key] ?? 0 }))} />
         </Card>
         <Card title="受付件数">
@@ -94,9 +96,11 @@ function Board({ me }: { me: Me }) {
         </Card>
         <Card title="初回返答まで">
           <span className="big">{median == null ? "—" : median < 90 ? `${Math.round(median)}秒` : `${(median / 60).toFixed(1)}分`}</span>
-          <span className="small soft">障害通知から、承認済み返答がお客様に届くまでの中央値</span>
+          <span className="small soft">障害通知から、承認済み返答を送信するまでの中央値</span>
           <hr className="hairline" />
           <div className="row between"><span className="soft">案内確認まで到達</span><span className="mid num">{pct(f.guided ?? 0, total)}%</span></div>
+          <div className="row between small"><span className="soft">警備員の出動依頼</span><span className="num">{data?.dispatched ?? 0}件</span></div>
+          <div className="row between small"><span className="soft">連絡が取れず終了</span><span className="num">{data?.abandoned ?? 0}件</span></div>
         </Card>
         <Card title="お客様の選択">
           <div className="stack" style={gap(14)}>

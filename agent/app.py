@@ -2,11 +2,15 @@
 
 Speech in, text out: the agent transcribes the caller in their language and publishes the
 transcript to the room. The web app turns each final transcript into a draft the caller confirms.
-The agent speaks only text the caller's own client asks it to read back (`ichido.say`).
+The agent speaks only text the web server signed for this room (HMAC over "<room>\n<text>"),
+relayed by the caller's client on `ichido.say`; anything else is ignored.
 It never runs a conversational LLM, never decides anything, and never asks for numbers.
 """
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -25,7 +29,32 @@ VOICES = {
     "en-US": os.getenv("VOICE_EN_US", "en-US-JennyNeural"),
     "ja-JP": os.getenv("VOICE_JA_JP", "ja-JP-NanamiNeural"),
 }
-MAX_SAY_CHARS = 600
+MAX_SAY_BYTES = 4096
+BRIDGE_SECRET = os.environ["AGENT_BRIDGE_SECRET"].encode()
+
+
+def signed_text(room: str, payload: str) -> str | None:
+    """Return the text if its signature matches this room, else None."""
+    try:
+        msg = json.loads(payload)
+        text, sig = msg["text"], msg["sig"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(text, str) or not isinstance(sig, str):
+        return None
+    expected = base64.urlsafe_b64encode(hmac.new(BRIDGE_SECRET, f"{room}\n{text}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
+    return text if hmac.compare_digest(expected, sig) else None
+
+
+async def read_bounded(reader: rtc.TextStreamReader) -> str | None:
+    """Read a text stream but give up once it exceeds MAX_SAY_BYTES."""
+    parts, size = [], 0
+    async for chunk in reader:
+        size += len(chunk.encode())
+        if size > MAX_SAY_BYTES:
+            return None
+        parts.append(chunk)
+    return "".join(parts)
 
 server = AgentServer()
 
@@ -60,16 +89,19 @@ async def intake(ctx: JobContext) -> None:
         vad=ctx.proc.userdata["vad"],
     )
 
-    # Only the caller (identities issued by the token route start with "c-") may ask the agent to speak.
+    # Only the caller relays text, and only server-signed text for this room is spoken.
     def on_say(reader: rtc.TextStreamReader, sender: str) -> None:
         if not sender.startswith("c-"):
             return
 
         async def speak() -> None:
-            text = (await reader.read_all()).strip()[:MAX_SAY_CHARS]
-            if text:
-                session.interrupt()
-                session.say(text, add_to_chat_ctx=False)
+            payload = await read_bounded(reader)
+            text = signed_text(ctx.room.name, payload) if payload else None
+            if not text:
+                log.warning("ignored unsigned speech request")
+                return
+            session.interrupt()
+            session.say(text, add_to_chat_ctx=False)
 
         asyncio.create_task(speak())
 

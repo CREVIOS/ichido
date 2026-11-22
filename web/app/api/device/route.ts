@@ -28,6 +28,8 @@ export async function POST(req: Request): Promise<Response> {
 export async function GET(req: Request): Promise<Response> {
   const id = station(req);
   if (!id) return reply(401, { error: "unauthorised" });
-  const { data } = await admin.from("light").select("state, updated_at").eq("station", id).maybeSingle();
+  const { data, error } = await admin.from("light").select("state").eq("station", id).maybeSingle();
+  // A lookup failure must not look like a healthy idle station; the device shows "offline" instead.
+  if (error) return reply(503, { error: "unavailable" });
   return new Response(data?.state ?? "idle", { headers: { "content-type": "text/plain", "cache-control": "no-store" } });
 }

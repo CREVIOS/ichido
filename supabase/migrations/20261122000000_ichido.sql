@@ -40,6 +40,9 @@ create table public.desk (
   confirmed_rev int,
   caller_words text,                   -- caller's original wording, shared only after confirmation
   remote_release text check (remote_release in ('failed', 'released')),
+  clarifying boolean not null default false,   -- the assistant is asking the caller a clarifying question
+  abandoned boolean not null default false,
+  guided_at timestamptz,
   created_at timestamptz not null default now(),
   finished_at timestamptz
 );
@@ -57,6 +60,13 @@ create table ichido.pair_code (
   digest text unique not null,
   expires timestamptz not null
 );
+
+create table ichido.pair_attempt (
+  uid uuid not null,
+  station text not null,
+  at timestamptz not null default now()
+);
+create index pair_attempt_recent on ichido.pair_attempt (at);
 
 -- A caller (anonymous user) is bound to exactly one incident, and an incident to one caller.
 create table ichido.binding (
@@ -87,7 +97,10 @@ create table public.caller_card (
   field_state text not null default 'none' check (field_state in ('none', 'requested', 'on_way', 'arrived', 'done')),
   eta text,                            -- the guard's own estimate, e.g. '30-45'; null = unknown
   choice text check (choice in ('wait', 'leave')),
+  reply_id uuid,                       -- the latest approved reply shown to the caller
   teachback text,
+  teachback_ja text,                   -- machine translation for staff, labelled as such
+  teachback_reply uuid,                -- which reply the teach-back answers
   teachback_result text check (teachback_result in ('understood', 'clarify')),
   needs_human boolean not null default false
 );
@@ -108,6 +121,7 @@ create table public.field_job (
   station text not null references public.station,
   fault text not null,
   assignee uuid not null references ichido.staff,
+  generation int not null default 1,
   state text not null default 'requested' check (state in ('requested', 'on_way', 'arrived', 'done')),
   eta text,
   case_closed boolean not null default false,
@@ -165,25 +179,33 @@ begin
   end loop;
 end $$;
 
+create function ichido.guards_station(s text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.field_job f where f.station = s and f.assignee = auth.uid() and not f.case_closed)
+$$;
+revoke all on function ichido.guards_station(text) from public, anon, authenticated;
+grant execute on function ichido.guards_station(text) to authenticated;
+
 create policy station_read on public.station for select to authenticated
-  using (ichido.is_staff() or ichido.owns_station(id));
+  using (ichido.has_role('operator') or ichido.owns_station(id) or ichido.guards_station(id));
 create policy operator_desk on public.desk for select to authenticated
   using (ichido.has_role('operator'));
 create policy caller_draft on public.draft for select to authenticated
-  using (ichido.owns(incident) or ichido.has_role('operator'));
+  using (ichido.owns(incident));
 create policy caller_card_read on public.caller_card for select to authenticated
   using (ichido.owns(id) or ichido.has_role('operator'));
 create policy reply_read on public.reply for select to authenticated
   using (ichido.owns(incident) or ichido.has_role('operator'));
 create policy field_job_read on public.field_job for select to authenticated
-  using (ichido.has_role('operator') or (ichido.has_role('field') and assignee = auth.uid()));
+  using (ichido.has_role('operator') or (ichido.has_role('field') and assignee = auth.uid() and not case_closed));
 create policy events_read on public.case_event for select to authenticated
   using (ichido.has_role('operator'));
 create policy light_read on public.light for select to authenticated
-  using (ichido.is_staff());
+  using (ichido.has_role('operator'));
 
 alter publication supabase_realtime add table
   public.desk, public.draft, public.caller_card, public.reply, public.field_job, public.case_event, public.light;
+alter publication supabase_realtime set (publish = 'insert, update');
 
 -- Race-sensitive commands live in SQL so each runs in one transaction.
 

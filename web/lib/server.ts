@@ -9,7 +9,7 @@ export const priv = () => admin.schema("ichido");
 
 export type Actor =
   | { kind: "staff"; uid: string; role: "operator" | "field" | "manager"; name: string }
-  | { kind: "caller"; uid: string; incident: string | null; lang: "bn" | "en" | "ja" | null }
+  | { kind: "caller"; uid: string; incident: string | null; lang: "bn" | "en" | "ja" | null; expires: string | null }
   | { kind: "none" };
 
 // Derive the actor from the bearer token only; never trust role or incident fields in the body.
@@ -23,8 +23,8 @@ export async function actorFrom(req: Request): Promise<Actor> {
   if (staff) return { kind: "staff", uid, role: staff.role, name: staff.display_name };
   if (!data.user.is_anonymous) return { kind: "none" };
   const { data: b } = await priv()
-    .from("binding").select("incident, lang").eq("uid", uid).gt("expires", new Date().toISOString()).maybeSingle();
-  return { kind: "caller", uid, incident: b?.incident ?? null, lang: b?.lang ?? null };
+    .from("binding").select("incident, lang, expires").eq("uid", uid).gt("expires", new Date().toISOString()).maybeSingle();
+  return { kind: "caller", uid, incident: b?.incident ?? null, lang: b?.lang ?? null, expires: b?.expires ?? null };
 }
 
 export class HttpError extends Error {
