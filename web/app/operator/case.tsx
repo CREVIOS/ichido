@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ACTOR, DESK, FACTS, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
+import { SuggestCard } from "./suggest";
 import { hhmm, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Reply, type Run } from "./types";
 
 // True while a caller is connected: paired, and not reset since.
@@ -79,6 +80,7 @@ function Actions({ d, mine, closed, paired, lang, replies, job, guards, card, ru
   return (
     <>
       {!paired && <PairCard incident={d.id} />}
+      <SuggestCard d={d} run={run} />
       <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />

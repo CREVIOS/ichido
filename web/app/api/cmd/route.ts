@@ -1,9 +1,10 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
+import { suggest } from "@/lib/decide";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
-import { actorFrom, admin, priv, fail, reply, HttpError, type Actor } from "@/lib/server";
+import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
@@ -58,6 +59,18 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     staff(a, "operator");
     if (!isFault(b.fault)) fail(400, "bad_request");
     return { incident: await rpc("record_fault", { p_station: str(b, "station"), p_key: randomBytes(16).toString("hex"), p_source: "simulator", p_fault: b.fault }) };
+  },
+
+  // Gemini decision support for the operator who owns the case. Recorded on the timeline; never sent to the caller.
+  async suggest(a, b) {
+    const op = staff(a, "operator");
+    const incident = str(b, "incident");
+    const { data: d } = await admin.from("desk").select("id").eq("id", incident).eq("operator_id", op.uid).is("finished_at", null).maybeSingle();
+    if (!d) fail(409, "conflict");
+    const s = await suggest(incident);
+    if (!s) return { suggestion: null };
+    await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, model: s.model });
+    return { suggestion: s };
   },
 
   async staff_list(a) {

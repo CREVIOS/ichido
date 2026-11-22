@@ -146,6 +146,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "teachback": return "お客様が次の手順を自分の言葉で説明";
     case "human": return "お客様が担当者との会話を希望";
     case "clarify": return "理解が不十分 → 再案内";
+    case "suggested": return `AI提案（${d.model ?? "Gemini"}）：${replyOf(d.intent)?.code ?? "—"}${String(d.dispatch) === "true" ? `・${d.guard ?? "警備員"}へ依頼` : ""}（判断は担当者）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     default: return kind;
@@ -260,9 +261,9 @@ export const VOICE = {
   start: { bn: "কথা বলুন", en: "Speak", ja: "はなす" },
   stop: { bn: "থামুন", en: "Stop", ja: "とめる" },
   notice: {
-    bn: "কথা বললে আপনার কণ্ঠ LiveKit হয়ে Google-এর স্পিচ রিকগনিশনে যায়, আর আমার উত্তর Azure পড়ে শোনায়। লিখলে লেখা আমাদের সার্ভারে যায় (চালু থাকলে OpenAI-ও)। নম্বর বলবেন না।",
-    en: "If you speak, your voice goes through LiveKit to Google speech recognition, and Azure reads my replies aloud. If you type, the text goes to our server (and to OpenAI if enabled). Please don't say any numbers.",
-    ja: "はなすと 声は LiveKit を とおって Google の 音声認識に おくられ、Azure が こたえを よみあげます。書くと 文字は サーバーに おくられます（設定に よっては OpenAI にも）。番号は いわないで ください。",
+    bn: "কথা বললে আপনার কণ্ঠ LiveKit হয়ে Soniox-এর স্পিচ রিকগনিশনে যায়, আর আমার উত্তর ElevenLabs পড়ে শোনায়। লিখলে লেখা আমাদের সার্ভারে যায় (চালু থাকলে OpenAI-ও)। অপারেটরের সহায়তার জন্য Google Gemini শুধু নিশ্চিত তথ্য দেখে, আপনার কথা নয়। নম্বর বলবেন না।",
+    en: "If you speak, your voice goes through LiveKit to Soniox speech recognition, and ElevenLabs reads my replies aloud. If you type, the text goes to our server (and to OpenAI if enabled). Google Gemini helps the operator using only the facts you confirmed, never your words. Please don't say any numbers.",
+    ja: "はなすと 声は LiveKit を とおって Soniox の 音声認識に おくられ、ElevenLabs が こたえを よみあげます。書くと 文字は サーバーに おくられます（設定に よっては OpenAI にも）。係の 人を たすける Google Gemini は、あなたが かくにんした 内容だけを 見ます。番号は いわないで ください。",
   },
   connecting: { bn: "সংযোগ হচ্ছে…", en: "Connecting…", ja: "つないで います…" },
   hearing: { bn: "শুনছি…", en: "Listening…", ja: "きいています…" },
