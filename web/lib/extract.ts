@@ -26,7 +26,7 @@ export type Patch = { card_back: Fact | "unchanged"; cash_received: Fact | "unch
 const MODEL = () => process.env.OPENAI_MODEL ?? "gpt-6.1-terra";
 
 // One call to the Responses API; returns the model's output text, or null when it gave none.
-async function respond(key: string, body: Record<string, unknown>): Promise<string | null> {
+export async function respond(key: string, body: Record<string, unknown>): Promise<string | null> {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },

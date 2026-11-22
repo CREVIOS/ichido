@@ -18,6 +18,7 @@ export type Fields = {
   duration_ms?: number;
   station?: string;
   incident?: string;
+  session?: string;         // training session id (lib/training.ts)
   fault?: string;
   repeat?: boolean;
   ttl_s?: number;

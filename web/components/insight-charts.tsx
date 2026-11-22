@@ -49,6 +49,23 @@ export function ReplyLine({ data, label, target, targetLabel }: { data: { day: s
   );
 }
 
+// Training scores (0–100%) over sessions, with the pass line.
+export function ScoreLine({ data, label, target, targetLabel }: { data: { at: string; score: number }[]; label: string; target: number; targetLabel: string }) {
+  const config = { score: { label, color: GREEN } } satisfies ChartConfig;
+  return (
+    <ChartContainer config={config} className="aspect-auto h-[200px] w-full">
+      <LineChart data={data} margin={{ left: -8, right: 12, top: 12 }}>
+        <CartesianGrid vertical={false} strokeOpacity={0.6} />
+        <XAxis dataKey="at" {...AXIS} minTickGap={24} />
+        <YAxis {...AXIS} width={44} domain={[0, 100]} ticks={[0, 50, 100]} />
+        <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+        <ReferenceLine y={target} stroke="oklch(0.6 0.19 27)" strokeDasharray="4 4" label={{ value: targetLabel, position: "insideBottomRight", fontSize: 11, fill: "oklch(0.6 0.19 27)" }} />
+        <Line dataKey="score" type="monotone" stroke="var(--color-score)" strokeWidth={1.75} dot={{ r: 3 }} />
+      </LineChart>
+    </ChartContainer>
+  );
+}
+
 // Horizontal funnel: each stage's bar, with its count and conversion from the stage before.
 export function FunnelBars({ data, label }: { data: { stage: string; value: number; rate: string }[]; label: string }) {
   const config = { value: { label, color: "oklch(0.3 0 0)" } } satisfies ChartConfig;
