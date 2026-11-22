@@ -355,6 +355,7 @@ export const UI = {
 export * from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
+export * from "./enterprise.ts";
 export * from "./mobile.ts";
 
 // Pairing page behind the Help Point sticker.

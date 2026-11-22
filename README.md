@@ -15,6 +15,8 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | Route | Who | What |
 |---|---|---|
 | `/` | everyone | Overview and links |
+| `/enterprise` | monitoring centres, banks | What Ichido offers a centre: customization, controls, the full feature list, MCP, a 30-day rollout and buyer FAQ |
+| `/pricing` | monitoring centres, banks | **Proposed** 2027 pilot price list in JPY (Pilot, Centre, Network, Enterprise), subject to agreement |
 | `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
 | `/automation` | monitoring-centre operator | Every open case's Ichido Bot workflow and the step it is on |
 | `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
@@ -46,7 +48,9 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 - **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
-- **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Bengali, Vietnamese, Indonesian, Nepali, English and Japanese (staff screens Japanese only). `L10n` makes TypeScript refuse a caller string missing any language. The database holds codes and data only.
+- **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`, `enterprise.ts`): every user-visible string, fault type, reply and timeline sentence, in Bengali, Vietnamese, Indonesian, Nepali, English and Japanese (staff screens Japanese only). `L10n` makes TypeScript refuse a caller string missing any language. The database holds codes and data only.
+
+The marketing pages' sales links ("Start the pilot", "Talk to us", "Contact") go to the placeholder `CONTACT` address `pilot@ichido.example` in `web/content/enterprise.ts`; replace it with a real inbox before launch. "Sign in to the console" goes to `/operator`.
 
 ## MCP server
 
