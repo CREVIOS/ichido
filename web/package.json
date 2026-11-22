@@ -9,10 +9,12 @@
     "lint": "eslint",
     "check:ja": "node scripts/check-yasashii.mjs",
     "test": "node --env-file=.env.local --test --test-concurrency=1 tests/*.test.mjs",
-    "test:fresh": "supabase db reset --local --workdir .. && npm test"
+    "seed:staff": "node --env-file=.env.local ../scripts/seed-staff.mjs",
+    "test:fresh": "supabase db reset --local --workdir .. && npm run seed:staff && npm test"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@better-auth/expo": "^1.7.27",
     "@better-auth/passkey": "^1.7.27",
     "@livekit/protocol": "^1.54.1",
     "@modelcontextprotocol/server": "^2.4.0",
@@ -52,6 +54,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "playwright-core": "^1.65.1",
     "tailwindcss": "^4.3.5",
     "typescript": "^5"
   },

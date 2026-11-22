@@ -26,13 +26,13 @@ async function setArea(who: ReturnType<typeof staffIn>, stations: string[], noti
 
 export const disasterCommands: Record<string, Command> = {
   async disaster_set(a, b) {
-    const who = staffIn(a, ["operator", "manager"]);
+    const who = staffIn(a, ["operator", "manager", "admin"]);
     if (!isDisasterNotice(b.notice)) fail(400, "bad_request");
     return setArea(who, stationList(b), b.notice as string);
   },
 
   async disaster_clear(a, b) {
-    return setArea(staffIn(a, ["operator", "manager"]), stationList(b), null);
+    return setArea(staffIn(a, ["operator", "manager", "admin"]), stationList(b), null);
   },
 
   // Caller: the notice for their station, if it is in a disaster area, and where to go instead.

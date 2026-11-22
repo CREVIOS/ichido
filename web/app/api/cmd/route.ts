@@ -7,7 +7,8 @@ import * as training from "@/lib/training";
 import * as faults from "@/lib/faults";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
-import { actorFrom, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
+import { actorFrom, authorize, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
+import { COMMANDS } from "@/lib/rbac";
 import { requestLog, errorFields } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
@@ -49,7 +50,7 @@ async function finishVoice(cmd: "outcome" | "reset_caller" | "abandon", a: Actor
 
 const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async me(a) {
-    return a.kind === "staff" ? { role: a.role, name: a.name } : { role: a.kind };
+    return a.kind === "staff" ? { role: a.role, name: a.name, aal: a.aal } : { role: a.kind };
   },
 
   // Caller: which case this phone is bound to (none for staff sessions or unpaired phones).
@@ -322,6 +323,7 @@ export async function POST(req: Request): Promise<Response> {
       const limited = await limitKey(name, actor.uid, callerLimits[name], 60);
       if (limited) return limited;
     }
+    authorize(actor, COMMANDS[name]);   // lib/rbac.ts; a command missing there is refused
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });

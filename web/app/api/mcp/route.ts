@@ -2,13 +2,14 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { actorFrom, reply } from "@/lib/server";
+import { can } from "@/lib/rbac";
 import { eligibleReplies } from "@/lib/case-tools";
 import { suggest } from "@/lib/decide";
 import { boundedText, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 
 // Ichido as an MCP server (Streamable HTTP) for operators' and managers' own AI clients.
-// Sign in as staff and pass the Supabase access token as the bearer token. Every query runs as that person,
+// Sign in as staff and pass a token from /api/auth/supabase-token (scripts/mcp-token.mjs) as the bearer token. Every query runs as that person,
 // so row-level security decides what each tool can see. Read-only by design: no tool sends a reply or dispatches a guard —
 // a person does that in the console. Callers' drafts are never reachable.
 
@@ -82,11 +83,11 @@ const handler = createMcpHandler((server) => {
   });
 }, { serverInfo: { name: "ichido", version: "1.0.0" } });
 
-// Staff only: operators and managers. Guards and callers get 403.
+// Staff with mcp:use (lib/rbac.ts) and a second factor in the session. Guards and callers get 403.
 async function verify(req: Request, token?: string) {
   if (!token) return undefined;
   const a = await actorFrom(req);
-  if (a.kind !== "staff" || (a.role !== "operator" && a.role !== "manager")) return undefined;
+  if (a.kind !== "staff" || a.aal !== "aal2" || !can(a.role, "mcp:use")) return undefined;
   return { token, clientId: a.uid, scopes: [a.role], extra: { uid: a.uid, role: a.role, name: a.name, token } satisfies Who };
 }
 

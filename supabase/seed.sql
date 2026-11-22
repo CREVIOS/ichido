@@ -39,32 +39,8 @@ on conflict (id) do nothing;
 insert into public.light (station) values ('HOSP-A'), ('CITY-A'), ('RAIL-A'), ('SHELTER-A') on conflict (station) do nothing;
 -- packs:end
 
--- Staff accounts: operator, two guards, manager.
-do $$
-declare
-  acct record;
-  uid uuid;
-begin
-  for acct in select * from (values
-    ('operator@ichido.demo', 'operator', '伊藤'),
-    ('operator2@ichido.demo', 'operator', '佐藤'),
-    ('guard1@ichido.demo', 'field', '山口'),
-    ('guard2@ichido.demo', 'field', '中村'),
-    ('manager@ichido.demo', 'manager', '管理者')
-  ) as t(email, role, name) loop
-    uid := gen_random_uuid();
-    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-                            created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
-                            confirmation_token, recovery_token, email_change_token_new, email_change)
-    values ('00000000-0000-0000-0000-000000000000', uid, 'authenticated', 'authenticated', acct.email,
-            crypt('ichido-demo', gen_salt('bf')), now(), now(), now(),
-            '{"provider":"email","providers":["email"]}', '{}', '', '', '', '');
-    insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-    values (gen_random_uuid(), uid, uid::text, jsonb_build_object('sub', uid::text, 'email', acct.email),
-            'email', now(), now(), now());
-    insert into ichido.staff (uid, role, display_name) values (uid, acct.role::public.staff_role, acct.name);
-  end loop;
-end $$;
+-- Staff accounts are Better Auth users (schema auth_ba) with hashed passwords and authenticator secrets, so they
+-- come from scripts/seed-staff.mjs after the reset (npm run test:fresh runs it), not from SQL here.
 
 -- Local only: the test suite pairs at TABLE-A many times within five minutes. Production keeps the default of 30.
 update ichido.ops_setting set value = 500 where key = 'pair_station_limit';
