@@ -9,13 +9,16 @@ import { ChevronLeft, ChevronRight, Ellipsis, type LucideIcon } from "lucide-rea
 import { color, control, font, radius, shadow, space, type } from "@/theme";
 import { LANGS, LANG_NAME, MOBILE, type Lang } from "@content/catalogue";
 
-// Pick the face by script: Hind Siliguri for Bengali, Noto Sans JP for Japanese, Inter (or DM Mono) otherwise.
+// Pick the face by script: Hind Siliguri for Bengali, Noto Sans Devanagari for Nepali, Noto Sans JP for Japanese,
+// Inter (or DM Mono) otherwise; Inter covers Vietnamese and Indonesian.
 const BN = /[ঀ-৿]/;
+const NE = /[ऀ-ॿ]/;
 const JA = /[぀-ヿ㐀-鿿＀-￯]/;
 const textOf = (n: ReactNode): string =>
   typeof n === "string" || typeof n === "number" ? String(n) : Array.isArray(n) ? n.map(textOf).join("") : "";
 export function familyFor(s: string, weight: 400 | 500 = 400, mono = false): string {
   if (BN.test(s)) return font.bn[weight];
+  if (NE.test(s)) return font.ne[weight];
   if (JA.test(s)) return font.ja[weight];
   return (mono ? font.mono : font.inter)[weight];
 }
@@ -254,8 +257,9 @@ export function Fact({ label, value, tone }: { label: string; value: ReactNode; 
 
 export function LangPicker({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
   return (
-    <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="radiogroup">
-      {LANGS.map((l) => <Toggle key={l} on={l === lang} label={LANG_NAME[l]} onPress={() => onChange(l)} style={{ flex: 1, paddingHorizontal: 6 }} />)}
+    // Six languages: two rows of three, in LANGS order.
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }} accessibilityRole="radiogroup">
+      {LANGS.map((l) => <Toggle key={l} on={l === lang} label={LANG_NAME[l]} onPress={() => onChange(l)} style={{ flexBasis: "31%", flexGrow: 1, paddingHorizontal: 6 }} />)}
     </View>
   );
 }

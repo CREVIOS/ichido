@@ -4,7 +4,7 @@ import { Room, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
 import { Mic, Square } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { VOICE, type Lang } from "@/content/catalogue";
+import { VOICE, VOICE_LANGS, type Lang } from "@/content/catalogue";
 
 export type SignedSpeech = { text: string; sig: string };
 type State = "idle" | "connecting" | "live" | "unavailable";
@@ -86,6 +86,13 @@ export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text
     setState("idle");
   }
 
+  // No speech recognition for this language (Nepali): the caller types.
+  if (!VOICE_LANGS.includes(lang)) return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[14px]">{VOICE.unavailable[lang]}</p>
+      <p className="text-[12px] leading-5 text-muted-foreground">{VOICE.notice[lang]}</p>
+    </div>
+  );
   return (
     <div className="flex flex-col gap-2">
       {state === "live" ? (

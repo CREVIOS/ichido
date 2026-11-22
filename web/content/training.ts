@@ -27,8 +27,8 @@ export type Scenario = {
 
 // Slots for the approved replies in training: a fictional branch, never a real station row.
 export const TRAINING_SLOTS: { branch: L10n; hours: L10n } = {
-  branch: { ja: "訓練支店", bn: "প্রশিক্ষণ শাখা", en: "Training Branch" },
-  hours: { ja: "平日 9:00〜15:00", bn: "সোম–শুক্র ৯:০০–১৫:০০", en: "weekdays 9:00–15:00" },
+  branch: { ja: "訓練支店", bn: "প্রশিক্ষণ শাখা", en: "Training Branch", vi: "Chi nhánh đào tạo", id: "Cabang Pelatihan", ne: "तालिम शाखा" },
+  hours: { ja: "平日 9:00〜15:00", bn: "সোম–শুক্র ৯:০০–১৫:০০", en: "weekdays 9:00–15:00", vi: "thứ Hai–thứ Sáu, 9:00–15:00", id: "Senin–Jumat, 9:00–15:00", ne: "सोम–शुक्र, ९:००–१५:००" },
 };
 
 export const SCENARIOS: Scenario[] = [

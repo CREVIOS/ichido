@@ -4,9 +4,9 @@
 
 insert into public.station (id, label, branch, counter_hours, security_company, lat, lng) values (
   'TABLE-A',
-  '{"ja": "長崎駅前 店舗外ATM（架空）", "bn": "নাগাসাকি স্টেশনের সামনের এটিএম (কাল্পনিক)", "en": "Nagasaki Station front ATM (fictional)"}',
-  '{"ja": "出島銀行 駅前支店（架空）", "bn": "দেজিমা ব্যাংক স্টেশন শাখা (কাল্পনিক)", "en": "Dejima Bank Station branch (fictional)"}',
-  '{"ja": "平日 9:00〜15:00", "bn": "সোম–শুক্র, ৯:০০–১৫:০০", "en": "weekdays 9:00–15:00"}',
+  '{"ja": "長崎駅前 店舗外ATM（架空）", "bn": "নাগাসাকি স্টেশনের সামনের এটিএম (কাল্পনিক)", "en": "Nagasaki Station front ATM (fictional)", "vi": "Cây ATM trước ga Nagasaki (hư cấu)", "id": "ATM depan Stasiun Nagasaki (fiktif)", "ne": "नागासाकी स्टेसन अगाडिको एटीएम (काल्पनिक)"}',
+  '{"ja": "出島銀行 駅前支店（架空）", "bn": "দেজিমা ব্যাংক স্টেশন শাখা (কাল্পনিক)", "en": "Dejima Bank Station branch (fictional)", "vi": "Ngân hàng Dejima, chi nhánh Nhà ga (hư cấu)", "id": "Bank Dejima Cabang Stasiun (fiktif)", "ne": "देजिमा बैंक स्टेसन शाखा (काल्पनिक)"}',
+  '{"ja": "平日 9:00〜15:00", "bn": "সোম–শুক্র, ৯:০০–১৫:০০", "en": "weekdays 9:00–15:00", "vi": "Thứ Hai–thứ Sáu, 9:00–15:00", "id": "Senin–Jumat, 9:00–15:00", "ne": "सोम–शुक्र, ९:००–१५:००"}',
   '架空警備株式会社',
   32.7522, 129.8702
 );

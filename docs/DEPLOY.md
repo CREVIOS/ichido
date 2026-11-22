@@ -40,14 +40,14 @@ user under Authentication → Users (their staff row goes with it).
 ### Stations
 
 Each Help Point needs a station row. Run this once per station in the SQL editor. The labels are shown to
-callers in their language:
+callers in their language, one key per caller language (`bn`, `vi`, `id`, `ne`, `en`, `ja`); a missing key shows the `en` text:
 
 ```sql
 insert into public.station (id, label, branch, counter_hours, security_company, lat, lng) values (
   'TABLE-A',
-  '{"ja": "…", "bn": "…", "en": "…"}',      -- machine location
-  '{"ja": "…", "bn": "…", "en": "…"}',      -- branch name
-  '{"ja": "…", "bn": "…", "en": "…"}',      -- counter hours
+  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- machine location
+  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- branch name
+  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- counter hours
   '…',                                        -- security company
   32.75, 129.87                               -- location for the operator's map (optional)
 );
@@ -95,12 +95,16 @@ The secrets are stored by LiveKit Cloud and injected at runtime. They are not ba
 Speech providers, both with your own keys:
 
 - **Soniox** speech-to-text (`SONIOX_API_KEY`, model `SONIOX_MODEL`, default `stt-rt-v6`; v5 is deprecated
-  and is removed on 15 December 2026). The agent sends the caller's language as a strict hint (`bn`, `en`, `ja`).
+  and is removed on 15 December 2026). The agent sends the caller's language as a strict hint (`bn`, `vi`,
+  `id`, `en`, `ja`). Soniox has no Nepali model, so Nepali callers type: the web and mobile apps hide the
+  Speak button for `ne` and the token route refuses it (`voice_unavailable`).
 - **ElevenLabs** text-to-speech (`ELEVEN_API_KEY`, model `ELEVEN_MODEL`, default `eleven_v4_turbo`). Use a
   model that supports Bengali: `eleven_flash_v2_5` does not. Voices per language are `ELEVEN_VOICE_BN`,
-  `ELEVEN_VOICE_EN` and `ELEVEN_VOICE_JA`. All three default to ElevenLabs' stock voice
-  `hpp4J3VqNfWAUOO0d1Us`, which v4 speaks in every supported language. A native-speaker voice from the Voice
-  Library sounds better. The agent passes the language code so Bengali is pronounced as Bengali.
+  `ELEVEN_VOICE_VI`, `ELEVEN_VOICE_ID`, `ELEVEN_VOICE_EN` and `ELEVEN_VOICE_JA`. All default to ElevenLabs'
+  stock voice `hpp4J3VqNfWAUOO0d1Us`, which v4 speaks in every supported language. v4 Turbo also speaks
+  Nepali; once Soniox transcribes it, add `ne-NP` to `LANGS`/`VOICES` in `agent/app.py` with an
+  `ELEVEN_VOICE_NE` and to `VOICE_LANGS` in the catalogue. A native-speaker voice from the Voice Library
+  sounds better. The agent passes the language code so Bengali is pronounced as Bengali.
 
 Audio extras, both optional (the agent starts without them and logs `audio_setup` with what it used):
 
@@ -108,7 +112,7 @@ Audio extras, both optional (the agent starts without them and logs `audio_setup
   microphone. It is licensed through **LiveKit Cloud** only. On a self-hosted LiveKit server, set
   `NOISE_CANCELLATION=off`.
 - **Turn detection**: the multilingual end-of-turn model decides when a Japanese or English caller has
-  finished. Bengali uses Silero VAD endpointing. The model files come from `download-files`, which the
+  finished, and an Indonesian one. Bengali and Vietnamese use Silero VAD endpointing (the model does not cover them). The model files come from `download-files`, which the
   Dockerfile runs at build time. If they are missing, every language falls back to VAD endpointing
   (`turn_detector_unavailable` in the logs).
 

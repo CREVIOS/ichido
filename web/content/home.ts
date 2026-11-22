@@ -17,7 +17,7 @@ export const HOME = {
   secondary: { href: "/s/TABLE-A", label: "Help Point" },
   news: { label: "TSUNAGU", text: "Update the way we connect — Nagasaki" },
   title: ["Say it once.", "In your own language."],
-  lead: "When an ATM keeps your card, the monitoring centre already knows the machine failed. Ichido joins that alert, your own words and the operator's decision into one case — in Bengali, English or easy Japanese.",
+  lead: "When an ATM keeps your card, the monitoring centre already knows the machine failed. Ichido joins that alert, your own words and the operator's decision into one case — in Bengali, Vietnamese, Indonesian, Nepali, English or easy Japanese.",
   how: {
     title: "How Ichido works",
     steps: [
@@ -32,7 +32,7 @@ export const HOME = {
     lead: "Everyone sees the same case, and only the part they need.",
     items: [
       { href: "/operator", title: "Monitoring centre", sub: "監視センター", body: "Queue, machine state, the caller's own words beside the facts they confirmed, approved replies, dispatch." },
-      { href: "/s/TABLE-A", title: "Help Point", sub: "বাংলা · English · やさしい日本語", body: "Scan the sticker, enter the operator's single-use code, say what happened." },
+      { href: "/s/TABLE-A", title: "Help Point", sub: "বাংলা · Tiếng Việt · Bahasa Indonesia · नेपाली · English · やさしい日本語", body: "Scan the sticker, enter the operator's single-use code, say what happened." },
       { href: "/field", title: "Security guard", sub: "警備員", body: "Only your own assignments. On the way with your own estimate, arrived, done." },
       { href: "/insights", title: "Insights", sub: "インサイト", body: "How cases flow from the machine's alert to a caller who can explain their next step." },
     ],
@@ -76,7 +76,7 @@ export const HOME = {
     badgeState: "Caller confirmed",
     queue: [
       { title: "長崎駅前 店舗外ATM", meta: "2分前", status: "review", lang: "bn" },
-      { title: "浜町アーケード ATM", meta: "14分前", status: "field", lang: "en" },
+      { title: "浜町アーケード ATM", meta: "14分前", status: "field", lang: "vi" },
       { title: "出島ワーフ ATM", meta: "31分前", status: "guided", lang: "ja" },
     ],
     table: "すべて",
@@ -86,11 +86,11 @@ export const HOME = {
       { id: "NGS-01", title: "長崎駅前 店舗外ATM", reply: 6, time: "48秒", status: "review", lang: "bn", live: true },
       { id: "HMC-02", title: "浜町アーケード ATM", reply: 6, time: "1.2分", status: "field", lang: "en" },
       { id: "DJM-03", title: "出島ワーフ ATM", reply: 5, time: "2.0分", status: "guided", lang: "ja" },
-      { id: "OUR-04", title: "大浦天主堂下 ATM", reply: 5, time: "2.6分", status: "guided", lang: "bn" },
+      { id: "OUR-04", title: "大浦天主堂下 ATM", reply: 5, time: "2.6分", status: "guided", lang: "vi" },
       { id: "SAN-05", title: "思案橋 ATM", reply: 4, time: "3.4分", status: "received", lang: "en" },
-      { id: "ISH-06", title: "諫早駅 ATM", reply: 4, time: "3.9分", status: "guided", lang: "bn" },
+      { id: "ISH-06", title: "諫早駅 ATM", reply: 4, time: "3.9分", status: "guided", lang: "ne" },
       { id: "SSB-07", title: "佐世保四ヶ町 ATM", reply: 3, time: "5.1分", status: "field", lang: "ja" },
-      { id: "SMB-08", title: "島原港 ATM", reply: 3, time: "5.8分", status: "guided", lang: "en" },
+      { id: "SMB-08", title: "島原港 ATM", reply: 3, time: "5.8分", status: "guided", lang: "id" },
       { id: "OMR-09", title: "長崎空港 ATM", reply: 2, time: "7.5分", status: "alert", lang: "bn" },
       { id: "INS-10", title: "稲佐山口 ATM", reply: 2, time: "8.2分", status: "guided", lang: "ja" },
     ],

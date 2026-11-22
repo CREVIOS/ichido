@@ -188,7 +188,7 @@ export const CASES = {
   status: "状態",
   statuses: { open: "対応中", done: "完了", abandoned: "連絡なし終了" },
   language: "言語",
-  languages: { bn: "ベンガル語", en: "英語", ja: "やさしい日本語" },
+  languages: { bn: "ベンガル語", vi: "ベトナム語", id: "インドネシア語", ne: "ネパール語", en: "英語", ja: "やさしい日本語" },
   days: { today: "今日", week: "7日", month: "30日" },
   firstReply: "初回返答",
   operator: "担当",

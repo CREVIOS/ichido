@@ -7,6 +7,7 @@
     "@expo-google-fonts/dm-mono": "^0.4.2",
     "@expo-google-fonts/hind-siliguri": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/noto-sans-devanagari": "^0.4.2",
     "@expo-google-fonts/noto-sans-jp": "^0.4.4",
     "@livekit/react-native": "^3.2.0",
     "@livekit/react-native-expo-plugin": "^1.2.0",

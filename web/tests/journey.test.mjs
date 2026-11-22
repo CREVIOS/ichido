@@ -1,7 +1,8 @@
 // End-to-end: npm run test:fresh (resets the local DB, then runs against APP, default http://localhost:3123).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { staff, caller, cmd, ok, device, newKey, closeOpen } from "./helpers.mjs";
+import { staff, caller, cmd, ok, device, newKey, closeOpen, openPairedCase } from "./helpers.mjs";
+import { LANGS, pick, readBackText, replyOf } from "../content/catalogue.ts";
 
 test("typed journey: alert → corrected report → approved reply → guard → teach-back", async () => {
   const op = await staff("operator@ichido.demo");
@@ -87,4 +88,46 @@ test("typed journey: alert → corrected report → approved reply → guard →
   assert.ok((await a.c.rpc("insights", { p_days: 7 })).error);
   assert.ok((await g1.c.rpc("insights", { p_days: 7 })).error);
   assert.equal((await cmd(g1, "simulate", { station: "TABLE-A", fault: "card_retained" })).status, 403);
+});
+
+test("Vietnamese journey: pairs in vi, numbers withheld, read-back and approved reply in Vietnamese", async () => {
+  const op = await staff("operator@ichido.demo");
+  const a = await caller();
+  await closeOpen(op);
+  const incident = await openPairedCase(op, a, "vi");
+  assert.equal((await a.c.from("caller_card").select("lang").single()).data.lang, "vi");
+
+  assert.equal((await ok(cmd(a, "draft", { base_rev: 0, text: "mã pin là một hai ba bốn" }))).withheld, true);
+  const { say } = await ok(cmd(a, "draft", { base_rev: 0, card_back: "no", cash_received: "yes" }));
+  // The read-back the agent speaks (signed only when AGENT_BRIDGE_SECRET is set) is Vietnamese.
+  const readBack = readBackText("vi", { card_back: "no", cash_received: "yes" });
+  assert.equal(readBack, "Những gì tôi hiểu: Thẻ chưa được trả ra. Đã nhận được tiền");
+  if (say) assert.equal(say.text, readBack);
+  await ok(cmd(a, "confirm", { rev: 1 }));
+  await ok(cmd(op, "remote_release", { incident, result: "failed" }));
+  await ok(cmd(op, "send", { incident, intent: "HELD_WAIT_OR_LEAVE" }));
+
+  // What the caller's phone renders (app/caller/guidance.tsx): the catalogue text in vi with the station's vi slots.
+  const { data: [r] } = await a.c.from("reply").select("intent, slots");
+  const text = replyOf(r.intent).text(r.slots).vi;
+  assert.match(text, /^Thẻ của bạn đang ở trong máy\. Bạn có thể chờ ở đây, hoặc có thể ra về\./);
+  assert.ok(r.slots.branch.vi && r.slots.hours.vi, "the station row carries Vietnamese slots");
+  assert.ok(text.includes(`Quầy giao dịch của ${r.slots.branch.vi} (${r.slots.hours.vi})`), text);
+  await closeOpen(op);
+});
+
+test("pairing accepts the six caller languages only", async () => {
+  const op = await staff("operator@ichido.demo");
+  const a = await caller();
+  await closeOpen(op);
+  assert.equal((await device(newKey())).status, 204);
+  const { data: [d] } = await op.c.from("desk").select("id").is("finished_at", null);
+  await ok(cmd(op, "claim", { incident: d.id }));
+  const { code } = await ok(cmd(op, "issue_code", { incident: d.id }));
+  assert.equal((await cmd(a, "pair", { station: "TABLE-A", code, lang: "fr" })).status, 400);
+  await ok(cmd(a, "pair", { station: "TABLE-A", code, lang: "ne" }));
+  assert.equal((await a.c.from("caller_card").select("lang").single()).data.lang, "ne");
+  assert.deepEqual([...LANGS].sort(), ["bn", "en", "id", "ja", "ne", "vi"]);
+  assert.equal(pick({ en: "fallback" }, "ne"), "fallback", "a station without a Nepali key shows English");
+  await closeOpen(op);
 });

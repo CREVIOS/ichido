@@ -3,7 +3,7 @@ import { AccessToken } from "livekit-server-sdk";
 import { actorFrom, admin, reply } from "@/lib/server";
 import { requestLog } from "@/lib/log";
 import { roomFor } from "@/lib/speech";
-import { LANG_LOCALE, type Lang } from "@/content/catalogue";
+import { LANG_LOCALE, VOICE_LANGS, type Lang } from "@/content/catalogue";
 
 const MAX_TTL_S = 600;
 
@@ -25,6 +25,11 @@ export async function POST(req: Request): Promise<Response> {
   if (a.kind !== "caller" || !a.incident || !a.lang || !a.expires) return refuse(a.kind === "caller" ? "unpaired" : "not_caller");
   const { data: open } = await admin.from("desk").select("id").eq("id", a.incident).is("finished_at", null).maybeSingle();
   if (!open) return refuse("case_closed", a.incident);
+  // Nepali has no speech recognition: the caller types.
+  if (!VOICE_LANGS.includes(a.lang as Lang)) {
+    log.warn("voice_token", { role, incident: a.incident, status: 503, code: "voice_unavailable", duration_ms: log.ms() });
+    return reply(503, { error: "voice_unavailable" });
+  }
   const ttl = Math.min(MAX_TTL_S, Math.floor((Date.parse(a.expires) - Date.now()) / 1000));
   if (ttl <= 0) return refuse("binding_expired", a.incident);
 

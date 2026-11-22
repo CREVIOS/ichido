@@ -19,7 +19,7 @@ type Turn = { who: "caller" | "operator" | "system"; kind: string; text: string 
 const MAX_TURNS = 60;
 const MAX_SAY = 300;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LANG_EN: Record<Lang, string> = { bn: "Bengali", en: "English", ja: "plain, polite Japanese" };
+const LANG_EN: Record<Lang, string> = { bn: "Bengali", en: "English", ja: "plain, polite Japanese", vi: "Vietnamese", id: "Indonesian", ne: "Nepali" };
 
 // Asking for a number, unless the same sentence says not to.
 const NUMBER_WORD = /番号|暗証|ナンバー|number|pin\b|নম্বর|পিন/i;
