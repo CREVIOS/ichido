@@ -7,7 +7,7 @@ import { usePresence } from "@/lib/presence";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Dot, MoreMenu, Notice } from "@/components/kit";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CASES, DESK, DEVICE_FAULT, FAULTS, STAFF, isFault, staffError } from "@/content/catalogue";
+import { CASES, DESK, DEVICE_FAULT, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
 import { CaseAlerts } from "./alerts";
 import { CaseView } from "./case";
 import { Peers, Queue, useClock, useQueueKeys } from "./queue";
@@ -94,7 +94,7 @@ function Console({ me }: { me: Me }) {
   const watching = peers.filter((p) => current && p.viewing === current.id).map((p) => p.name);
   const stations = snapshot?.stations ?? [];
   const commands = [
-    ...(open ?? []).map((c) => ({ group: STAFF.palette.cases, label: `${label[c.station] ?? c.station} · ${isFault(c.fault) ? FAULTS[c.fault].ja : DESK.unknownFault}`, onSelect: () => select(c.id) })),
+    ...(open ?? []).map((c) => ({ group: STAFF.palette.cases, label: `${label[c.station] ?? c.station} · ${isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}`, onSelect: () => select(c.id) })),
     ...(current && !current.operator_id && !current.finished_at ? [{ group: STAFF.palette.actions, label: DESK.claim, hint: "C", onSelect: () => run("claim", { incident: current.id }) }] : []),
     ...stations.map((s) => ({ group: STAFF.palette.actions, label: DESK.manualFaultAt(s.label.ja), onSelect: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) })),
   ];

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { DESK, DEVICE_FAULT, FACTS, FAULTS, LANG_NAME, REPLIES, SLA, staffError, type Fact as FactValue, type Lang } from "@/content/catalogue";
+import { DESK, DEVICE_FAULT, FACTS, LANG_NAME, REPLIES, SLA, staffError, type Fact as FactValue, type Lang, STAFF_JA } from "@/content/catalogue";
 import { TRAINING, TRAINING_SLOTS, feedback, type Scenario, type ScoreItem } from "@/content/training";
 import { DispatchCard, ReplyCard } from "@/app/operator/actions";
 import { hhmm, type Reply, type Run } from "@/app/operator/types";
@@ -114,7 +114,7 @@ function Header({ s, sc }: { s: SessionRow; sc: Scenario }) {
         <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{sc.title}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-        <Fact label={DESK.facts.fault} value={FAULTS[DEVICE_FAULT].ja} />
+        <Fact label={DESK.facts.fault} value={STAFF_JA.fault[DEVICE_FAULT]} />
         <Fact label={TRAINING.language} value={LANG_NAME[s.lang]} />
         <Fact label={TRAINING.started} value={<span className="num">{hhmm(s.started_at)}</span>} />
         <Fact label={TRAINING.timer} value={<Timer s={s} />} />

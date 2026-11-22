@@ -177,7 +177,7 @@ const RATING_JA: Record<number, string> = { 3: "よかった", 2: "ふつう", 1
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
   switch (kind) {
-    case "fault": return `障害通知：${isFault(d.fault) ? FAULTS[d.fault].ja : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
+    case "fault": return `障害通知：${isFault(d.fault) ? STAFF_JA.fault[d.fault] : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
     case "claimed": return "担当者が対応を開始";
     case "escalated": return `エスカレーション（レベル${d.level}）：${DESK.escalationReason[d.reason ?? ""] ?? "対応期限を超過"}`;
@@ -188,7 +188,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "redispatch": return `別の警備員へ再依頼（${d.assignee ?? ""}）`;
     case "caller_reset": return "お客様の接続をリセット（新しいコードが必要）";
     case "abandoned": return "案件を終了（お客様と連絡が取れず）";
-    case "field": return `${FIELD_STATE[(d.state ?? "none") as FieldState].ja}${d.state === "on_way" ? `（目安 ${d.eta ? d.eta.replace("-", "〜") + "分" : "未定"}）` : ""}`;
+    case "field": return `${STAFF_JA.field[(d.state ?? "none") as FieldState]}${d.state === "on_way" ? `（目安 ${d.eta ? d.eta.replace("-", "〜") + "分" : "未定"}）` : ""}`;
     case "choice": return d.choice === "wait" ? "お客様：現地で待つ" : "お客様：帰宅し銀行からの連絡を待つ";
     case "teachback": return "お客様が次の手順を自分の言葉で説明";
     case "human": return "お客様が担当者との会話を希望";
@@ -349,7 +349,7 @@ export const UI = {
 } satisfies Record<string, L10n>;
 
 export * from "./staff.ts";
-import { HANDOFF } from "./staff.ts";
+import { HANDOFF, STAFF_JA } from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./mobile.ts";

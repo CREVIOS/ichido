@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Dot } from "@/components/kit";
 import { cn } from "@/lib/utils";
-import { DESK, FAULTS, LANG_NAME, SLA, isFault } from "@/content/catalogue";
+import { DESK, LANG_NAME, SLA, isFault, STAFF_JA } from "@/content/catalogue";
 import type { Peer } from "@/lib/presence";
 import { when, type Desk, type OpenDesk, type Targets, type Run } from "./types";
 
@@ -61,7 +61,7 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
         {open.map((c) => (
           <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
             title={label[c.station] ?? c.station} meta={ago(c.created_at)}
-            sub={<>{isFault(c.fault) ? FAULTS[c.fault].ja : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}</>} />
+            sub={<>{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}</>} />
         ))}
       </QueueGroup>
       {done.length > 0 && (

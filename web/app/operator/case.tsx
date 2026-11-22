@@ -6,7 +6,7 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, DESK, FACT_STAFF, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
@@ -100,7 +100,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{isFault(d.fault) ? FAULTS[d.fault].ja : DESK.unknownFault}</span>
+          <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{isFault(d.fault) ? STAFF_JA.fault[d.fault] : DESK.unknownFault}</span>
           {d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}
         </div>
         <MoreMenu label={DESK.caseMenu} items={menu} />

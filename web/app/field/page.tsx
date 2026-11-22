@@ -8,7 +8,7 @@ import { AppShell, Chip, Dot } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DESK, ETA_OPTIONS, FAULTS, FIELD, FIELD_STATE, isFault, type FieldState, type L10n } from "@/content/catalogue";
+import { DESK, ETA_OPTIONS, FIELD, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
 type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
 const UNKNOWN_ETA = "";
@@ -55,11 +55,11 @@ function JobCard({ j, label }: { j: Job; label: string }) {
     <section className="surface flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
         <span className="mono text-muted-foreground">{j.station}</span>
-        <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{FIELD_STATE[j.state].ja}</span>
+        <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{STAFF_JA.field[j.state]}</span>
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-[22px] leading-tight tracking-[-0.03em] text-foreground">{label}</span>
-        <span className="text-[14px]">{isFault(j.fault) ? FAULTS[j.fault].ja : DESK.unknownFault}</span>
+        <span className="text-[14px]">{isFault(j.fault) ? STAFF_JA.fault[j.fault] : DESK.unknownFault}</span>
       </div>
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
       {(j.state === "requested" || j.state === "on_way") && (

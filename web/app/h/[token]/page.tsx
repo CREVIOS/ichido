@@ -3,7 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { admin } from "@/lib/server";
 import { openHandoff } from "@/lib/handoff";
 import { Mark } from "@/components/mark";
-import { ACTOR, DESK, FACT_STAFF, FAULTS, FIELD_STATE, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status, STAFF_JA } from "@/content/catalogue";
 import { PrintButton } from "./print";
 
 export const metadata: Metadata = { title: HANDOFF.doc.title, robots: { index: false, follow: false } };
@@ -30,7 +30,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
   ]);
   if (!d) return null;
   const { data: st } = await admin.from("station").select("label, branch").eq("id", d.station).maybeSingle();
-  const status = d.abandoned ? DESK.abandonedChip : d.finished_at ? STATUS[d.status as Status].ja : `${D.open}・${STATUS[d.status as Status].ja}`;
+  const status = d.abandoned ? DESK.abandonedChip : d.finished_at ? STAFF_JA.status[d.status as Status] : `${D.open}・${STAFF_JA.status[d.status as Status]}`;
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-8 px-5 py-10 print:py-0">
@@ -50,7 +50,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
       <Grid rows={[
         [D.station, `${(st?.label as L10n | undefined)?.ja ?? d.station}（${d.station}）`],
         [D.branch, (st?.branch as L10n | undefined)?.ja ?? D.none],
-        [D.fault, isFault(d.fault) ? FAULTS[d.fault].ja : DESK.unknownFault],
+        [D.fault, isFault(d.fault) ? STAFF_JA.fault[d.fault] : DESK.unknownFault],
         [D.source, DESK.source[d.source] ?? d.source],
         [D.opened, at(d.created_at)],
         [D.closed, at(d.finished_at)],
@@ -71,7 +71,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
         <Grid rows={[
           [D.replies, replies?.length ? replies.map((r) => `${replyOf(r.intent)?.code ?? ""} ${replyOf(r.intent)?.title ?? r.intent}（${at(r.sent_at)}）`).join("\n") : D.none],
           [D.release, d.remote_release ? REMOTE_RELEASE[d.remote_release] : DESK.releaseNone],
-          [D.guard, job ? `${FIELD_STATE[job.state as FieldState].ja}${job.eta ? `・${DESK.dispatch.eta(job.eta)}` : ""}` : D.none],
+          [D.guard, job ? `${STAFF_JA.field[job.state as FieldState]}${job.eta ? `・${DESK.dispatch.eta(job.eta)}` : ""}` : D.none],
           [D.choice, card?.choice ? DESK.choiceText[card.choice] : D.none],
           [D.outcome, card?.teachback_result === "understood" ? STATUS.guided.ja : card?.teachback_result ? DESK.teach.clarify : D.none],
           [D.rating, card?.rating ? RATING[card.rating].ja : D.none],

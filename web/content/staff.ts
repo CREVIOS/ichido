@@ -305,3 +305,14 @@ export const HANDOFF = {
     open: "対応中",
   },
 };
+
+// Formal Japanese for staff screens, records and hand-offs. Callers (including Japanese callers) see the easy-Japanese
+// versions in catalogue.ts STATUS / FIELD_STATE / FAULTS.
+export const STAFF_JA = {
+  status: { received: "受付済み", review: "担当者が確認中", field: "現地確認を依頼済み", guided: "案内確認済み" } as Record<string, string>,
+  field: {
+    none: "未依頼", requested: "現地確認を依頼しました", on_way: "警備員が向かっています", arrived: "警備員が到着しました",
+    done: "現地対応完了（カードの扱いは銀行所定の手続き）",
+  } as Record<string, string>,
+  fault: { card_retained: "取引後にカードが排出されない" } as Record<string, string>,
+};

@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyOf, staffError, type Lang } from "@/content/catalogue";
+import { DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
 
 // Seconds left on a single-use code, ticking once a second.
@@ -99,7 +99,7 @@ export function DispatchCard({ d, job, guards, card, lang, run }: { d: Pick<Desk
         <div className="surface flex flex-col gap-1 p-3.5">
           <span className="flex items-center justify-between text-[14px] text-foreground">
             {guards.find((g) => g.uid === job.assignee)?.display_name ?? DESK.dispatch.guard}
-            <Chip>{FIELD_STATE[job.state].ja}</Chip>
+            <Chip>{STAFF_JA.field[job.state]}</Chip>
           </span>
           <span className="text-[13px]">{job.eta ? DESK.dispatch.eta(job.eta) : DESK.dispatch.etaUnknown}</span>
         </div>

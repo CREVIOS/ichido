@@ -2,10 +2,10 @@ import { Bell, ChartNoAxesColumn, ChevronsLeft, CircleDashed, Clock, Languages, 
 import { Dot } from "@/components/kit";
 import { Mark } from "@/components/mark";
 import { Pill, SegBar } from "@/components/charts";
-import { DESK, HOME, LANG_NAME, NAV, STATUS, type Lang, type Status } from "@/content/catalogue";
+import { DESK, HOME, LANG_NAME, NAV, type Lang, type Status, STAFF_JA } from "@/content/catalogue";
 
 const P = HOME.preview;
-const statusText = (s: string) => (s === "alert" ? DESK.abandonedChip : STATUS[s as Status].ja);
+const statusText = (s: string) => (s === "alert" ? DESK.abandonedChip : STAFF_JA.status[s as Status]);
 
 // Static illustration of the console's case table, assembled from the catalogue; it bleeds off the right edge like a window.
 export function HeroPreview() {

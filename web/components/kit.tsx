@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Mark } from "@/components/mark";
 import { Palette, usePalette, type PaletteItem } from "@/components/palette";
 export { Mark } from "@/components/mark";
-import { STATUS, STAFF, type Lang, type Status } from "@/content/catalogue";
+import { STATUS, STAFF, STAFF_JA, type Lang, type Status } from "@/content/catalogue";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon; count?: number };
 
@@ -118,8 +118,8 @@ export function MoreMenu({ label, items }: { label: string; items: { label: stri
 
 export const Dot = ({ s, className }: { s: string; className?: string }) => <span className={cn("dot", className)} data-s={s} aria-hidden />;
 
-export function StatusLabel({ status, lang = "ja", className }: { status: Status; lang?: Lang; className?: string }) {
-  return <span className={cn("inline-flex items-center gap-1.5 text-[13px] text-soft", className)}><Dot s={status} />{STATUS[status][lang]}</span>;
+export function StatusLabel({ status, lang, className }: { status: Status; lang?: Lang; className?: string }) {
+  return <span className={cn("inline-flex items-center gap-1.5 text-[13px] text-soft", className)}><Dot s={status} />{lang ? STATUS[status][lang] : STAFF_JA.status[status]}</span>;
 }
 
 // Small grey token, as used for counts and metadata.
