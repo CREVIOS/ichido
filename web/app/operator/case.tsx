@@ -6,17 +6,18 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACCESS_STAFF, ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACCESS_STAFF, ACTOR, BOT, DESK, REVIEW, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
 import { BankStatusCard, CallerFlags, FaultCard } from "./faults";
 import { DeviceCodeCard, TextOnlyBadge, TextOnlyBanner } from "./access";
-import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
+import { hhmm, when, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
 
-type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null };
-const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null };
+type Approval = { reviewer: string; reviewed_at: string; note: string | null };
+type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null; approval: Approval | null };
+const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null, approval: null };
 
 // True while a caller is connected: paired, and not reset since.
 const isPaired = (events: CaseEvent[]) => {
@@ -33,7 +34,7 @@ function useCase(id: string) {
   // Staff never read the caller's draft; only what the caller confirmed reaches the desk.
   const load = useCallback(async () => {
     const db = sb();
-    const [c, e, r, j, b, x, p, rec] = await Promise.all([
+    const [c, e, r, j, b, x, p, rec, ok] = await Promise.all([
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
@@ -42,11 +43,12 @@ function useCase(id: string) {
       db.from("escalation").select("reason").eq("incident", id),
       db.from("bot_suggestion").select("rev, suggestion").eq("incident", id).maybeSingle(),
       db.from("case_record").select("summary").eq("incident", id).maybeSingle(),
+      db.from("review_state").select("reviewer, reviewed_at, note").eq("incident", id).eq("kind", "record").eq("decision", "approved").maybeSingle(),
     ]);
     setCard(c.data as CallerCard); setEvents((e.data ?? []) as CaseEvent[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
-    setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null });
+    setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null, approval: ok.data as Approval | null });
   }, [id]);
-  useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation"], load);
+  useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation", "review_state"], load);
   return { card, events, replies, job, bot };
 }
 
@@ -72,8 +74,9 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         {d.operator_id && <HandoffPanel incident={d.id} />}
         {d.operator_id && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
-          <Panel title={DESK.record} action={<Chip>{bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
+          <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
+            {bot.approval?.note && <p className="inset px-3 py-2 text-[13px] leading-5"><span className="label mr-2">{REVIEW.record.staffNote}</span>{bot.approval.note}</p>}
           </Panel>
         )}
       </div>

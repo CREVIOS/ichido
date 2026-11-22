@@ -4,6 +4,7 @@
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 import { FAULT_NAMES, FAULT_REPLIES, faultEventText } from "./faults.ts";
+import { REVIEW } from "./review.ts";
 
 export const MANUAL_VERSION = "retained-card/v1";
 
@@ -205,7 +206,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
-    default: return accessEventText(kind, d) ?? faultEventText(kind, d) ?? kind;
+    default: return accessEventText(kind, d) ?? faultEventText(kind, d) ?? REVIEW.events[kind] ?? kind;
   }
 }
 
@@ -356,6 +357,7 @@ export const UI = {
 } satisfies Record<string, L10n>;
 
 export * from "./staff.ts";
+export * from "./review.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./enterprise.ts";
