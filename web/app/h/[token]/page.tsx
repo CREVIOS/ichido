@@ -3,7 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { admin } from "@/lib/server";
 import { openHandoff } from "@/lib/handoff";
 import { Mark } from "@/components/mark";
-import { ACTOR, DESK, FACTS, FAULTS, FIELD_STATE, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, FAULTS, FIELD_STATE, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status } from "@/content/catalogue";
 import { PrintButton } from "./print";
 
 export const metadata: Metadata = { title: HANDOFF.doc.title, robots: { index: false, follow: false } };
@@ -61,8 +61,8 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
       <Section title={D.confirmed}>
         {d.confirmed_rev == null ? <p className="text-[14px]">{D.none}</p> : (
           <ul className="flex flex-col gap-1 text-[15px] text-foreground">
-            <li>{FACTS.card_back[d.card_back as Fact].ja}</li>
-            <li>{FACTS.cash_received[d.cash_received as Fact].ja}</li>
+            <li>{FACT_STAFF.card_back[d.card_back as Fact]}</li>
+            <li>{FACT_STAFF.cash_received[d.cash_received as Fact]}</li>
           </ul>
         )}
       </Section>

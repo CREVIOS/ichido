@@ -33,7 +33,7 @@ export function DailyArea({ data, labels, compact }: { data: { day: string; rece
   );
 }
 
-export function ReplyLine({ data, label, target, targetLabel }: { data: { day: string; minutes: number | null }[]; label: string; target: number; targetLabel: string }) {
+export function ReplyLine({ data, label, target, targetLabel }: { data: { day: string; minutes: number | null }[]; label: string; target?: number; targetLabel: string }) {
   const config = { minutes: { label, color: BLUE } } satisfies ChartConfig;
   return (
     <ChartContainer config={config} className="aspect-auto h-[300px] w-full">
@@ -42,7 +42,7 @@ export function ReplyLine({ data, label, target, targetLabel }: { data: { day: s
         <XAxis dataKey="day" {...AXIS} minTickGap={24} />
         <YAxis {...AXIS} width={44} />
         <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
-        <ReferenceLine y={target} stroke="oklch(0.6 0.19 27)" strokeDasharray="4 4" label={{ value: targetLabel, position: "insideTopRight", fontSize: 11, fill: "oklch(0.6 0.19 27)" }} />
+        {target != null && <ReferenceLine y={target} stroke="oklch(0.6 0.19 27)" strokeDasharray="4 4" label={{ value: targetLabel, position: "insideTopRight", fontSize: 11, fill: "oklch(0.6 0.19 27)" }} />}
         <Line dataKey="minutes" type="monotone" stroke="var(--color-minutes)" strokeWidth={1.75} dot={{ r: 3 }} connectNulls />
       </LineChart>
     </ChartContainer>

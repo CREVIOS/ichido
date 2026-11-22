@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, RATING, RATINGS, SLA, type Lang } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, RATING, RATINGS, type Lang } from "@/content/catalogue";
 
 export type Insights = {
   since: string;
@@ -14,6 +14,7 @@ export type Insights = {
   median_first_reply_s: number | null;
   choices: Record<string, number>;
   ratings: Record<string, number>;
+  targets: Partial<Record<string, number>>;
 };
 
 const HOURS_PER_SLOT = 2;
@@ -62,7 +63,7 @@ export const METRICS = {
     detail: (d: Insights) => (
       <div className="flex flex-col gap-6">
         <Big>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>
-        <ReplyLine label={series.reply} target={SLA.firstReplyS / 60} targetLabel={INSIGHTS.target(INSIGHTS.duration(SLA.firstReplyS))}
+        <ReplyLine label={series.reply} target={d.targets.no_reply != null ? d.targets.no_reply / 60 : undefined} targetLabel={d.targets.no_reply != null ? INSIGHTS.target(INSIGHTS.duration(d.targets.no_reply)) : ""}
           data={d.per_day.map((x) => ({ day: dayLabel(x.day), minutes: minutes(x.first_reply_s) }))} />
       </div>
     ),

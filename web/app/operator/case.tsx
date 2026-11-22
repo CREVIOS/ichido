@@ -6,7 +6,7 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, DESK, FACTS, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
@@ -129,8 +129,8 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </div>
           <div className="surface flex flex-col gap-2 p-4">
             <span className="flex justify-between"><span className="label">{DESK.confirmed}</span><span className="label num">{DESK.rev(d.confirmed_rev)}</span></span>
-            <span className="text-[15px] text-foreground">{FACTS.card_back[d.card_back].ja}</span>
-            <span className="text-[15px] text-foreground">{FACTS.cash_received[d.cash_received].ja}</span>
+            <span className="text-[15px] text-foreground">{FACT_STAFF.card_back[d.card_back]}</span>
+            <span className="text-[15px] text-foreground">{FACT_STAFF.cash_received[d.cash_received]}</span>
           </div>
         </div>
       )}

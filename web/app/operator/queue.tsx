@@ -4,7 +4,7 @@ import { Dot } from "@/components/kit";
 import { cn } from "@/lib/utils";
 import { DESK, FAULTS, LANG_NAME, SLA, isFault } from "@/content/catalogue";
 import type { Peer } from "@/lib/presence";
-import { when, type Desk, type Run } from "./types";
+import { when, type Desk, type OpenDesk, type Targets, type Run } from "./types";
 
 // A clock for countdowns and "n minutes ago", ticking every 15 seconds.
 export function useClock() {
@@ -13,15 +13,15 @@ export function useClock() {
   return now;
 }
 
-type Sla = { kind: string; tone: "ok" | "warn" | "late"; left: number };
+type Sla = { tone: "ok" | "warn" | "late"; left: number };
 
 // Which target applies to an open case, and how close it is: unclaimed → claim target; claimed without a reply → first-reply target.
-function slaOf(c: Desk, replied: boolean, now: number): Sla | null {
-  if (c.finished_at || replied || c.status === "guided") return null;
-  const kind = c.operator_id ? "reply" : "claim";
-  const target = kind === "claim" ? SLA.claimS : SLA.firstReplyS;
-  const left = Math.round(target - (now - Date.parse(c.created_at)) / 1000);
-  return { kind, tone: left < 0 ? "late" : left < target * (1 - SLA.warn) ? "warn" : "ok", left };
+function slaOf(c: OpenDesk, targets: Targets, now: number): Sla | null {
+  const start = c.operator_id ? c.case_event[0]?.at : c.created_at;
+  const target = targets[c.operator_id ? "no_reply" : "unclaimed"];
+  if (c.reply.length || !start || !target) return null;
+  const left = Math.round(target - (now - Date.parse(start)) / 1000);
+  return { tone: left < 0 ? "late" : left < target * (1 - SLA.warn) ? "warn" : "ok", left };
 }
 
 // J / K move through open cases, C claims the selected one. Ignored while typing or in a dialog.
@@ -51,15 +51,15 @@ export function Peers({ peers }: { peers: Peer[] }) {
   );
 }
 
-export function Queue({ open, done, replied, now, label, current, onPick }: {
-  open: Desk[]; done: Desk[]; replied: Set<string>; now: number; label: Record<string, string>; current?: string; onPick: (id: string) => void;
+export function Queue({ open, done, targets, now, label, current, onPick }: {
+  open: OpenDesk[]; done: Desk[]; targets: Targets; now: number; label: Record<string, string>; current?: string; onPick: (id: string) => void;
 }) {
   const ago = (t: string) => DESK.minutesAgo(Math.max(0, Math.round((now - Date.parse(t)) / 60000)));
   return (
     <div className="flex flex-col gap-4">
       <QueueGroup title={DESK.queue} empty={DESK.empty}>
         {open.map((c) => (
-          <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, replied.has(c.id), now)}
+          <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
             title={label[c.station] ?? c.station} meta={ago(c.created_at)}
             sub={<>{isFault(c.fault) ? FAULTS[c.fault].ja : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}</>} />
         ))}

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:ja": "node scripts/check-yasashii.mjs",
     "test": "node --env-file=.env.local --test --test-concurrency=1 tests/*.test.mjs",
     "test:fresh": "supabase db reset --local --workdir .. && npm test"
   },

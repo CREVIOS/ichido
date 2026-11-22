@@ -1,0 +1,48 @@
+import { ANSWER, ERRORS, FACTS, FAULTS, FIELD_STATE, MOBILE_CALLER, RATING, REPLIES, STATION, STATUS, UI, VOICE, etaText } from "../content/catalogue.ts";
+
+// Familiar banking and pairing terms, and the language name in the help-desk notice.
+const allowed = new Set(["カード", "コード", "シール", "ベンガル"]);
+const keigo = /いたします|ございま(?:す|し)|申し上げ|存じ|させていただ/u;
+
+export function findings(text) {
+  const issues = [];
+  for (const sentence of text.normalize("NFKC").split(/[。.!?\n]+/u)) {
+    const words = sentence.trim().split(/\s+/u);
+    if (words.some((w) => [...w].length > 40)) issues.push("over 40 characters without a break");
+    const letters = sentence.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/gu) ?? [];
+    const kanji = letters.filter((c) => /\p{Script=Han}/u.test(c)).length;
+    if (kanji > letters.length * 0.35) issues.push(`kanji ${Math.round(100 * kanji / letters.length)}%`);
+    const formal = words.join("").match(keigo);
+    if (formal) issues.push(`keigo: ${formal[0]}`);
+    for (const word of sentence.match(/[\p{Script=Katakana}][\p{Script=Katakana}ー]*/gu) ?? []) {
+      if (!allowed.has(word)) issues.push(`katakana: ${word}`);
+    }
+  }
+  return [...new Set(issues)];
+}
+
+function* japanese(entries, path = "") {
+  for (const [key, value] of Object.entries(entries)) {
+    const name = path ? `${path}.${key}` : key;
+    if (typeof value?.ja === "string") yield [name, value.ja];
+    else if (value && typeof value === "object") yield* japanese(value, name);
+  }
+}
+
+function checkCatalogue() {
+  const slots = { branch: { ja: "駅前支店" }, hours: { ja: "平日 9時から 15時まで" } };
+  const replies = Object.fromEntries(Object.entries(REPLIES).map(([key, r]) => [key, r.text(slots)]));
+  const entries = japanese({ UI, STATION, VOICE, ERRORS, FACTS, FAULTS, ANSWER, STATUS, FIELD_STATE, RATING, MOBILE: MOBILE_CALLER, REPLIES: replies,
+    ETA: { pending: { ja: etaText(null, "ja") }, provided: { ja: etaText("10-20", "ja") } } });
+  const rows = [];
+  let checked = 0;
+  for (const [entry, text] of entries) {
+    checked++;
+    for (const rule of findings(text)) rows.push({ entry, rule, text });
+  }
+  if (rows.length) console.table(rows);
+  console.log(`${checked} Japanese entries checked, ${rows.length} findings`);
+  if (rows.length) process.exitCode = 1;
+}
+
+if (import.meta.main) checkCatalogue();
