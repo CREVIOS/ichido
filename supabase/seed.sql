@@ -38,3 +38,6 @@ begin
     insert into ichido.staff (uid, role, display_name) values (uid, acct.role::public.staff_role, acct.name);
   end loop;
 end $$;
+
+-- Local only: the test suite pairs at TABLE-A many times within five minutes. Production keeps the default of 30.
+update ichido.ops_setting set value = 500 where key = 'pair_station_limit';
