@@ -27,7 +27,7 @@ const config: ExpoConfig = {
   android: {
     package: "demo.ichido.mobile",
     adaptiveIcon: {
-      backgroundColor: "#F5F5F5",
+      backgroundColor: "#0A0A0A",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",

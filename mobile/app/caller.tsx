@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
-import { Check, Volume2 } from "lucide-react-native";
+import { Check, CircleCheck, Frown, Meh, Smile, Volume2 } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { hasVoice } from "@/lib/voice";
-import { Brand, Button, Card, Icon, Input, Notice, Screen, T, Tag, Toggle } from "@/components/ui";
-import { color, radius, space } from "@/theme";
+import { Brand, Button, Card, Icon, Input, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
+import { color, radius, shadow, space, tint } from "@/theme";
 import {
-  FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
+  FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
   type Lang, type Fact, type Status, type FieldState, type L10n,
 } from "@content/catalogue";
 
 type CallerCard = {
   id: string; station: string; fault: string; lang: Lang | null; confirmed_rev: number | null; status: Status;
-  field_state: FieldState; eta: string | null; choice: string | null; teachback: string | null; teachback_result: string | null; needs_human: boolean;
+  field_state: FieldState; eta: string | null; choice: string | null; teachback: string | null; teachback_result: string | null; needs_human: boolean; rating: number | null;
 };
 type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -64,8 +64,8 @@ export default function CallerScreen() {
   return (
     <Screen eyebrow={<Brand />} right={<Tag value={LANG_NAME[lang]} />} onRefresh={load}>
       <View style={{ gap: 6 }}>
-        <T v="small">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
-        <Tag value={STATUS[card.status][lang]} />
+        <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
+        <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
       </View>
       {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
       {confirmed && !latest && <Waiting lang={lang} />}
@@ -193,9 +193,12 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCard; reply: 
       )}
 
       {done ? (
-        <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Icon icon={Check} size={18} /><T v="h2">{STATUS.guided[lang]}</T>
-        </Card>
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.card, padding: space.lg, backgroundColor: tint.guided.bg }}>
+            <CircleCheck size={20} strokeWidth={1.5} color={tint.guided.fg} /><T v="h2" style={{ color: tint.guided.fg }}>{STATUS.guided[lang]}</T>
+          </View>
+          <Rate lang={lang} rating={card.rating} onNote={setNote} />
+        </>
       ) : card.teachback ? (
         <T v="label">{UI.teachBackSent[lang]}</T>
       ) : (
@@ -206,5 +209,30 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCard; reply: 
         </Card>
       )}
     </>
+  );
+}
+
+const FACE = { 3: Smile, 2: Meh, 1: Frown } as const;
+
+// Three faces after a guided close (web/app/caller/guidance.tsx): one tap, no text, counted in insights.
+function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onNote: (n: string) => void }) {
+  if (rating) return <T v="row">{UI.rateThanks[lang]}</T>;
+  return (
+    <View style={{ gap: 10 }}>
+      <T v="label" tone="muted">{UI.rateTitle[lang]}</T>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {RATINGS.map((r) => {
+          const Face = FACE[r];
+          return (
+            <Pressable key={r} accessibilityRole="button" accessibilityLabel={RATING[r][lang]}
+              onPress={() => cmd("rate", { rating: r }).catch((e: Error) => onNote(errorText(e.message, lang)))}
+              style={({ pressed }) => [{ flex: 1, height: 84, alignItems: "center", justifyContent: "center", gap: 6, borderRadius: radius.card, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.press : color.surface }, shadow]}>
+              <Face size={24} strokeWidth={1.5} color={color.ink} />
+              <T v="row">{RATING[r][lang]}</T>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }

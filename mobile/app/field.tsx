@@ -4,13 +4,15 @@ import { LogOut } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
-import { Brand, Button, Card, Hairline, IconButton, Notice, Screen, T, Tag, Toggle } from "@/components/ui";
+import { Brand, Button, Card, Hairline, IconButton, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { faultJa } from "@/lib/staff";
 import { FIELD_STATE, ETA_OPTIONS, MOBILE, STAFF, type FieldState, type L10n } from "@content/catalogue";
 
 const F = MOBILE.field;
 type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
 const UNKNOWN_ETA = "";
+// Pill tint per assignment state, on the same scale as case status.
+const TONE: Record<FieldState, string> = { none: "neutral", requested: "received", on_way: "review", arrived: "field", done: "guided" };
 
 export default function FieldScreen() {
   return <StaffGate allow={["field"]} title={MOBILE.operator.guard}>{(me) => <Jobs me={me} />}</StaffGate>;
@@ -49,10 +51,12 @@ function Jobs({ me }: { me: Me }) {
         <Card key={j.incident}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T v="small" mono>{j.station}</T>
-            <Tag value={FIELD_STATE[j.state].ja} tone={j.state === "requested" ? "solid" : undefined} />
+            <Pill tone={TONE[j.state]}>{FIELD_STATE[j.state].ja}</Pill>
           </View>
-          <T v="h1" style={{ fontSize: 22, lineHeight: 28 }}>{labels[j.station] ?? j.station}</T>
-          <T v="body" tone="alert">{faultJa(j.fault)}</T>
+          <View style={{ gap: 2 }}>
+            <T v="h1" style={{ fontSize: 22, lineHeight: 28, letterSpacing: -0.66 }}>{labels[j.station] ?? j.station}</T>
+            <T v="row" tone="alert">{faultJa(j.fault)}</T>
+          </View>
           {j.eta && <Tag label={F.eta} value={F.minutes(j.eta)} />}
           <Hairline />
           <T v="label">{F.etaMine}</T>

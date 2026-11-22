@@ -4,10 +4,12 @@ import {
   type StyleProp, type TextInputProps, type TextProps, type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, Ellipsis, type LucideIcon } from "lucide-react-native";
-import { color, control, font, radius, shadow, space, type } from "@/theme";
+import { color, control, dot, font, radius, shadow, space, tier, tint, type, type TintKey } from "@/theme";
 import { LANGS, LANG_NAME, MOBILE, type Lang } from "@content/catalogue";
+import { BUBBLE, ICHI } from "@/components/mark";
 
 // Pick the face by script: Hind Siliguri for Bengali, Noto Sans Devanagari for Nepali, Noto Sans JP for Japanese,
 // Inter (or DM Mono) otherwise; Inter covers Vietnamese and Indonesian.
@@ -23,12 +25,12 @@ export function familyFor(s: string, weight: 400 | 500 = 400, mono = false): str
   return (mono ? font.mono : font.inter)[weight];
 }
 
-type Tone = "ink" | "body" | "muted" | "faint" | "alert" | "onPrimary";
-const TONE_FOR: Record<keyof typeof type, Tone> = { h1: "ink", h2: "ink", body: "body", row: "ink", label: "body", small: "muted", code: "ink" };
+type Tone = "ink" | "body" | "muted" | "faint" | "alert" | "warn" | "ok" | "info" | "onPrimary";
+const TONE_FOR: Record<keyof typeof type, Tone> = { h1: "ink", h2: "ink", big: "ink", body: "body", row: "ink", label: "body", small: "muted", tiny: "muted", code: "ink" };
 
 export function T({ v = "body", tone, weight = 400, mono, style, children, ...rest }: TextProps & { v?: keyof typeof type; tone?: Tone; weight?: 400 | 500; mono?: boolean }) {
   return (
-    <Text {...rest} style={[type[v], { color: color[tone ?? TONE_FOR[v]], fontFamily: familyFor(textOf(children), weight, mono || v === "code") }, style]}>
+    <Text {...rest} style={[type[v], { color: color[tone ?? TONE_FOR[v]], fontFamily: familyFor(textOf(children), weight, mono || v === "code" || v === "big") }, style]}>
       {children}
     </Text>
   );
@@ -37,6 +39,23 @@ export function T({ v = "body", tone, weight = 400, mono, style, children, ...re
 export function Icon({ icon: I, size = control.icon, tone = "ink" }: { icon: LucideIcon; size?: number; tone?: Tone }) {
   return <I size={size} strokeWidth={control.stroke} color={color[tone]} />;
 }
+
+// The Ichido mark: a speech bubble holding one brush stroke, 一. Same paths as web/components/mark.tsx.
+export function Mark({ size = 18, fill = color.ink }: { size?: number; fill?: string }) {
+  return (
+    <Svg width={size} height={(size * 17) / 20} viewBox="0 0 20 17" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Path d={BUBBLE} fill="none" stroke={fill} strokeWidth={1.5} strokeLinejoin="round" />
+      <Path d={ICHI} fill={fill} />
+    </Svg>
+  );
+}
+
+export const Brand = () => (
+  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }} accessible accessibilityLabel="Ichido">
+    <Mark />
+    <Text style={{ fontFamily: font.inter[400], fontSize: 17, lineHeight: 20, letterSpacing: -0.6, color: color.ink }}>Ichido</Text>
+  </View>
+);
 
 type ButtonKind = "primary" | "secondary" | "ghost";
 export function Button({ label, onPress, kind = "primary", disabled, busy, icon, block, style }: {
@@ -55,7 +74,8 @@ export function Button({ label, onPress, kind = "primary", disabled, busy, icon,
         {
           minHeight: control.height, borderRadius: radius.control, paddingHorizontal: 14, paddingVertical: 8,
           flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-          backgroundColor: primary ? color.primary : kind === "secondary" ? (pressed ? color.selected : color.press) : pressed ? color.press : "transparent",
+          backgroundColor: primary ? color.primary : kind === "secondary" ? (pressed ? color.press : color.surface) : pressed ? color.press : "transparent",
+          borderWidth: kind === "secondary" ? 1 : 0, borderColor: color.line,
           opacity: disabled ? 0.35 : primary && pressed ? 0.85 : 1,
         },
         block && { alignSelf: "stretch" },
@@ -71,18 +91,38 @@ export function Button({ label, onPress, kind = "primary", disabled, busy, icon,
 // A choice that stays visibly selected (yes / no / not sure, wait / leave, periods).
 export const Toggle = ({ on, ...p }: { on: boolean } & Omit<Parameters<typeof Button>[0], "kind">) => <Button {...p} kind={on ? "primary" : "secondary"} />;
 
+// Small segmented control (periods): a hairline track with the selected segment on white.
+export function Segments<K extends string | number>({ value, options, onChange }: { value: K; options: { key: K; label: string }[]; onChange: (k: K) => void }) {
+  return (
+    <View accessibilityRole="tablist" style={{ flexDirection: "row", padding: 2, gap: 2, borderRadius: radius.control + 2, backgroundColor: color.press, borderWidth: 1, borderColor: color.line }}>
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable key={o.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={o.label} onPress={() => onChange(o.key)}
+            style={[{ flex: 1, height: 28, alignItems: "center", justifyContent: "center", borderRadius: radius.control }, on && { backgroundColor: color.surface, ...shadow }]}>
+            <T v="label" tone={on ? "ink" : "muted"}>{o.label}</T>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export function IconButton({ icon, label, onPress }: { icon: LucideIcon; label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={8}
       style={({ pressed }) => ({ width: 32, height: 32, borderRadius: radius.control, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? color.press : "transparent" })}>
-      <Icon icon={icon} size={18} />
+      <Icon icon={icon} size={18} tone="body" />
     </Pressable>
   );
 }
 
-// Sidebar-style list row: 14px label, optional sub line, count pill or meta on the right.
-export function Row({ label, sub, icon, count, meta, selected, chevron, onPress }: {
-  label: string; sub?: ReactNode; icon?: LucideIcon; count?: number | string; meta?: string; selected?: boolean; chevron?: boolean; onPress?: () => void;
+// Status dot, as in the web sidebar list.
+export const Dot = ({ s }: { s: string }) => <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dot[s] ?? color.faint }} />;
+
+// Sidebar-style list row: optional dot or icon, 14px label, optional sub line, count or meta on the right.
+export function Row({ label, sub, icon, status, count, meta, metaTone, selected, chevron, onPress }: {
+  label: string; sub?: ReactNode; icon?: LucideIcon; status?: string; count?: number | string; meta?: string; metaTone?: Tone; selected?: boolean; chevron?: boolean; onPress?: () => void;
 }) {
   return (
     <Pressable accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={label} onPress={onPress} disabled={!onPress}
@@ -91,40 +131,64 @@ export function Row({ label, sub, icon, count, meta, selected, chevron, onPress 
         flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: selected ? color.selected : pressed ? color.press : "transparent",
       })}>
       {icon && <Icon icon={icon} tone="body" />}
+      {status && <Dot s={status} />}
       <View style={{ flex: 1, gap: 2 }}>
         <T v="row" numberOfLines={2}>{label}</T>
         {typeof sub === "string" ? <T v="small">{sub}</T> : sub}
       </View>
-      {meta != null && <T v="small" mono>{meta}</T>}
-      {count != null && <Pill>{count}</Pill>}
+      {meta != null && <T v="tiny" mono tone={metaTone ?? "muted"}>{meta}</T>}
+      {count != null && <Count>{count}</Count>}
       {chevron && <Icon icon={ChevronRight} size={14} tone="faint" />}
     </Pressable>
   );
 }
 
-export const Pill = ({ children }: { children: ReactNode }) => (
-  <View style={{ minWidth: 22, height: 20, paddingHorizontal: 6, borderRadius: radius.pill, backgroundColor: color.press, alignItems: "center", justifyContent: "center" }}>
-    <T v="small" mono tone="body">{children}</T>
+export const Count = ({ children }: { children: ReactNode }) => (
+  <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 4, backgroundColor: color.press, alignItems: "center", justifyContent: "center" }}>
+    <T v="tiny" mono>{children}</T>
   </View>
 );
 
-export function Tag({ label, value, tone }: { label?: string; value: ReactNode; tone?: "alert" | "solid" }) {
-  const solid = tone === "solid";
+// Tinted status pill: colour carries the state, the word carries the meaning.
+export const Pill = ({ tone = "neutral", children }: { tone?: TintKey | string; children: ReactNode }) => {
+  const t = tint[tone as TintKey] ?? tint.neutral;
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
-      backgroundColor: solid ? color.primary : color.press, borderWidth: tone === "alert" ? 1 : 0, borderColor: color.alert }}>
-      {label ? <T v="small" tone={solid ? "onPrimary" : "muted"}>{label}</T> : null}
-      <T v="small" weight={500} tone={solid ? "onPrimary" : tone === "alert" ? "alert" : "ink"}>{value}</T>
+    <View style={{ height: 24, paddingHorizontal: 8, borderRadius: radius.control, backgroundColor: t.bg, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" }}>
+      <T v="label" style={{ color: t.fg }} numberOfLines={1}>{children}</T>
+    </View>
+  );
+};
+
+// Small grey token for metadata (web Chip), with an optional muted label.
+export function Tag({ label, value }: { label?: string; value: ReactNode }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", height: 20, paddingHorizontal: 6, borderRadius: radius.chip, backgroundColor: color.press }}>
+      {label ? <T v="small" tone="muted">{label}</T> : null}
+      <T v="small" tone="body">{value}</T>
     </View>
   );
 }
 
+// Segmented score bar: filled segments out of `of`, coloured by tier (web SegBar).
+export function SegBar({ value, of = 6, label }: { value: number; of?: number; label?: ReactNode }) {
+  const c = value / of >= 0.8 ? tier.high : value / of >= 0.5 ? tier.mid : tier.low;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View style={{ flexDirection: "row", gap: 3 }} accessibilityElementsHidden>
+        {Array.from({ length: of }, (_, i) => <View key={i} style={{ height: 3, width: 10, borderRadius: 2, backgroundColor: i < value ? c : color.track }} />)}
+      </View>
+      {label != null && <T v="label" mono tone="muted">{label}</T>}
+    </View>
+  );
+}
+
+// A white surface; the title is a quiet 13px label, as in the web Panel.
 export function Card({ title, action, children, style }: { title?: ReactNode; action?: ReactNode; children?: ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.line, padding: space.lg, gap: space.md }, shadow, style]}>
       {(title || action) && (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm }}>
-          {typeof title === "string" ? <T v="h2" style={{ flex: 1 }}>{title}</T> : <View style={{ flex: 1 }}>{title}</View>}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm, minHeight: 24 }}>
+          {typeof title === "string" ? <T v="label" tone="muted" style={{ flex: 1 }}>{title}</T> : <View style={{ flex: 1 }}>{title}</View>}
           {action}
         </View>
       )}
@@ -135,7 +199,7 @@ export function Card({ title, action, children, style }: { title?: ReactNode; ac
 
 // An inset block inside a card (original words, confirmed facts, previews).
 export const Inset = ({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) => (
-  <View style={[{ backgroundColor: color.canvas, borderRadius: radius.control, padding: space.md, gap: 6 }, style]}>{children}</View>
+  <View style={[{ backgroundColor: color.canvas, borderRadius: radius.control + 2, padding: space.md, gap: 6 }, style]}>{children}</View>
 );
 
 export function Section({ label, right, children }: { label: string; right?: ReactNode; children: ReactNode }) {
@@ -167,7 +231,7 @@ export function Input({ label, value, mono, multiline, style, ...rest }: TextInp
           type.body,
           {
             fontFamily: familyFor(value || rest.placeholder || "", 400, mono), color: color.ink, backgroundColor: color.surface,
-            borderWidth: 1, borderColor: focus ? "rgba(0,0,0,0.3)" : color.line, borderRadius: radius.control,
+            borderWidth: 1, borderColor: focus ? "rgba(0,0,0,0.25)" : color.track, borderRadius: radius.control,
             paddingHorizontal: space.md, paddingVertical: 9, minHeight: multiline ? 96 : 40, textAlignVertical: multiline ? "top" : "center",
           },
           style,
@@ -177,10 +241,12 @@ export function Input({ label, value, mono, multiline, style, ...rest }: TextInp
   );
 }
 
-export function Notice({ children, tone }: { children: ReactNode; tone?: "alert" }) {
+// Quiet message block; alert / warn / info are tinted like the web Notice.
+export function Notice({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "alert" | "warn" | "info" }) {
+  const t = tint[tone];
   return (
-    <View style={{ backgroundColor: color.press, borderRadius: radius.control, padding: space.md, borderLeftWidth: tone === "alert" ? 2 : 0, borderLeftColor: color.alert }}>
-      <T v="label" tone={tone === "alert" ? "alert" : "body"}>{children}</T>
+    <View style={{ backgroundColor: t.bg, borderRadius: radius.control + 2, paddingHorizontal: space.md, paddingVertical: 10 }}>
+      <T v="row" style={{ color: t.fg }}>{children}</T>
     </View>
   );
 }
@@ -206,7 +272,7 @@ export function Menu({ label, items, closeLabel }: { label: string; closeLabel: 
   );
 }
 
-// Page frame: safe area, small top bar (back, eyebrow, actions), a 28px title, scrolling content with pull-to-refresh.
+// Page frame: safe area, a hairline top bar (back, eyebrow, actions), a 28px title, scrolling content with pull-to-refresh.
 export function Screen({ title, eyebrow, right, back, backLabel, onRefresh, children }: {
   title?: string; eyebrow?: ReactNode; right?: ReactNode; back?: boolean; backLabel?: string; onRefresh?: () => void; children: ReactNode;
 }) {
@@ -214,16 +280,16 @@ export function Screen({ title, eyebrow, right, back, backLabel, onRefresh, chil
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: color.canvas }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, height: 44 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, height: 48, borderBottomWidth: 1, borderBottomColor: color.line }}>
           {back && <IconButton icon={ChevronLeft} label={backLabel ?? MOBILE.back.ja} onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space.sm, paddingLeft: back ? 0 : 4 }}>
             {typeof eyebrow === "string" ? <T v="label" numberOfLines={1}>{eyebrow}</T> : eyebrow}
           </View>
           {right}
         </View>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: 48, gap: space.lg }}
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: 48, gap: space.lg }}
           refreshControl={onRefresh ? (
             <RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); }} />
           ) : undefined}
@@ -236,21 +302,20 @@ export function Screen({ title, eyebrow, right, back, backLabel, onRefresh, chil
   );
 }
 
-export const Brand = () => (
-  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-    <View style={{ width: 22, height: 22, borderRadius: 5, backgroundColor: color.primary, alignItems: "center", justifyContent: "center" }}>
-      <T v="small" weight={500} tone="onPrimary">一</T>
-    </View>
-    <T v="label" weight={500} tone="ink">ichido</T>
-  </View>
+// Breadcrumb for the top bar: "Section / Page", the last part in ink.
+export const Crumb = ({ parts }: { parts: string[] }) => (
+  <T v="label" numberOfLines={1} tone="muted">
+    {parts.map((p, i) => (i < parts.length - 1 ? `${p} / ` : null))}
+    <T v="label" tone="ink">{parts.at(-1)}</T>
+  </T>
 );
 
-// Two-column label / value, used for machine state and counts.
-export function Fact({ label, value, tone }: { label: string; value: ReactNode; tone?: "alert" }) {
+// Label over value, used for machine state and counts.
+export function Fact({ label, value, tone }: { label: string; value: ReactNode; tone?: Tone }) {
   return (
     <View style={{ gap: 2, minWidth: 88 }}>
       <T v="small">{label}</T>
-      {typeof value === "string" || typeof value === "number" ? <T v="body" tone={tone ?? "ink"}>{value}</T> : value}
+      {typeof value === "string" || typeof value === "number" ? <T v="row" tone={tone ?? "ink"}>{value}</T> : value}
     </View>
   );
 }
@@ -264,8 +329,8 @@ export function LangPicker({ lang, onChange }: { lang: Lang; onChange: (l: Lang)
   );
 }
 
-export const Meter =({ value, max }: { value: number; max: number }) => (
+export const Meter = ({ value, max, fill = color.ink }: { value: number; max: number; fill?: string }) => (
   <View style={{ height: 6, borderRadius: 3, backgroundColor: color.press, overflow: "hidden" }}>
-    <View style={{ width: `${Math.max(2, (value / Math.max(1, max)) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: color.primary }} />
+    <View style={{ width: `${Math.max(2, (value / Math.max(1, max)) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: fill, opacity: fill === color.ink ? 0.8 : 1 }} />
   </View>
 );
