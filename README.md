@@ -15,7 +15,8 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | Route | Who | What |
 |---|---|---|
 | `/` | everyone | Overview and links |
-| `/operator` | monitoring-centre operator | Queue with response-time targets, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
+| `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
+| `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
 | `/stations` | operator | Each Help Point's live health (last heartbeat, signal, firmware, open cases) and a printable QR sticker per station |
 | `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code |
 | `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close |
