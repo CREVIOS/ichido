@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+.vercel/
+.DS_Store
+.aislop/
+secrets.h
+__pycache__/
+.venv/
+supabase/.temp/
