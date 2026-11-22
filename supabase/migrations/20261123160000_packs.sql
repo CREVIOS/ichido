@@ -79,15 +79,18 @@ insert into ichido.reply_rule (intent, pack, faults, needs_flags, blocked_by) va
   ('SHELTER_STAFF_COMING', 'shelter', null, null, '{red_hurt,family_child}');
 
 -- Same signature, so the reply trigger and withdraw_unfit_reply keep calling it. No caller card yet = no taps.
+-- A desk whose fault has no situation row (an older or test desk) is treated as an ATM, as before packs; an intent
+-- with no rule is allowed only for an ATM case (the base behaviour), never for another pack's case.
 create or replace function ichido.reply_ok(p_intent text, p_fault text, p_flags text[]) returns boolean
 language sql stable security definer set search_path = '' as $$
+  with here as (select coalesce((select pack from ichido.situation where code = p_fault), 'atm') as pack)
   select coalesce((
-    select r.pack = s.pack
+    select r.pack = here.pack
        and (r.faults is null or p_fault = any (r.faults))
        and (r.needs_flags is null or coalesce(p_flags, '{}') && r.needs_flags)
        and not (coalesce(p_flags, '{}') && coalesce(r.blocked_by, '{}'))
-    from ichido.reply_rule r join ichido.situation s on s.code = p_fault
-    where r.intent = p_intent), false)
+    from ichido.reply_rule r, here
+    where r.intent = p_intent), (select pack = 'atm' from here))
 $$;
 
 -- The trigger reads the fault from the desk even before a caller card exists (a left join), now that a reply
