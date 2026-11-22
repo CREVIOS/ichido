@@ -27,7 +27,7 @@ function SideNav({ nav, side, footer, onSearch }: { nav: NavItem[]; side?: React
   const path = usePathname();
   return (
     <div className="flex h-full flex-col gap-5 px-3 py-4">
-      <div className="flex items-center justify-between pl-2">
+      <div className="flex items-center justify-between pr-9 pl-2 lg:pr-0">
         <Logo />
         <button type="button" onClick={onSearch} data-close className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground hover:bg-accent" aria-label={STAFF.palette.title}>
           <Search className="size-3.5 stroke-[1.5]" /><span className="mono text-[11px]">{STAFF.palette.shortcut}</span>

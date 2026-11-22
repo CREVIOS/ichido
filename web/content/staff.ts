@@ -67,7 +67,7 @@ export const DESK = {
   queue: "対応中",
   recent: "最近の案件",
   empty: "対応中の案件はありません。Help Point のボタンが押されるか、受話器での申告を手動で登録すると、ここに表示されます。",
-  pickCase: "左の一覧から案件を選んでください。",
+  pickCase: "案件一覧から案件を選んでください。",
   online: (n: number) => `ほかに ${n}人がオンライン`,
   alsoViewing: (names: string) => `${names} も表示中`,
   manualFault: "障害を手動登録",
