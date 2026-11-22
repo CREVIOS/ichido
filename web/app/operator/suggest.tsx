@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DESK, replyOf, staffError } from "@/content/catalogue";
 import type { Desk, Run } from "./types";
 
-type Suggestion = { intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; reasons: string[]; risks: string[]; model: string };
+type Step = { tool: string; ms: number };
+type Suggestion = { intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; reasons: string[]; risks: string[]; model: string; steps: Step[]; ms: number };
 type State = { status: "idle" | "loading" | "off" | "failed" } | { status: "ready"; s: Suggestion };
 
 // Gemini's recommendation for this case, refreshed when the caller confirms new facts. The operator adopts it or ignores it.
@@ -55,6 +56,7 @@ function Body({ s, onAdopt }: { s: Suggestion; onAdopt: () => void }) {
       {s.dispatch && s.guard && <span className="text-[13px] text-foreground">{DESK.ai.dispatch(s.guard.name)}</span>}
       <List title={DESK.ai.reasons} items={s.reasons} />
       <List title={DESK.ai.risks} items={s.risks} />
+      <Trace steps={s.steps} ms={s.ms} />
       {r && <Button onClick={onAdopt}>{s.dispatch && s.guard ? DESK.ai.adoptDispatch(s.guard.name) : DESK.ai.adopt}</Button>}
     </div>
   );
@@ -66,6 +68,24 @@ function List({ title, items }: { title: string; items: string[] }) {
     <div className="flex flex-col gap-1">
       <span className="label">{title}</span>
       <ul className="flex flex-col gap-1 text-[13px] leading-5">{items.map((x) => <li key={x} className="flex gap-2"><span className="mt-2 size-1 shrink-0 rounded-full bg-foreground/40" />{x}</li>)}</ul>
+    </div>
+  );
+}
+
+// What the model looked at, in order, with each step's time — a small waterfall.
+function Trace({ steps, ms }: { steps: Step[]; ms: number }) {
+  if (!steps.length) return null;
+  const max = Math.max(1, ...steps.map((x) => x.ms));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="flex justify-between"><span className="label">{DESK.ai.trace}</span><span className="label num">{DESK.ai.total(ms)}</span></span>
+      {steps.map((x, i) => (
+        <span key={`${x.tool}-${i}`} className="grid grid-cols-[110px_minmax(0,1fr)_44px] items-center gap-2 text-[12px]">
+          <span className="truncate text-muted-foreground">{DESK.ai.tools[x.tool] ?? x.tool}</span>
+          <span className="h-1.5 overflow-hidden rounded-full bg-secondary"><span className={`block h-full rounded-full ${x.tool === "model" ? "bg-[oklch(0.66_0.14_255)]" : "bg-[oklch(0.72_0.16_145)]"}`} style={{ width: `${Math.max(4, (x.ms / max) * 100)}%` }} /></span>
+          <span className="num text-right text-muted-foreground">{x.ms}ms</span>
+        </span>
+      ))}
     </div>
   );
 }

@@ -42,6 +42,26 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
 - **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
 
+## MCP server
+
+`/api/mcp` serves Ichido over the Model Context Protocol (Streamable HTTP) so an operator's or manager's own AI client can read the desk. Tools: `list_open_cases`, `get_case`, `station_health`, `insights`, `suggest_next_step` (Gemini decision support). Every tool is **read-only** — replies and dispatch stay a person's decision in the console — and every query runs as the signed-in staff member, so row-level security still applies. Guards and callers are refused.
+
+```sh
+export ICHIDO_MCP_TOKEN=$(node --env-file=web/.env.local scripts/mcp-token.mjs operator@ichido.demo)
+claude   # .mcp.json in this repo points Claude Code at http://localhost:3123/api/mcp with that token
+```
+
+## AI in the product
+
+| Where | Provider | What it may do |
+|---|---|---|
+| Voice in | Soniox (`stt-rt-v6`) via LiveKit | Transcribe the caller's speech |
+| Voice out | ElevenLabs (`eleven_v4_turbo`) via LiveKit | Read aloud server-signed text only |
+| Free text → facts, teach-back → Japanese | OpenAI `gpt-6.1-terra` (Responses API, strict JSON) | Fill two facts; labelled machine translation for staff |
+| Operator decision support | Google Gemini (`gemini-4-hydrogen`) with function calling | Read the case through four tools and recommend one approved reply and a guard, with reasons, risks and a timed trace. Validated against the catalogue; recorded on the timeline; the operator decides |
+
+No model writes a message to the caller, and Gemini never sees the caller's words — only the facts they confirmed.
+
 ## Rules the product keeps
 
 - **The bank's words, not the model's.** Callers receive approved replies only; branch names and hours come from the station record.

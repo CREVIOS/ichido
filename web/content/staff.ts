@@ -153,6 +153,9 @@ export const DESK = {
     dispatch: (n: string) => `${n} へ現地確認を依頼`,
     off: "AI提案は未設定です（GEMINI_API_KEY）。",
     failed: "AI提案を取得できませんでした。",
+    trace: "判断の過程",
+    tools: { model: "Gemini 推論", get_case: "案件を確認", list_replies: "承認済み返答を確認", list_guards: "警備員の空き状況", station_status: "機器の状態" } as Record<string, string>,
+    total: (ms: number) => `合計 ${(ms / 1000).toFixed(1)}秒`,
   },
   dispatch: {
     title: "取次・出動依頼",

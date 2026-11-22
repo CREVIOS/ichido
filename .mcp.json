@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ichido": {
+      "type": "http",
+      "url": "${ICHIDO_MCP_URL:-http://localhost:3123/api/mcp}",
+      "headers": { "Authorization": "Bearer ${ICHIDO_MCP_TOKEN}" }
+    }
+  }
+}
