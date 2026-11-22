@@ -1,8 +1,8 @@
 import "server-only";
-import { REPLIES, SLA, looksLikeNumber, readBackText, replyOf, type Fact, type Lang } from "@/content/catalogue";
+import { REPLIES, looksLikeNumber, readBackText, replyOf, type Fact, type Lang } from "@/content/catalogue";
 import { TRAINING_SLOTS, scenarioOf, type Line, type Result, type RubricKey, type Scenario, type ScoreItem } from "@/content/training";
 import { respond } from "@/lib/extract";
-import { admin, fail, type Actor } from "@/lib/server";
+import { admin, fail, priv, type Actor } from "@/lib/server";
 import { entry, errorFields } from "@/lib/log";
 
 // AI response training: a simulated caller against an isolated session. Nothing here reads or writes the desk,
@@ -166,12 +166,13 @@ export async function dispatch(op: Staff, b: Body) {
   return {};
 }
 
-export function score(sc: Scenario, s: Session, turns: Turn[]): ScoreItem[] {
+// `target` is the first-reply target in seconds, from ichido.sla_target — the same one the real queue uses.
+export function score(sc: Scenario, s: Session, turns: Turn[], target: number): ScoreItem[] {
   const intents = turns.filter((t) => t.kind === "reply").map((t) => String(t.data?.intent));
   const ops = turns.filter((t) => t.who === "operator");
   const seconds = s.first_reply_at ? Math.round((Date.parse(s.first_reply_at) - Date.parse(s.started_at)) / 1000) : null;
   const result: Record<RubricKey, Result> = {
-    time: seconds == null ? "fail" : seconds <= SLA.firstReplyS ? "pass" : seconds <= 2 * SLA.firstReplyS ? "partial" : "fail",
+    time: seconds == null ? "fail" : seconds <= target ? "pass" : seconds <= 2 * target ? "partial" : "fail",
     intent: intents.some((i) => sc.intents.includes(i)) ? "pass" : "fail",
     held: intents.some((i) => REPLIES[i]?.needsHeld && s.card_back !== "no") ? "fail" : "pass",
     guard: s.dispatched === sc.dispatch ? "pass" : "fail",
@@ -181,13 +182,15 @@ export function score(sc: Scenario, s: Session, turns: Turn[]): ScoreItem[] {
   };
   return (Object.entries(sc.rubric) as [RubricKey, number][]).map(([key, max]) => {
     const r = result[key];
-    return { key, result: r, max, points: r === "pass" ? max : r === "partial" ? Math.floor(max / 2) : 0, ...(key === "time" ? { seconds } : {}) };
+    return { key, result: r, max, points: r === "pass" ? max : r === "partial" ? Math.floor(max / 2) : 0, ...(key === "time" ? { seconds, target } : {}) };
   });
 }
 
 export async function end(op: Staff, b: Body) {
   const { s, turns, sc } = await load(op, b);
-  const items = score(sc, s, turns);
+  const { data: t } = await priv().from("sla_target").select("seconds").eq("reason", "no_reply").single();
+  if (!t) fail(500, "server");
+  const items = score(sc, s, turns, t!.seconds);
   const points = items.reduce((a, x) => a + x.points, 0);
   const max = items.reduce((a, x) => a + x.max, 0);
   const { data, error } = await admin.from("training_session")

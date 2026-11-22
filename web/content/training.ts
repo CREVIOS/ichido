@@ -6,7 +6,7 @@ import { CASES, REPLIES, SLA, type Fact, type L10n, type Lang } from "./catalogu
 export type Line = { text: string; ja?: string };
 export type RubricKey = "time" | "intent" | "held" | "guard" | "numbers" | "human";
 export type Result = "pass" | "partial" | "fail";
-export type ScoreItem = { key: RubricKey; result: Result; points: number; max: number; seconds?: number | null };
+export type ScoreItem = { key: RubricKey; result: Result; points: number; max: number; seconds?: number | null; target?: number };
 
 export type Scenario = {
   id: string;
@@ -243,7 +243,7 @@ export const TRAINING = {
 
 // Plain-Japanese feedback for one rubric item.
 export function feedback(item: ScoreItem, s: Scenario): string {
-  const target = dur(SLA.firstReplyS);
+  const target = dur(item.target ?? 0);
   switch (item.key) {
     case "time":
       if (item.seconds == null) return `返答を送っていません。目標は障害通知から${target}以内です。`;

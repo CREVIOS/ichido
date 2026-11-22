@@ -124,11 +124,21 @@ function Header({ s, sc }: { s: SessionRow; sc: Scenario }) {
 }
 
 // Time to first reply against the same target the real queue uses.
+function useReplyTarget() {
+  const [target, setTarget] = useState<number | null>(null);
+  useEffect(() => {
+    sb().schema("ichido").from("sla_target").select("seconds").eq("reason", "no_reply").maybeSingle().then(({ data }) => setTarget(data?.seconds ?? null));
+  }, []);
+  return target;
+}
+
 function Timer({ s }: { s: SessionRow }) {
   const now = useNow(!s.first_reply_at);
+  const target = useReplyTarget();
   if (s.first_reply_at) return <span className="num">{TRAINING.replied(seconds(s.started_at, Date.parse(s.first_reply_at)))}</span>;
-  const left = SLA.firstReplyS - seconds(s.started_at, now);
-  const tone = left < 0 ? "text-alert" : left < SLA.firstReplyS * (1 - SLA.warn) ? "text-warn" : "";
+  if (target == null) return <span className="num">—</span>;
+  const left = target - seconds(s.started_at, now);
+  const tone = left < 0 ? "text-alert" : left < target * (1 - SLA.warn) ? "text-warn" : "";
   return <span className={cn("num", tone)}>{left < 0 ? SLA.late(Math.ceil(-left / 60)) : SLA.left(left)}</span>;
 }
 
