@@ -81,6 +81,16 @@ npx expo-doctor
 npx expo export --platform ios
 ```
 
+## Staff sign-in
+
+Staff sign in against the web app's Better Auth (`lib/auth.ts`, `@better-auth/expo`): email and password, then the
+authenticator code (or a backup code). The session cookie is kept in the OS keychain (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`);
+database reads use a five-minute token minted from it (`/api/auth/supabase-token`) and kept in memory. A first
+sign-in registers an authenticator app on the phone (the setup link opens it; the key is shown too) and shows the
+backup codes once. The web app must list `ichido://` among its trusted origins (it does by default). Passkeys work in
+the web console only: the app has no native WebAuthn module yet. The permission matrix is the web's `web/lib/rbac.ts`
+(`@rbac`). Callers are unchanged: Supabase anonymous sessions.
+
 ## Rules the app keeps
 
 The same as the web app: it never asks for a PIN, card, account or ID number (the server withholds text that looks like one and the caller is told); callers see only catalogue replies and only their own case; staff never read drafts, only what the caller confirmed; the AI drafts and a person decides.

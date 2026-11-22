@@ -25,7 +25,7 @@ type Job = { assignee: string; state: FieldState; eta: string | null };
 type Guard = { uid: string; display_name: string };
 
 export default function CaseScreen() {
-  return <StaffGate allow={["operator"]} title={O.title}>{(me) => <CaseView me={me} />}</StaffGate>;
+  return <StaffGate need="case:act" title={O.title}>{(me) => <CaseView me={me} />}</StaffGate>;
 }
 
 function CaseView({ me }: { me: Me }) {

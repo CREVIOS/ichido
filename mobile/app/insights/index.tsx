@@ -9,7 +9,7 @@ import { color, radius, shadow, space } from "@/theme";
 import { INSIGHTS, STAFF } from "@content/catalogue";
 
 export default function InsightsScreen() {
-  return <StaffGate allow={["operator", "manager"]} title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
+  return <StaffGate need="insights:read" title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
 }
 
 // The metric-card list of the web Insights page; each card opens its chart.

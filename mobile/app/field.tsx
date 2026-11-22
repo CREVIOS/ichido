@@ -15,7 +15,7 @@ const UNKNOWN_ETA = "";
 const TONE: Record<FieldState, string> = { none: "neutral", requested: "received", on_way: "review", arrived: "field", done: "guided" };
 
 export default function FieldScreen() {
-  return <StaffGate allow={["field"]} title={MOBILE.operator.guard}>{(me) => <Jobs me={me} />}</StaffGate>;
+  return <StaffGate need="field:act" title={MOBILE.operator.guard}>{(me) => <Jobs me={me} />}</StaffGate>;
 }
 
 // Only this guard's open assignments (row-level security). No identity checks or card handback here.

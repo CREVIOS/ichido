@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { sb, cmd } from "@/lib/supabase";
+import { callerAuth, cmd, signOut } from "@/lib/supabase";
 import { Brand, Button, Card, Input, LangPicker, Notice, Screen, T, Tag } from "@/components/ui";
 import { LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
 
@@ -27,9 +27,9 @@ export default function StationScreen() {
   async function connect() {
     setBusy(true); setError("");
     try {
-      const { data } = await sb().auth.getSession();
+      const { data } = await callerAuth().getSession();
       if (!data.session) {
-        const { error } = await sb().auth.signInAnonymously();
+        const { error } = await callerAuth().signInAnonymously();
         if (error) throw new Error("server");
       }
       await cmd("pair", { station, code, lang });
@@ -48,7 +48,7 @@ export default function StationScreen() {
       {staffSession ? (
         <Card>
           <T v="body" tone="ink">{STATION.staffSession[lang]}</T>
-          <Button label={STATION.signOutStaff[lang]} onPress={async () => { await sb().auth.signOut(); setStaffSession(false); }} block />
+          <Button label={STATION.signOutStaff[lang]} onPress={async () => { await signOut(); setStaffSession(false); }} block />
         </Card>
       ) : (
         <Card>

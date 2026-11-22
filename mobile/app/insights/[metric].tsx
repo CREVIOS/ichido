@@ -12,7 +12,7 @@ export default function MetricScreen() {
   if (!isMetric(metric)) return <Redirect href="/insights" />;
   const d = Number(days);
   return (
-    <StaffGate allow={["operator", "manager"]} title={INSIGHTS.title}>
+    <StaffGate need="insights:read" title={INSIGHTS.title}>
       {() => <Detail k={metric} initialDays={PERIODS.includes(d) ? d : DEFAULT_DAYS} />}
     </StaffGate>
   );

@@ -14,7 +14,7 @@ const HISTORY = 8;
 type Station = { id: string; label: L10n };
 
 export default function OperatorScreen() {
-  return <StaffGate allow={["operator"]} title={O.title}>{(me) => <Queue me={me} />}</StaffGate>;
+  return <StaffGate need="case:act" title={O.title}>{(me) => <Queue me={me} />}</StaffGate>;
 }
 
 function Queue({ me }: { me: Me }) {
