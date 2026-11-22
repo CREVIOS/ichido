@@ -1,5 +1,6 @@
 // Staff screens (Japanese): console, guard, insights, sign-in.
 import { FAULT_STAFF } from "./faults.ts";
+import { PACK_RECIPIENTS } from "./packs/index.ts";
 
 // Staff sign-in (staff screens are Japanese).
 export const STAFF = {
@@ -270,7 +271,7 @@ export const INSIGHTS = {
 export const HANDOFF = {
   title: "引継票",
   lead: "銀行・警察・警備会社へ、この案件の記録を読み取り専用のリンクで渡します。ファイルをメールで送る必要はありません。24時間で失効し、閲覧は経過に記録されます。お客様の自由記述は含みません。",
-  recipient: { bank: "銀行", police: "警察", security: "警備会社" } as Record<string, string>,
+  recipient: PACK_RECIPIENTS,   // per pack: content/packs (bank, police, security for an ATM)
   create: (r: string) => `${r}宛`,
   copy: "リンクをコピー",
   copied: "リンクをコピーしました",

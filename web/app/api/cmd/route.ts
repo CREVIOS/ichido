@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
-import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, packOfFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
@@ -62,10 +62,14 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   },
 
   // Operator
+  // Without a fault, the station's own default (a pack's first situation, or the ATM's card fault). The database
+  // refuses a situation from another pack.
   async simulate(a, b) {
     staff(a, "operator");
-    if (!isFault(b.fault)) fail(400, "bad_request");
-    const incident = await rpc<string>("record_fault", { p_station: str(b, "station"), p_key: randomBytes(16).toString("hex"), p_source: "simulator", p_fault: b.fault });
+    const station = str(b, "station");
+    if (b.fault !== undefined && !isFault(b.fault)) fail(400, "bad_request");
+    const fault = (b.fault as string | undefined) ?? await faults.defaultFault(station);
+    const incident = await rpc<string>("record_fault", { p_station: station, p_key: randomBytes(16).toString("hex"), p_source: "simulator", p_fault: fault });
     await startBot(incident);
     return { incident };
   },
@@ -189,11 +193,18 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (!c.incident || !c.lang) fail(403, "forbidden");
     const incident = c.incident as string;
     const lang = c.lang as Lang;
-    const { data: cur } = await admin.from("draft").select("rev, card_back, cash_received").eq("incident", incident).single();
+    const [{ data: cur }, { data: desk }] = await Promise.all([
+      admin.from("draft").select("rev, card_back, cash_received").eq("incident", incident).single(),
+      admin.from("desk").select("fault").eq("id", incident).single(),
+    ]);
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
     if (text && looksLikeNumber(text)) return { withheld: true };
-    const patch = text ? await extract(text, lang, { card_back: cur!.card_back, cash_received: cur!.cash_received }) : null;
+    // Only the ATM has facts to extract and read back; any other pack's caller answers with taps, and their words
+    // are kept as they are for the person who decides.
+    const atm = packOfFault(desk?.fault) === "atm";
+    if (!atm && (b.card_back !== undefined || b.cash_received !== undefined)) fail(400, "bad_request");
+    const patch = text && atm ? await extract(text, lang, { card_back: cur!.card_back, cash_received: cur!.cash_received }) : null;
     const pickFact = (k: (typeof FACT_KEYS)[number]): Fact | null => {
       const v = b[k];
       if (v === "yes" || v === "no" || v === "unknown") return v;
@@ -205,7 +216,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const rev = await rpc<number>("cmd_draft", {
       p_uid: c.uid, p_rev: cur!.rev, p_card: card, p_cash: cash, p_words: text || null, p_clarify: Boolean(patch?.clarify) && !tapped,
     });
-    const said = readBackText(lang, { card_back: card ?? cur!.card_back, cash_received: cash ?? cur!.cash_received });
+    const said = atm ? readBackText(lang, { card_back: card ?? cur!.card_back, cash_received: cash ?? cur!.cash_received }) : null;
     return { rev, say: said ? signSpeech(incident, said) : null };
   },
 

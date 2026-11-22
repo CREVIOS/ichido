@@ -6,6 +6,7 @@
 //
 // No runtime import from catalogue.ts: catalogue.ts spreads these objects at load time, so a cycle would break it.
 import type { Fact, L10n, Lang, ReplySlots } from "./catalogue.ts";
+import { PACK_REPLIES, PACK_RULES, PACK_SITUATION_NAMES, PACK_SITUATION_STAFF, PACK_TAPS, contentPack, packOfFault, packTapsFor, type PackId } from "./packs/index.ts";
 
 const p = (v: L10n | undefined, lang: Lang) => v?.[lang] ?? v?.en ?? "";
 
@@ -80,15 +81,17 @@ export const FAULT_TYPES: Record<string, FaultType> = {
     },
   },
 };
-export const FAULT_NAMES = Object.fromEntries(Object.entries(FAULT_TYPES).map(([k, f]) => [k, f.name])) as Record<string, L10n>;
-export const FAULT_STAFF = Object.fromEntries(Object.entries(FAULT_TYPES).map(([k, f]) => [k, f.staff])) as Record<string, string>;
+// The other packs' situations (content/packs) are fault codes too, so every screen and the SQL rules share one list.
+export const FAULT_NAMES = { ...Object.fromEntries(Object.entries(FAULT_TYPES).map(([k, f]) => [k, f.name])), ...PACK_SITUATION_NAMES } as Record<string, L10n>;
+export const FAULT_STAFF = { ...Object.fromEntries(Object.entries(FAULT_TYPES).map(([k, f]) => [k, f.staff])), ...PACK_SITUATION_STAFF } as Record<string, string>;
 const groupOf = (fault: string): Group => FAULT_TYPES[fault]?.group ?? "card";
 export const takesAmount = (fault: string) => Boolean(FAULT_TYPES[fault]?.amount);
 export const AMOUNT_FAULTS = Object.keys(FAULT_TYPES).filter(takesAmount);
 export const AMOUNT_MAX = 10_000_000;
 
 // What the caller can tap (their own statements). suggests: the fault type their story points to, shown to the operator.
-type CallerFlag = { label: L10n; staff: string; suggests?: string };
+// urgent and group: a pack's red flags and grouped taps (content/packs/types.ts).
+type CallerFlag = { label: L10n; staff: string; suggests?: string; urgent?: boolean; group?: string };
 export const CALLER_FLAGS: Record<string, CallerFlag> = {
   forgot_card: {
     suggests: "card_forgotten", staff: "カードを取り忘れたとのこと",
@@ -187,6 +190,7 @@ export const CALLER_FLAGS: Record<string, CallerFlag> = {
       id: "Anggota keluarga sedang membantu saya", ne: "परिवारको एक जना सदस्यले मलाई सहयोग गर्दै हुनुहुन्छ",
     },
   },
+  ...PACK_TAPS,
 };
 export const isCallerFlag = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(CALLER_FLAGS, k);
 // Each fault type's own facts first, then the ones every caller may need.
@@ -196,7 +200,11 @@ const GROUP_FLAGS: Record<Group, string[]> = {
   cash: ["debited_no_cash", "cash_left", "cash_in_stuck", "limit_msg"],
 };
 const COMMON_FLAGS = ["foreign_card", "leaving_japan", "helper"];
-export const flagsFor = (fault: string) => [...GROUP_FLAGS[groupOf(fault)], ...COMMON_FLAGS];
+// flags: the caller's current taps (a pack also shows the details of the situations they point to).
+export function flagsFor(fault: string, flags: readonly string[] = []) {
+  const p = contentPack(fault);
+  return p ? packTapsFor(p, fault, flags) : [...GROUP_FLAGS[groupOf(fault)], ...COMMON_FLAGS];
+}
 
 // Fault types the caller's taps point to that differ from the current one (a hint for the operator, never automatic).
 export const suggestedFaults = (fault: string, flags: readonly string[]) =>
@@ -314,14 +322,18 @@ export const FAULT_REPLIES: Record<string, FaultReply> = {
       ne: `तपाईंको पासबुक मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। जानुभयो भने बैंकले तपाईंलाई सम्पर्क गर्नेछ। पासबुकको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${p(s.branch, "ne")} को काउन्टरमा (${p(s.hours, "ne")}) पनि सोध्न सक्नुहुन्छ।`,
     }),
   },
+  ...PACK_REPLIES,
 };
 
-// Which fault types (and caller statements) each reply needs. The SQL trigger on public.reply enforces exactly this;
-// an intent without a rule may be sent for any fault. A forgotten or deliberately kept card can never get the
-// "card is inside, you can wait" reply, whatever the machine alert said.
+// Which pack, situations (fault types) and caller statements each reply needs. The SQL trigger on public.reply
+// enforces exactly this (ichido.reply_rule); an intent without a rule is never sent, and no reply crosses packs.
+// pack defaults to the ATM; no faults = any situation of the pack. A forgotten or deliberately kept card can never
+// get the "card is inside, you can wait" reply, whatever the machine alert said.
 const CARD = ["card_retained", "card_forgotten", "card_kept", "card_unreadable"];
-type Rule = { faults: string[]; needsFlags?: string[]; blockedBy?: string[] };
+type Rule = { pack?: PackId; faults?: string[]; needsFlags?: string[]; blockedBy?: string[] };
 export const REPLY_RULES: Record<string, Rule> = {
+  HANDSET: {},
+  OFFICIAL_CHANNEL: {},
   HELD_WAIT_OR_LEAVE: { faults: ["card_retained"], blockedBy: ["forgot_card", "card_kept_msg"] },
   CARD_FORGOTTEN: { faults: ["card_forgotten"] },
   CARD_KEPT_RULE: { faults: ["card_kept"] },
@@ -333,6 +345,7 @@ export const REPLY_RULES: Record<string, Rule> = {
   CASH_IN_JAM: { faults: ["cash_jam"], needsFlags: ["cash_in_stuck"] },
   LIMIT_REFUSED: { faults: ["limit_refused"] },
   PASSBOOK_HELD: { faults: ["passbook_stuck"], needsFlags: ["passbook_inside"] },
+  ...PACK_RULES,
 };
 
 export type ReplyCtx = { fault: string; flags: readonly string[]; confirmed: boolean; card_back: Fact; remote_release: string | null };
@@ -342,8 +355,8 @@ export function replyBlock(intent: string, needsHeld: boolean | undefined, c: Re
   if (!c.confirmed) return "awaiting";
   if (needsHeld && (c.card_back !== "no" || c.remote_release === "released")) return "held";
   const r = Object.hasOwn(REPLY_RULES, intent) ? REPLY_RULES[intent] : null;
-  if (!r) return null;
-  if (!r.faults.includes(c.fault)) return "fault";
+  if (!r || (r.pack ?? "atm") !== packOfFault(c.fault)) return "fault";
+  if (r.faults && !r.faults.includes(c.fault)) return "fault";
   if (r.needsFlags && !r.needsFlags.some((f) => c.flags.includes(f))) return "flag";
   if (r.blockedBy?.some((f) => c.flags.includes(f))) return "flag";
   return null;

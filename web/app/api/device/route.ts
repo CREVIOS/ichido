@@ -1,6 +1,6 @@
 import { admin, priv, reply, deviceStation } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
-import { DEVICE_FAULT } from "@/content/catalogue";
+import { defaultFault } from "@/lib/faults";
 import { startBot } from "@/lib/bot";
 import { displayLines } from "@/lib/access";
 
@@ -20,13 +20,14 @@ export async function POST(req: Request): Promise<Response> {
   }
   // Only for the log: whether this is a retry of an event the server already recorded.
   const { data: seen } = await priv().from("device_event").select("incident").eq("station", station).eq("event_key", key).maybeSingle();
-  const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: DEVICE_FAULT });
+  const fault = await defaultFault(station);   // the station pack's situation for a press (the ATM: card retained)
+  const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: fault });
   if (error) {
-    log.error("device_fault", { station, fault: DEVICE_FAULT, status: 500, duration_ms: log.ms(), ...errorFields(error) });
+    log.error("device_fault", { station, fault, status: 500, duration_ms: log.ms(), ...errorFields(error) });
     return reply(500, { error: "not recorded" });
   }
   if (!seen) await startBot(incident as string);   // a second press on an open case finds its run already there
-  log.info("device_fault", { station, fault: DEVICE_FAULT, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
+  log.info("device_fault", { station, fault, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
   return new Response(null, { status: 204 });
 }
 
