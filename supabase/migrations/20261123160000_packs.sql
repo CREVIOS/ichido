@@ -78,17 +78,28 @@ insert into ichido.reply_rule (intent, pack, faults, needs_flags, blocked_by) va
   ('SHELTER_INFO', 'shelter', '{shelter_info}', null, '{red_hurt,family_child}'),
   ('SHELTER_STAFF_COMING', 'shelter', null, null, '{red_hurt,family_child}');
 
--- Same signature, so the reply trigger and withdraw_unfit_reply keep calling it.
+-- Same signature, so the reply trigger and withdraw_unfit_reply keep calling it. No caller card yet = no taps.
 create or replace function ichido.reply_ok(p_intent text, p_fault text, p_flags text[]) returns boolean
 language sql stable security definer set search_path = '' as $$
   select coalesce((
     select r.pack = s.pack
        and (r.faults is null or p_fault = any (r.faults))
-       and (r.needs_flags is null or p_flags && r.needs_flags)
-       and not (p_flags && coalesce(r.blocked_by, '{}'))
+       and (r.needs_flags is null or coalesce(p_flags, '{}') && r.needs_flags)
+       and not (coalesce(p_flags, '{}') && coalesce(r.blocked_by, '{}'))
     from ichido.reply_rule r join ichido.situation s on s.code = p_fault
     where r.intent = p_intent), false)
 $$;
+
+-- The trigger reads the fault from the desk even before a caller card exists (a left join), now that a reply
+-- without a matching situation is refused.
+create or replace function ichido.reply_allowed() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare f text; fl text[];
+begin
+  select d.fault, c.flags into f, fl from public.desk d left join public.caller_card c on c.id = d.id where d.id = new.incident;
+  if not ichido.reply_ok(new.intent, f, fl) then perform ichido.fail('conflict'); end if;
+  return new;
+end $$;
 
 -- 4. Confirming: an ATM caller confirms the read-back of two facts; any other pack's caller confirms their taps.
 create or replace function public.cmd_confirm(p_uid uuid, p_rev int) returns void
