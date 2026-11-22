@@ -35,7 +35,8 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
 - **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
 - **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers.
-- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication.
+- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, and a heartbeat every 60 s (`public.device_health`).
+- **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Content** (`web/content/catalogue.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
 
 ## Rules the product keeps
@@ -53,14 +54,16 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 Prerequisites: Node 24, Docker, Supabase CLI, Python 3.11 with `uv` (voice only), Arduino CLI (device only).
 
 ```sh
-supabase start                     # applies supabase/migrations and seed.sql (synthetic data)
+supabase start                     # applies supabase/migrations and seed.sql (local demo station and accounts)
 cd web
 cp .env.example .env.local         # fill from `supabase status`; DEVICE_SECRETS_JSON={"TABLE-A":"…"}
 npm ci
 npm run dev                        # http://localhost:3000
 ```
 
-Demo accounts (local only): `operator@ichido.demo`, `operator2@ichido.demo`, `guard1@ichido.demo`, `guard2@ichido.demo`, `manager@ichido.demo`, password `ichido-demo`.
+Demo accounts (local only): `operator@ichido.demo`, `operator2@ichido.demo`, `guard1@ichido.demo`, `guard2@ichido.demo`, `manager@ichido.demo`, password `ichido-demo`. For a populated insights page, also load `supabase/seed-local-history.sql` (20 days of synthetic cases; command in the file).
+
+**Production:** follow [docs/DEPLOY.md](docs/DEPLOY.md). Hosted projects get migrations only, staff from `scripts/create-staff.mjs`, and no demo data.
 
 **Voice (optional):** create a LiveKit Cloud project, then
 
@@ -87,7 +90,7 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 
 ```sh
 cd web
-npm run test:fresh     # resets the local DB, then runs the journey and number-withholding tests
+npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health and device-heartbeat tests
 ```
 
 The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.
@@ -102,7 +105,7 @@ cd agent && AGENT_BRIDGE_SECRET=test uv run python -m unittest test_signing.py  
 |---|---|---|
 | Case flow across caller, operator and guard screens with live updates | The ATM (ESP32 prop or on-screen action) | Real telephony and the ATM's own handset |
 | Row-level security and single-use pairing | The bank, branch, security company and manual | Connection to a monitoring system |
-| Voice agent code (LiveKit, Google STT, Azure TTS) | Synthetic history in the insights page | Native review of all Bengali and Japanese wording |
+| Voice agent code (LiveKit, Google STT, Azure TTS) | Synthetic history in the insights page (local only, optional) | Native review of all Bengali and Japanese wording |
 | ESP32 firmware | | |
 
 ## How AI tools were used
