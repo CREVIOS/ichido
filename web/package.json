@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@better-auth/passkey": "^1.7.27",
     "@livekit/protocol": "^1.54.1",
     "@modelcontextprotocol/server": "^2.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.2",
+    "better-auth": "^1.7.27",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
@@ -27,6 +29,7 @@
     "mcp-handler": "^2.4.0",
     "next": "16.4.6",
     "next-themes": "^0.4.6",
+    "pg": "^8.23.1",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -40,8 +43,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.22",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
