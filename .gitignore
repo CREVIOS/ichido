@@ -12,3 +12,5 @@ __pycache__/
 supabase/.temp/
 .claude/
 .playwright-mcp/
+scripts/*.json
+!scripts/staff.example.json

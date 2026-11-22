@@ -8,6 +8,8 @@
 //           idle = off, received = amber, review = blue, field = amber blinking,
 //           guided = blue slow pulse, offline / no valid state yet = red blinking.
 //           There is deliberately no green "collect your card" signal.
+// Heartbeat: every 60 s, POST /api/device/heartbeat with uptime, free heap, Wi-Fi RSSI, firmware version
+//           and the last fault-ack and poll round trips, so the desk can see the device is alive.
 //
 // Wiring (classic ESP32 dev board; change the pins below for C3/S3 boards):
 //   button : GPIO14 -> button -> GND (internal pull-up)
@@ -21,6 +23,8 @@
 #include <Preferences.h>
 #include "secrets.h"
 
+#define FW_VERSION "1.1.0"
+
 const int PIN_BUTTON = 14;
 const int PIN_R = 25, PIN_G = 26, PIN_B = 27;
 
@@ -29,6 +33,7 @@ const unsigned long POLL_MS = 2000;
 const unsigned long STALE_MS = 10000;      // no successful poll for this long -> show offline
 const unsigned long RETRY_MIN_MS = 1500;
 const unsigned long RETRY_MAX_MS = 30000;
+const unsigned long HEARTBEAT_MS = 60000;
 const char *KNOWN_STATES[] = {"idle", "received", "review", "field", "guided"};
 
 Preferences store;
@@ -39,6 +44,9 @@ String pendingEvent = "";                  // unacknowledged fault event (also k
 unsigned long retryDelayMs = RETRY_MIN_MS, lastRetryMs = 0;
 volatile unsigned long pressedAtMs = 0;    // set by the interrupt, consumed in loop()
 unsigned long lastAcceptedPressMs = 0;
+long ackRttMs = -1, pollRttMs = -1;        // last round trips; -1 = none since boot
+unsigned long lastHeartbeatMs = 0;
+bool heartbeatSent = false;
 
 String newEventId() {
   char buf[33];
@@ -69,22 +77,40 @@ bool sendFault(const String &eventId) {
   WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
   if (!begin(http, tls, plain, "/api/device")) return false;
   http.addHeader("Content-Type", "text/plain");
+  unsigned long t0 = millis();
   int code = http.POST(eventId);
   http.end();
   Serial.printf("fault %s -> %d\n", eventId.c_str(), code);
+  if (code == 204) ackRttMs = millis() - t0;
   return code == 204;
 }
 
 void poll() {
   WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
   if (!begin(http, tls, plain, "/api/device")) return;
+  unsigned long t0 = millis();
   int code = http.GET();
   if (code == 200) {
+    pollRttMs = millis() - t0;
     String body = http.getString();
     body.trim();
     if (isKnownState(body)) { state = body; haveState = true; lastFreshMs = millis(); }
   }
   http.end();
+}
+
+void heartbeat() {
+  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
+  if (!begin(http, tls, plain, "/api/device/heartbeat")) return;
+  http.addHeader("Content-Type", "application/json");
+  char body[192];
+  snprintf(body, sizeof body,
+           "{\"uptime_s\":%llu,\"free_heap\":%u,\"rssi\":%d,\"fw\":\"%s\",\"ack_ms\":%ld,\"poll_ms\":%ld}",
+           (unsigned long long)(esp_timer_get_time() / 1000000), (unsigned)ESP.getFreeHeap(), (int)WiFi.RSSI(),
+           FW_VERSION, ackRttMs, pollRttMs);
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("heartbeat -> %d\n", code);
 }
 
 void setRgb(bool r, bool g, bool b) {
@@ -142,6 +168,7 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     retryPending();
     if (millis() - lastPollMs > POLL_MS) { lastPollMs = millis(); poll(); }
+    if (!heartbeatSent || millis() - lastHeartbeatMs >= HEARTBEAT_MS) { lastHeartbeatMs = millis(); heartbeatSent = true; heartbeat(); }
   }
   showState();
   delay(10);

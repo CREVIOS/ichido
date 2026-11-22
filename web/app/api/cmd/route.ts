@@ -4,6 +4,7 @@ import { extract, toJapanese } from "@/lib/extract";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, admin, priv, fail, reply, HttpError, type Actor } from "@/lib/server";
+import { requestLog, errorFields } from "@/lib/log";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -17,6 +18,7 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 const CODE_TTL_MS = 5 * 60_000;
 const MAX_TEXT = 500;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;   // only well-formed ids reach the logs
 const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400, rate_limited: 429 };
 
 const str = (b: Body, k: string) => (typeof b[k] === "string" && b[k] ? (b[k] as string) : fail(400, "bad_request"));
@@ -206,13 +208,26 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
 };
 
 export async function POST(req: Request): Promise<Response> {
+  const log = requestLog("/api/cmd", req);
+  let cmd = "unknown";
+  let role = "none";
+  let incident: string | undefined;
   try {
     const body = (await req.json().catch(() => ({}))) as Body;
     const name = typeof body.cmd === "string" && Object.hasOwn(commands, body.cmd) ? body.cmd : fail(404, "not_found");
-    return reply(200, await commands[name](await actorFrom(req), body));
+    cmd = name;
+    const actor = await actorFrom(req);
+    role = actor.kind === "staff" ? actor.role : actor.kind;
+    incident = actor.kind === "caller" ? actor.incident ?? undefined : typeof body.incident === "string" && UUID.test(body.incident) ? body.incident : undefined;
+    const out = await commands[name](actor, body);
+    log.info("cmd", { cmd, role, incident, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
+    return reply(200, out);
   } catch (e) {
-    if (e instanceof HttpError) return reply(e.status, { error: e.message });
-    console.error("cmd failed", e instanceof Error ? e.message : e);
+    if (e instanceof HttpError) {
+      log[e.status >= 500 ? "error" : "warn"]("cmd", { cmd, role, incident, status: e.status, code: e.message, duration_ms: log.ms() });
+      return reply(e.status, { error: e.message });
+    }
+    log.error("cmd", { cmd, role, incident, status: 500, code: "server", duration_ms: log.ms(), ...errorFields(e) });
     return reply(500, { error: "server" });
   }
 }

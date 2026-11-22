@@ -1,0 +1,5 @@
+[
+  { "email": "operator1@example.com", "role": "operator", "name": "伊藤" },
+  { "email": "guard1@example.com", "role": "field", "name": "山口" },
+  { "email": "manager@example.com", "role": "manager", "name": "管理者" }
+]
