@@ -71,11 +71,11 @@ function Tooltip({ title, rows }: { title: string; rows: { name: string; color: 
 const TIP_W = 150;
 
 // Up to two series as lines over a soft area fill. Compact = a sparkline for the metric card (no axis, no touch).
-export function Lines({ series, labels, height = 220, compact, format = (n: number) => String(n) }: {
-  series: Series[]; labels: string[]; height?: number; compact?: boolean; format?: (n: number) => string;
+export function Lines({ series, labels, height = 220, compact, target, format = (n: number) => String(n) }: {
+  series: Series[]; labels: string[]; height?: number; compact?: boolean; target?: { value: number; label: string }; format?: (n: number) => string;
 }) {
   const [w, onLayout] = useWidth();
-  const { max, sections } = axis(series.flatMap((s) => s.values));
+  const { max, sections } = axis([...series.flatMap((s) => s.values), target?.value ?? null]);
   const left = compact ? 0 : AXIS_W;
   const edge = compact ? 4 : 8;
   const plot = Math.max(0, w - left - edge * 2);
@@ -96,6 +96,8 @@ export function Lines({ series, labels, height = 220, compact, format = (n: numb
             dataPointsColor1={a.color} dataPointsColor2={b?.color} dataPointsRadius={compact ? 2 : 3}
             areaChart startFillColor1={a.color} startFillColor2={b?.color} endFillColor1={a.color} endFillColor2={b?.color}
             startOpacity={0.16} endOpacity={0}
+            showReferenceLine1={target != null} referenceLine1Position={target?.value}
+            referenceLine1Config={{ color: color.alert, thickness: 1, dashWidth: 4, dashGap: 4, labelText: target?.label, labelTextStyle: { ...axisText, color: color.alert, marginLeft: 4 } }}
             disableScroll extrapolateMissingValues={false} isAnimated={!compact} animationDuration={500}
             pointerConfig={compact ? undefined : {
               pointerStripHeight: height, pointerStripColor: color.track, pointerStripWidth: 1, radius: 4,

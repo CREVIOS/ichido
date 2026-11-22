@@ -24,14 +24,17 @@ export function useClock() {
   return now;
 }
 
-export type Sla = { kind: string; tone: "ok" | "warn" | "late"; left: number };
+export type OpenDesk = Desk & { case_event: { at: string }[]; reply: { id: string }[] };
+export type Targets = Partial<Record<string, number>>;
+export type Sla = { tone: "ok" | "warn" | "late"; left: number };
 
-// Same rule as web/app/operator/queue.tsx: unclaimed → claim target; claimed without a reply → first-reply target.
-export function slaOf(c: Desk, replied: boolean, now: number): Sla | null {
-  if (c.finished_at || replied || c.status === "guided") return null;
-  const kind = c.operator_id ? "reply" : "claim";
-  const target = kind === "claim" ? SLA.claimS : SLA.firstReplyS;
-  const left = Math.round(target - (now - Date.parse(c.created_at)) / 1000);
-  return { kind, tone: left < 0 ? "late" : left < target * (1 - SLA.warn) ? "warn" : "ok", left };
+// Same rule as web/app/operator/queue.tsx, with targets from ichido.sla_target:
+// unclaimed → time since the fault; claimed without a reply → time since the claim.
+export function slaOf(c: OpenDesk, targets: Targets, now: number): Sla | null {
+  const start = c.operator_id ? c.case_event[0]?.at : c.created_at;
+  const target = targets[c.operator_id ? "no_reply" : "unclaimed"];
+  if (c.reply.length || !start || !target) return null;
+  const left = Math.round(target - (now - Date.parse(start)) / 1000);
+  return { tone: left < 0 ? "late" : left < target * (1 - SLA.warn) ? "warn" : "ok", left };
 }
 export const slaText = (s: Sla) => (s.tone === "late" ? SLA.late(Math.ceil(-s.left / 60)) : SLA.left(s.left));

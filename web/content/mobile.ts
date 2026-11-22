@@ -1,8 +1,5 @@
 // Staff-only Expo screens. Caller-facing mobile wording lives in catalogue.ts.
 export const MOBILE_STAFF = {
-  // Seeded local demo accounts (supabase/seed.sql), prefilled on the sign-in form.
-  demoAccount: { operator: "operator@ichido.demo", field: "guard1@ichido.demo", manager: "manager@ichido.demo" } as Record<string, string>,
-
   staff: {
     close: "閉じる",
     count: (n: number) => `${n}件`,
@@ -19,7 +16,6 @@ export const MOBILE_STAFF = {
     queue: "対応キュー",
     open: "対応中",
     history: "完了した案件",
-    env: "デモ・架空の銀行",
     empty: "対応中の案件はありません。Help Point のボタン、または右上のメニューから模擬障害を起こせます。",
     simulate: "障害を模擬",
     simulateAt: (label: string) => `ATM障害を模擬：${label}`,

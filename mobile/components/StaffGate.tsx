@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { View } from "react-native";
 import { router } from "expo-router";
 import { sb, cmd, signOut } from "@/lib/supabase";
 import { Brand, Button, Card, Input, Notice, Screen, T } from "@/components/ui";
-import { STAFF, MOBILE } from "@content/catalogue";
+import { STAFF } from "@content/catalogue";
 
 export type Role = "operator" | "field" | "manager";
 export type Me = { uid: string; role: Role; name: string; signOut: () => Promise<void> };
@@ -20,7 +19,7 @@ async function resolve(): Promise<Who | null> {
 // Mirrors web/components/StaffGate.tsx: signs a staff member in, checks the role against the screen, then renders it.
 export function StaffGate({ allow, title, children }: { allow: Role[]; title: string; children: (me: Me) => ReactNode }) {
   const [me, setMe] = useState<Who | null | undefined>(undefined);
-  const [email, setEmail] = useState(MOBILE.demoAccount[allow[0]] ?? "");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,13 +32,15 @@ export function StaffGate({ allow, title, children }: { allow: Role[]; title: st
 
   async function signIn() {
     setBusy(true); setError("");
-    const { error } = await sb().auth.signInWithPassword({ email: email.trim(), password });    if (error) { setError(error.message); setBusy(false); return; }
+    const { error } = await sb().auth.signInWithPassword({ email: email.trim(), password });
+    if (error) { setError(error.message); setBusy(false); return; }
     setMe(await resolve());
     setBusy(false);
   }
 
   return (
     <Screen back eyebrow={<Brand />} title={title}>
+      <T v="row" tone="body">{STAFF.signInLead}</T>
       {me && <Notice tone="alert">{STAFF.noAccess(me.role)}</Notice>}
       <Card>
         <Input label={STAFF.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="username" />
@@ -48,7 +49,6 @@ export function StaffGate({ allow, title, children }: { allow: Role[]; title: st
         <Button label={STAFF.signIn} onPress={signIn} busy={busy} disabled={!email || !password} block />
         {me && <Button kind="ghost" label={STAFF.otherAccount} onPress={out} />}
       </Card>
-      <View style={{ paddingHorizontal: 4 }}><T v="small">{STAFF.signInLead}</T></View>
     </Screen>
   );
 }

@@ -8,7 +8,7 @@ import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, T
 import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
-  FACTS, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
+  FACT_STAFF, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
   eventText, summaryDraft, pick, replyOf,
   type Lang, type FieldState, type L10n,
 } from "@content/catalogue";
@@ -163,8 +163,8 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </Inset>
           <Inset>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}><T v="small">{O.confirmed}</T><T v="small" mono>{O.rev(d.confirmed_rev)}</T></View>
-            <T v="body" tone="ink">{FACTS.card_back[d.card_back].ja}</T>
-            <T v="body" tone="ink">{FACTS.cash_received[d.cash_received].ja}</T>
+            <T v="body" tone="ink">{FACT_STAFF.card_back[d.card_back]}</T>
+            <T v="body" tone="ink">{FACT_STAFF.cash_received[d.cash_received]}</T>
           </Inset>
         </>
       )}

@@ -19,6 +19,7 @@ export type Insights = {
   median_first_reply_s: number | null;
   choices: Record<string, number>;
   ratings: Record<string, number>;
+  targets: Partial<Record<string, number>>;
 };
 
 export const PERIODS = [7, 14, 30];
@@ -29,10 +30,15 @@ export function useInsights(days: number) {
   const [data, setData] = useState<Insights | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    const [main, ratings] = await Promise.all([sb().rpc("insights", { p_days: days }), sb().rpc("insights_ratings", { p_days: days })]);
+    const [main, ratings, t] = await Promise.all([
+      sb().rpc("insights", { p_days: days }),
+      sb().rpc("insights_ratings", { p_days: days }),
+      sb().schema("ichido").from("sla_target").select("reason, seconds"), // operators only; managers see no target line
+    ]);
     const e = main.error ?? ratings.error;
+    const targets = Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds]));
     if (e) setError(staffError(e.message));
-    else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {} }); }
+    else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, targets }); }
   }, [days]);
   useLive(["desk"], load);
   return { data, error, load };
@@ -103,12 +109,17 @@ export const METRICS = {
       <View style={{ gap: 16 }}>
         <Big large sub={INSIGHTS.firstReplyNote}>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>
         <Lines height={200} labels={d.per_day.map((x) => dayLabel(x.day))}
+          target={d.targets.no_reply != null ? { value: d.targets.no_reply / 60, label: INSIGHTS.target(INSIGHTS.duration(d.targets.no_reply)) } : undefined}
           series={[{ name: INSIGHTS.series.reply, color: chart.blue, values: d.per_day.map((x) => minutes(x.first_reply_s)) }]} />
       </View>
     ),
   },
   langs: {
-    card: (d: Insights) => <Big>{Object.keys(d.languages).filter((l) => l !== "none").map((l) => LANG_NAME[l as Lang]).join(" · ") || "—"}</Big>,
+    card: (d: Insights) => {
+      const [top] = Object.entries(d.languages).filter(([l]) => l !== "none").sort((a, b) => b[1] - a[1]);
+      const all = Object.values(d.languages).reduce((n, v) => n + v, 0);
+      return top ? <Big sub={LANG_NAME[top[0] as Lang]}>{`${pct(top[1], all)}%`}</Big> : <Big>—</Big>;
+    },
     detail: (d: Insights) => {
       const rows = Object.entries(d.languages).sort((a, b) => b[1] - a[1]);
       const total = rows.reduce((n, [, v]) => n + v, 0);

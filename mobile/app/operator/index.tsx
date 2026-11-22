@@ -6,8 +6,8 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
-import { type Desk, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
-import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, SLA, STAFF, STATUS, type L10n } from "@content/catalogue";
+import { type Desk, type OpenDesk, type Targets, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
+import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n } from "@content/catalogue";
 
 const O = MOBILE.operator;
 const HISTORY = 8;
@@ -18,26 +18,27 @@ export default function OperatorScreen() {
 }
 
 function Queue({ me }: { me: Me }) {
-  const [open, setOpen] = useState<Desk[]>([]);
+  const [open, setOpen] = useState<OpenDesk[]>([]);
   const [done, setDone] = useState<Desk[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [replied, setReplied] = useState<Set<string>>(new Set());
+  const [targets, setTargets] = useState<Targets>({});
   const [error, setError] = useState("");
   const now = useClock();
 
   // Open cases are fetched on their own so no amount of history can push one out of the queue.
   const load = useCallback(async () => {
     const db = sb();
-    const [o, h, s] = await Promise.all([
-      db.from("desk").select("*").is("finished_at", null).order("created_at"),
+    // Each open case carries its claim time and whether a reply exists, for the response-time targets.
+    const [o, h, s, t] = await Promise.all([
+      db.from("desk").select("*, reply(id), case_event(at)").is("finished_at", null)
+        .eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
+        .limit(1, { referencedTable: "case_event" }).limit(1, { referencedTable: "reply" }).order("created_at"),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY),
       db.from("station").select("id, label").order("id"),
+      db.schema("ichido").from("sla_target").select("reason, seconds"),
     ]);
-    const queue = (o.data ?? []) as Desk[];
-    // Which open cases already have a reply, for the first-reply target.
-    const r = queue.length ? await db.from("reply").select("incident").in("incident", queue.map((c) => c.id)) : { data: [] };
-    setOpen(queue); setDone((h.data ?? []) as Desk[]); setStations((s.data ?? []) as Station[]);
-    setReplied(new Set(((r.data ?? []) as { incident: string }[]).map((x) => x.incident)));
+    setOpen((o.data ?? []) as OpenDesk[]); setDone((h.data ?? []) as Desk[]); setStations((s.data ?? []) as Station[]);
+    setTargets(Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds])));
   }, []);
   useLive(["desk", "reply"], load);
 
@@ -60,7 +61,6 @@ function Queue({ me }: { me: Me }) {
     >
       <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
         <Tag label={O.open} value={MOBILE.staff.count(open.length)} />
-        <Tag value={O.env} />
         <Tag value={me.name} />
       </View>
       {error ? <Notice tone="alert">{error}</Notice> : null}
@@ -71,11 +71,11 @@ function Queue({ me }: { me: Me }) {
         ) : (
           <Card style={{ padding: 4, gap: 0 }}>
             {open.map((c) => {
-              const sla = slaOf(c, replied.has(c.id), now);
+              const sla = slaOf(c, targets, now);
               const late = sla && sla.tone !== "ok";
               return (
                 <Row key={c.id} status={c.status} label={label[c.station] ?? c.station} chevron onPress={() => openCase(c.id)}
-                  meta={late ? `${SLA.label[sla.kind]} ${slaText(sla)}` : O.minutesAgo(minutesAgo(c.created_at, now))}
+                  meta={late ? slaText(sla) : O.minutesAgo(minutesAgo(c.created_at, now))}
                   metaTone={sla?.tone === "late" ? "alert" : sla?.tone === "warn" ? "warn" : undefined}
                   sub={`${faultJa(c.fault)}${c.lang ? ` · ${LANG_NAME[c.lang]}` : ""}${c.operator_id ? "" : ` · ${O.unclaimed}`}`} />
               );
