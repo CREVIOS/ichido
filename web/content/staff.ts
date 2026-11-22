@@ -241,6 +241,8 @@ export const INSIGHTS = {
   choiceNote: "「待つ／帰る」を選べる返答を受けたお客様のみ",
   privacy: "件数のみを集計しています。お客様の言葉や個人を特定できる情報は表示しません。",
   definition: "定義",
+  unit: "件数",
+  target: (t: string) => `目標 ${t}`,
   range: "期間",
   interval: "間隔",
   everyDay: "毎日",
