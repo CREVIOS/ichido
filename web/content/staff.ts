@@ -322,6 +322,7 @@ export const STAFF_JA = {
 
 // Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.
 const secs = (s: number | undefined | null) => (s == null || Number.isNaN(s) ? "—" : s < 90 ? `${Math.round(s)}秒` : `${(s / 60).toFixed(1)}分`);
+const num = (v: unknown) => (v == null || v === "" ? undefined : Number(v));
 export const BOT = {
   name: "Ichido Bot",
   note: "担当者の推奨、AI提案の事前準備、期限前の通知、対応記録の作成を自動で行います。担当の決定、返答の送信、出動依頼、案件の終了は担当者が行います。",
@@ -354,6 +355,14 @@ export const BOT = {
     `対応記録を作成しました（担当まで ${secs(d.claim_s)}・初回返答まで ${secs(d.first_reply_s)}・警備員到着まで ${secs(d.guard_arrival_s)}・合計 ${secs(d.total_s)}）`,
   recordBy: "Ichido Bot が作成・要確認",
   secs,
+  // Timeline sentences for the bot's own events (eventText in catalogue.ts).
+  event: (kind: string, d: Record<string, string | undefined>): string => {
+    if (kind === "bot_routed") return BOT.routed(d.operator ?? "—");
+    if (kind === "bot_remind") {
+      return d.reason === "guard_late" ? BOT.remind.guard_late(d.assignee ?? "—", secs(num(d.target_s))) : BOT.remind.no_reply(secs(num(d.target_s)));
+    }
+    return BOT.closed({ claim_s: num(d.claim_s), first_reply_s: num(d.first_reply_s), guard_arrival_s: num(d.guard_arrival_s), total_s: num(d.total_s) });
+  },
   automation: {
     title: "自動化",
     lead: "対応中の案件ごとに Ichido Bot のワークフローが動いています。各案件の現在のステップを表示します。",

@@ -174,8 +174,6 @@ export const RATING: Record<number, L10n> = {
 };
 const RATING_JA: Record<number, string> = { 3: "よかった", 2: "ふつう", 1: "むずかしかった" };
 
-const num = (v: unknown) => (v == null || v === "" ? undefined : Number(v));
-
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
   switch (kind) {
@@ -202,12 +200,8 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "lang_changed": return `お客様が言語を変更（${LANG_NAME[d.from as Lang] ?? d.from ?? "—"} → ${LANG_NAME[d.to as Lang] ?? d.to}）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
-    case "bot_routed": return BOT.routed(d.operator ?? "—");
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
-    case "bot_remind": return d.reason === "guard_late"
-      ? BOT.remind.guard_late(d.assignee ?? "—", BOT.secs(num(d.target_s)))
-      : BOT.remind.no_reply(BOT.secs(num(d.target_s)));
-    case "bot_closed": return BOT.closed({ claim_s: num(d.claim_s), first_reply_s: num(d.first_reply_s), guard_arrival_s: num(d.guard_arrival_s), total_s: num(d.total_s) });
+    case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
     default: return kind;
   }
 }
