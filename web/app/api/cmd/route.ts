@@ -128,6 +128,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
       "お客様が次の行動を自分の言葉で説明した。",
     ].filter(Boolean).join("");
     await admin.from("desk").update({ status: "guided", summary_draft: summary, finished_at: new Date().toISOString() }).eq("id", d.id);
+    await admin.from("field_job").update({ case_closed: true }).eq("incident", d.id);
     await setLight(d.station, "guided");
     await event(d.id, "operator", "guided", "案内を確認しました（お客様が次の手順を説明）", op.name);
     return { summary };
@@ -181,6 +182,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     await admin.from("desk").update({
       card_back: cur!.card_back, cash_received: cur!.cash_received, confirmed_rev: cur!.rev, caller_words: cur!.words,
     }).eq("id", c.incident);
+    await admin.from("caller_card").update({ confirmed_rev: cur!.rev }).eq("id", c.incident);
     const fact = (k: "card_back" | "cash_received") => FACTS[k][cur![k] as Fact].ja;
     await event(c.incident, "caller", "confirmed", `お客様が内容を確認（${fact("card_back")}／${fact("cash_received")}）`);
     return {};

@@ -40,7 +40,7 @@ function Console({ uid }: { uid: string }) {
   useLive(["desk"], loadQueue);
 
   const open = cases.filter((c) => !c.finished_at);
-  const current = cases.find((c) => c.id === sel) ?? open[0] ?? null;
+  const current = cases.find((c) => c.id === sel) ?? open[0] ?? cases[0] ?? null;
   const run = (name: string, body: Record<string, unknown> = {}) =>
     cmd(name, body).then(() => setError("")).catch((e: Error) => setError(e.message));
 
@@ -146,7 +146,7 @@ function CaseView({ d, uid, run, error }: { d: Desk; uid: string; run: (n: strin
                   <span lang={lang} style={{ fontSize: 16 }}>{d.caller_words ?? "（選択肢で回答）"}</span>
                 </div>
                 <div className="well grow stack" style={{ "--gap": "4px", minWidth: 240 } as React.CSSProperties}>
-                  <span className="row small muted">お客様が確認した内容 <span className="chip guided">本人確認済みの申告</span></span>
+                  <span className="row small muted">お客様が確認した内容 <span className="chip guided">お客様が確認した申告</span></span>
                   <span>{FACTS.card_back[d.card_back].ja}</span>
                   <span>{FACTS.cash_received[d.cash_received].ja}</span>
                 </div>

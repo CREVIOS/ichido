@@ -53,10 +53,11 @@ export type ReplySlots = { branch?: string; hours?: string };
 export const REPLIES: Record<string, { title: string; text: (s: ReplySlots) => Record<Lang, string> }> = {
   HELD_WAIT_OR_LEAVE: {
     title: "A-3 機械障害によりカードを保管中（待つ／帰るを選択）",
-    text: ({ branch = "長崎駅前支店", hours = "平日 9:00〜15:00" }) => ({
-      ja: `カードは機械の中で保管されています。お待ちいただくか、お帰りいただくかを選べます。お帰りの場合は、銀行からご連絡のうえ、${branch}の窓口（${hours}）で、銀行所定の手続きでお受け取りください。`,
-      bn: `আপনার কার্ড মেশিনের ভেতরে রাখা আছে। আপনি অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে; পরে ${branch} শাখায় (${hours}) ব্যাংকের নিয়ম অনুযায়ী কার্ড নিতে পারবেন।`,
-      en: `Your card is being held inside the machine. You can wait, or you can leave. If you leave, the bank will contact you, and you can collect it at the ${branch} counter (${hours}) following the bank's procedure.`,
+    // Slot defaults are per language so a Japanese branch name never lands in a Bengali sentence.
+    text: (s) => ({
+      ja: `カードは機械の中で保管されています。お待ちいただくか、お帰りいただくかを選べます。お帰りの場合は、銀行からご連絡のうえ、${s.branch ?? "長崎駅前支店"}の窓口（${s.hours ?? "平日 9:00〜15:00"}）で、銀行所定の手続きでお受け取りください。`,
+      bn: `আপনার কার্ড মেশিনের ভেতরে রাখা আছে। আপনি অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে; পরে ${s.branch ?? "নাগাসাকি একিমায়ে"} শাখায় (${s.hours ?? "সোম–শুক্র, ৯:০০–১৫:০০"}) ব্যাংকের নিয়ম অনুযায়ী কার্ড নিতে পারবেন।`,
+      en: `Your card is being held inside the machine. You can wait, or you can leave. If you leave, the bank will contact you, and you can collect it at the ${s.branch ?? "Nagasaki Ekimae branch"} counter (${s.hours ?? "weekdays 9:00–15:00"}) following the bank's procedure.`,
     }),
   },
   HANDSET: {

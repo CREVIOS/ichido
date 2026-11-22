@@ -21,7 +21,7 @@ function Jobs() {
   const [eta, setEta] = useState("30-45");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    const { data } = await sb().from("field_job").select("*").neq("state", "done").order("updated_at", { ascending: false });
+    const { data } = await sb().from("field_job").select("*").eq("case_closed", false).neq("state", "done").order("updated_at", { ascending: false });
     setJobs((data ?? []) as Job[]);
   }, []);
   useLive(["field_job"], load);

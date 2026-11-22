@@ -5,7 +5,7 @@ import { useLive } from "@/lib/live";
 import { FACTS, REPLIES, STATUS, UI, FIELD_STATE, LANG_NAME, etaText, type Lang, type Fact, type FactKey, type Status } from "@/content/catalogue";
 import { VoiceIntake } from "@/components/VoiceIntake";
 
-type Card = { id: string; lang: Lang | null; status: Status; field_state: string; eta_text: string | null; choice: string | null; teachback: string | null; teachback_result: string | null };
+type Card = { id: string; lang: Lang | null; confirmed_rev: number | null; status: Status; field_state: string; eta_text: string | null; choice: string | null; teachback: string | null; teachback_result: string | null };
 type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
 type Reply = { id: string; intent: string; slots: Record<string, string>; sent_at: string };
 
@@ -48,7 +48,7 @@ export default function CallerPage() {
 
   const lang: Lang = card.lang ?? "bn";
   const latest = replies.at(-1);
-  const sent = confirmed !== null || card.status !== "received" || replies.length > 0;
+  const sent = confirmed !== null || card.confirmed_rev != null || replies.length > 0;
 
   return (
     <main className="phone" lang={lang}>

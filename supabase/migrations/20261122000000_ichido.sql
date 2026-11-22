@@ -78,6 +78,7 @@ create table public.draft (
 create table public.caller_card (
   id uuid primary key references public.desk on delete cascade,
   lang text check (lang in ('bn', 'en', 'ja')),
+  confirmed_rev int,
   status public.case_status not null default 'received',
   field_state text not null default 'none' check (field_state in ('none', 'requested', 'on_way', 'arrived', 'done')),
   eta_text text,               -- the guard's own estimate, e.g. '30-45' or null for unknown
@@ -103,6 +104,7 @@ create table public.field_job (
   assignee uuid not null references ichido.staff,
   state text not null default 'requested' check (state in ('requested', 'on_way', 'arrived', 'done')),
   eta_text text,
+  case_closed boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
