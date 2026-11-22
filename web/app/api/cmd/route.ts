@@ -3,6 +3,7 @@ import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault,
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
+import * as training from "@/lib/training";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
@@ -235,6 +236,14 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
+  // AI response training (lib/training.ts): the operator's own isolated session; never touches the desk.
+  training_start: (a, b) => training.start(staff(a, "operator"), b),
+  training_say: (a, b) => training.say(staff(a, "operator"), b),
+  training_readback: (a, b) => training.readback(staff(a, "operator"), b),
+  training_reply: (a, b) => training.sendReply(staff(a, "operator"), b),
+  training_dispatch: (a, b) => training.dispatch(staff(a, "operator"), b),
+  training_end: (a, b) => training.end(staff(a, "operator"), b),
+
   // Field (security guard)
   async field(a, b) {
     const f = staff(a, "field");
@@ -250,6 +259,7 @@ export async function POST(req: Request): Promise<Response> {
   let cmd = "unknown";
   let role = "none";
   let incident: string | undefined;
+  let session: string | undefined;
   try {
     const body = (await req.json().catch(() => ({}))) as Body;
     const name = typeof body.cmd === "string" && Object.hasOwn(commands, body.cmd) ? body.cmd : fail(404, "not_found");
@@ -257,15 +267,16 @@ export async function POST(req: Request): Promise<Response> {
     const actor = await actorFrom(req);
     role = actor.kind === "staff" ? actor.role : actor.kind;
     incident = actor.kind === "caller" ? actor.incident ?? undefined : typeof body.incident === "string" && UUID.test(body.incident) ? body.incident : undefined;
+    session = typeof body.session === "string" && UUID.test(body.session) ? body.session : undefined;
     const out = await commands[name](actor, body);
-    log.info("cmd", { cmd, role, incident, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
+    log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
     return reply(200, out);
   } catch (e) {
     if (e instanceof HttpError) {
-      log[e.status >= 500 ? "error" : "warn"]("cmd", { cmd, role, incident, status: e.status, code: e.message, duration_ms: log.ms() });
+      log[e.status >= 500 ? "error" : "warn"]("cmd", { cmd, role, incident, session, status: e.status, code: e.message, duration_ms: log.ms() });
       return reply(e.status, { error: e.message });
     }
-    log.error("cmd", { cmd, role, incident, status: 500, code: "server", duration_ms: log.ms(), ...errorFields(e) });
+    log.error("cmd", { cmd, role, incident, session, status: 500, code: "server", duration_ms: log.ms(), ...errorFields(e) });
     return reply(500, { error: "server" });
   }
 }

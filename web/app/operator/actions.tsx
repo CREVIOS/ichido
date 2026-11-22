@@ -45,13 +45,16 @@ export function PairCard({ incident }: { incident: string }) {
 
 const INTENTS = Object.keys(REPLIES);
 
-export function ReplyCard({ d, lang, replies, run, bundleTo }: { d: Desk; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard }) {
+// practice: the training console, where the held-card rule is scored in the debrief instead of hinted here.
+export function ReplyCard({ d, lang, replies, run, bundleTo, practice }: {
+  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release">; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean;
+}) {
   const [intent, setIntent] = useState(INTENTS[0]);
   const r = replyOf(intent) ?? REPLIES[INTENTS[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
   // Mirrors the server rule: "card is still inside" only when the caller confirmed it and no release succeeded.
   const blocked = d.confirmed_rev == null ? DESK.reply.awaiting
-    : r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? DESK.reply.mismatch : "";
+    : !practice && r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? DESK.reply.mismatch : "";
   const send = () => run("send", { incident: d.id, intent }).then((ok) => { if (ok) toast.success(DESK.reply.toast); });
   // One step for the common case: the approved reply, then a site check by the first available guard.
   const sendAndDispatch = async (g: Guard) => {
@@ -77,9 +80,9 @@ export function ReplyCard({ d, lang, replies, run, bundleTo }: { d: Desk; lang: 
           <span className="text-[13px] leading-5">{DESK.reply.slotsNote(LANG_NAME[lang])}</span>
         )}
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-[12px] text-muted-foreground">{blocked || (replies.length ? DESK.reply.sent(replies.length) : "")}</span>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           {bundleTo && <Button variant="secondary" disabled={Boolean(blocked)} onClick={() => sendAndDispatch(bundleTo)}>{DESK.reply.bundle(bundleTo.display_name)}</Button>}
           <Button disabled={Boolean(blocked)} onClick={send}>{DESK.reply.send}</Button>
         </div>
@@ -88,7 +91,7 @@ export function ReplyCard({ d, lang, replies, run, bundleTo }: { d: Desk; lang: 
   );
 }
 
-export function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job | null; guards: Guard[]; card: CallerCard | null; lang: Lang; run: Run }) {
+export function DispatchCard({ d, job, guards, card, lang, run }: { d: Pick<Desk, "id">; job: Job | null; guards: Guard[]; card: Pick<CallerCard, "field_state"> | null; lang: Lang; run: Run }) {
   const others = guards.filter((g) => g.uid !== job?.assignee);
   return (
     <Panel title={DESK.dispatch.title}>

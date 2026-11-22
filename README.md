@@ -23,6 +23,7 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close |
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
 | `/insights` | operator, manager | Metric cards with definitions and Recharts charts: daily cases vs guided, funnel with conversion, time to first reply against the target, languages, busiest hours, wait/leave, ratings — counts only |
+| `/training` | operator | AI応対トレーニング: practise against a simulated caller (OpenAI, or a scripted fallback offline) in Bengali, English or Japanese with the console's own reply and dispatch cards, then a scorecard (first-reply time, reply choice, held-card rule, guard decision, numbers withheld, request for a person) with a veteran's tip and a score trend. Isolated tables: never touches the desk, guards, pairing, Gemini or insights |
 
 The same screens also ship as a React Native app in `mobile/` (see below).
 

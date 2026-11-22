@@ -21,6 +21,7 @@ export const NAV = {
   cases: "案件一覧",
   stations: "ステーション",
   insights: "インサイト",
+  training: "AI応対トレーニング",
   field: "割当",
 };
 
