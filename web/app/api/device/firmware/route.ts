@@ -1,24 +1,23 @@
-import { reply, deviceStation } from "@/lib/server";
+import { reply } from "@/lib/server";
+import { authenticateDevice } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
+import { firmwareVersion, validImageUrl } from "@/lib/firmware-manifest.mjs";
 
 // Signed firmware manifest for Help Points, with the same per-station secret as /api/device.
-// FIRMWARE_MANIFEST_JSON is the output of scripts/sign-firmware.mjs: {"version","url","sha256","signature"}.
+// FIRMWARE_MANIFEST_JSON is the output of scripts/sign-firmware.mjs: {"version","url","sha256","signature_v2"} plus signature on the bootstrap release.
 // Unset means no update is published (204). The device verifies the signature against the key compiled into
 // it, so this route cannot push an unsigned image; it only authenticates the station and refuses bad config.
 // Devices send their running version in X-Firmware; it is only logged.
 
-type Manifest = { version: string; url: string; sha256: string; signature: string };
+type Manifest = { version: string; url: string; sha256: string; signature_v2?: string; signature?: string };
 
-const FIELDS: Record<keyof Manifest, RegExp> = {
-  version: /^\d+\.\d+\.\d+$/,
-  url: /^https?:\/\/[^\s"\\]{1,400}$/,
-  sha256: /^[0-9a-f]{64}$/,
-  signature: /^[A-Za-z0-9+/]{100,680}={0,2}$/,
-};
+const rsaSignature = (value: unknown): value is string =>
+  typeof value === "string" && /^(?:[A-Za-z0-9+/]{512}|[A-Za-z0-9+/]{683}=)$/.test(value);
 
 function published(): Manifest | null | "invalid" {
   const raw = process.env.FIRMWARE_MANIFEST_JSON;
   if (!raw) return null;
+  if (raw.length > 2048) return "invalid";
   let m: Record<string, unknown>;
   try {
     m = JSON.parse(raw);
@@ -26,21 +25,29 @@ function published(): Manifest | null | "invalid" {
     if (e instanceof SyntaxError) return "invalid";
     throw e;
   }
-  const ok = m !== null && typeof m === "object" &&
-    (Object.keys(FIELDS) as (keyof Manifest)[]).every((k) => typeof m[k] === "string" && FIELDS[k].test(m[k] as string));
-  return ok ? { version: m.version, url: m.url, sha256: m.sha256, signature: m.signature } as Manifest : "invalid";
+  if (!m || typeof m !== "object") return "invalid";
+  const { version, url, sha256, signature_v2, signature } = m;
+  if (typeof version !== "string" || !firmwareVersion.test(version) ||
+      typeof url !== "string" || !validImageUrl(url) ||
+      typeof sha256 !== "string" || !/^[0-9a-f]{64}$/.test(sha256)) return "invalid";
+  const manifest: Manifest = { version, url, sha256 };
+  if (signature_v2 !== undefined) {
+    if (!rsaSignature(signature_v2)) return "invalid";
+    manifest.signature_v2 = signature_v2;
+  }
+  if (signature !== undefined) {
+    if (!rsaSignature(signature)) return "invalid";
+    manifest.signature = signature;
+  }
+  return manifest.signature || manifest.signature_v2 ? manifest : "invalid";
 }
 
 export async function GET(req: Request): Promise<Response> {
-  const log = requestLog("/api/device/firmware", req);
-  const auth = deviceStation(req);
-  if (auth.id === null) {
-    log.warn("device_auth_failed", { status: 401, code: auth.reason, station: auth.station });
-    return reply(401, { error: "unauthorised" });
-  }
-  const station = auth.id;
+  const log = requestLog("/api/device/firmware");
+  const station = await authenticateDevice(req, "/api/device/firmware");
+  if (station instanceof Response) return station;
   const header = req.headers.get("x-firmware") ?? "";
-  const fw = /^[A-Za-z0-9._+-]{1,32}$/.test(header) ? header : undefined;
+  const fw = /^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(header) ? header : undefined;
   const m = published();
   if (m === "invalid") {
     log.error("device_firmware", { station, fw, status: 500, code: "bad_manifest" });

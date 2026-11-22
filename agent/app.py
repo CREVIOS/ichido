@@ -2,7 +2,7 @@
 
 Speech in, text out: the agent transcribes the caller in their language (Soniox) and publishes the
 transcript to the room. The web app turns each final transcript into a draft the caller confirms.
-The agent speaks (ElevenLabs) only text the web server signed for this room (HMAC over "<room>\n<text>"),
+The agent speaks (ElevenLabs) only fresh text the web server signed for this room and caller,
 relayed by the caller's client on `ichido.say`; anything else is ignored.
 It never runs a conversational LLM, never decides anything, and never asks for numbers.
 
@@ -17,11 +17,11 @@ rejected speech requests, errors) with room, locale, sizes and timings only, nev
 
 import asyncio
 import base64
-import hashlib
 import hmac
 import json
 import logging
 import os
+import re
 import time
 
 from dotenv import load_dotenv
@@ -31,6 +31,7 @@ from livekit.plugins import elevenlabs, silero, soniox
 
 load_dotenv()
 log = logging.getLogger("ichido-agent")
+JOB_LOGS = logging.Filter(log.name)
 
 # Optional audio extras. Both only change how the caller's audio is cleaned and when a turn ends; neither
 # produces text. The agent still never replies on its own (there is no LLM in the session).
@@ -69,23 +70,38 @@ VOICES = {
 ELEVEN_MODEL = os.getenv("ELEVEN_MODEL") or "eleven_v4_turbo"
 SONIOX_MODEL = os.getenv("SONIOX_MODEL") or "stt-rt-v6"
 MAX_SAY_BYTES = 4096
+SAY_WINDOW_S = 30
 # Required to run a session (checked at job start); optional at import so `download-files` works without it.
 BRIDGE_SECRET = os.getenv("AGENT_BRIDGE_SECRET", "").encode()
 
 
-def signed_text(room: str, payload: str) -> str | None:
-    """Return the text if its signature matches this room, else None. Without a secret nothing is accepted."""
+def signed_text(room: str, sender: str, payload: str, seen: dict[str, int]) -> str | None:
+    """Verify and consume a read-back in this room's agent session."""
     if not BRIDGE_SECRET:
         return None
     try:
         msg = json.loads(payload)
-        text, sig = msg["text"], msg["sig"]
-    except (ValueError, KeyError, TypeError):
+        text, issued, nonce, sig = msg["text"], msg["issued"], msg["nonce"], msg["sig"]
+    except (ValueError, KeyError, TypeError, RecursionError):
         return None
-    if not isinstance(text, str) or not isinstance(sig, str):
+    now = int(time.time())
+    if (not isinstance(text, str) or not text or type(issued) is not int or not now - SAY_WINDOW_S < issued <= now + 5
+            or not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce)
+            or not isinstance(sig, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", sig)):
         return None
-    expected = base64.urlsafe_b64encode(hmac.new(BRIDGE_SECRET, f"{room}\n{text}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
-    return text if hmac.compare_digest(expected, sig) else None
+    try:
+        message = f"ichido-say/2\n{room}\n{sender}\n{issued}\n{nonce}\n{text}".encode()
+    except UnicodeEncodeError:
+        return None
+    expected = base64.urlsafe_b64encode(hmac.digest(BRIDGE_SECRET, message, "sha256")).rstrip(b"=").decode()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    for used in [used for used, expires in seen.items() if expires <= now]:
+        del seen[used]
+    if nonce in seen or len(seen) >= 256:
+        return None
+    seen[nonce] = issued + SAY_WINDOW_S
+    return text
 
 
 async def read_bounded(reader: rtc.TextStreamReader) -> str | None:
@@ -138,6 +154,12 @@ def noise_filter():
     return noise_cancellation.BVC()
 
 
+def restrict_job_logs() -> None:
+    # The SDK sends root records to stdout through the worker IPC queue, including raw provider errors.
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(JOB_LOGS)
+
+
 def prewarm(proc: JobProcess) -> None:
     proc.userdata["vad"] = silero.VAD.load()
     proc.userdata["turn_model_ready"] = turn_model_files_ready()
@@ -150,16 +172,19 @@ server.setup_fnc = prewarm
 
 @server.rtc_session(agent_name=os.getenv("AGENT_NAME", "ichido-intake"))
 async def intake(ctx: JobContext) -> None:
+    restrict_job_logs()
     if not BRIDGE_SECRET:
         raise RuntimeError("AGENT_BRIDGE_SECRET is not set: the agent would have nothing it may speak")
     meta = json.loads(ctx.job.metadata or "{}")
     locale = meta.get("locale") if meta.get("locale") in VOICES else "bn-BD"
     room = ctx.room.name
+    if not re.fullmatch(r"case-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", room):
+        raise ValueError("Invalid intake room")
     started = time.monotonic()
     log.info("job_start", extra={"event": "job_start", "room": room, "locale": locale, "job": ctx.job.id})
 
-    async def on_end(reason: str) -> None:
-        log.info("job_end", extra={"event": "job_end", "room": room, "locale": locale, "reason": reason,
+    async def on_end(_reason: str) -> None:
+        log.info("job_end", extra={"event": "job_end", "room": room, "locale": locale,
                                    "duration_s": round(time.monotonic() - started, 1)})
 
     ctx.add_shutdown_callback(on_end)
@@ -167,7 +192,7 @@ async def intake(ctx: JobContext) -> None:
         await run_intake(ctx, room, locale)
     except Exception as e:
         log.error("job_failed", extra={"event": "job_failed", "room": room, "error": type(e).__name__})
-        raise
+        raise RuntimeError("Voice intake failed") from None
 
 
 async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
@@ -186,14 +211,26 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
     )
 
     # Only the caller relays text, and only server-signed text for this room is spoken.
+    seen: dict[str, int] = {}
+    pending: set[asyncio.Task] = set()
+
     def on_say(reader: rtc.TextStreamReader, sender: str) -> None:
+        if len(pending) >= 4:
+            reader.close()
+            return
         if not sender.startswith("c-"):
+            reader.close()
             log.warning("say_rejected", extra={"event": "say_rejected", "room": room, "reason": "not_caller"})
             return
 
         async def speak() -> None:
-            payload = await read_bounded(reader)
-            text = signed_text(room, payload) if payload else None
+            try:
+                payload = await asyncio.wait_for(read_bounded(reader), timeout=5)
+            except (TimeoutError, rtc.StreamError):
+                return
+            finally:
+                reader.close()
+            text = signed_text(room, sender, payload, seen) if payload else None
             if not text:
                 reason = "too_large" if payload is None else "unsigned"
                 log.warning("say_rejected", extra={"event": "say_rejected", "room": room, "reason": reason})
@@ -202,7 +239,9 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
             session.interrupt()
             session.say(text, add_to_chat_ctx=False)
 
-        asyncio.create_task(speak())
+        task = asyncio.create_task(speak())
+        pending.add(task)
+        task.add_done_callback(pending.discard)
 
     ctx.room.register_text_stream_handler("ichido.say", on_say)
 
@@ -227,7 +266,7 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
         Agent(instructions="Transcribe the caller. Do not reply on your own."),
         room=ctx.room,
         room_options=room_io.RoomOptions(text_input=False, audio_input=room_io.AudioInputOptions(noise_cancellation=nc)),
-        record=False,
+        record={"audio": False, "traces": False, "logs": False, "transcript": False, "redaction": True},
     )
 
 

@@ -16,11 +16,13 @@ import { STATUS, STAFF, STAFF_JA, type Lang, type Status } from "@/content/catal
 export type NavItem = { href: string; label: string; icon: LucideIcon; count?: number; Badge?: ComponentType };
 
 export function Logo({ className }: { className?: string }) {
+  // Leaving the voice screen needs a new document to drop its microphone permission policy.
+  const HomeLink = usePathname() === "/caller" ? "a" : Link;
   return (
-    <Link href="/" className={cn("inline-flex items-center gap-1.5 text-foreground", className)} aria-label="Ichido">
+    <HomeLink href="/" className={cn("inline-flex items-center gap-1.5 text-foreground", className)} aria-label="Ichido">
       <Mark />
       <span className="text-[17px] leading-none tracking-[-0.035em]">Ichido</span>
-    </Link>
+    </HomeLink>
   );
 }
 

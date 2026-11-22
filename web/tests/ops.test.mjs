@@ -279,7 +279,8 @@ test("harassment flag and takeover: one person's judgement, and another operator
 });
 
 test("the Ichido Bot and Gemini have no path to fraud mode or a broadcast", () => {
-  const BOT_RPCS = new Set(["bot_mark", "bot_remind", "bot_close", "ops_promise_expire"]);
+  // mcp_field_staff: the role-checked, read-only guard roster the case tools read with the staff bearer.
+  const BOT_RPCS = new Set(["bot_mark", "bot_remind", "bot_close", "ops_promise_expire", "mcp_field_staff"]);
   for (const f of ["workflows/case-bot.ts", "lib/bot-steps.ts", "lib/promise-steps.ts", "lib/decide.ts", "lib/case-tools.ts"]) {
     const src = readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
     assert.ok(!/cmd_fraud|cmd_broadcast|\/api\/cmd|OPS_COMMANDS/.test(src), f);

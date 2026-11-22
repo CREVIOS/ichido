@@ -64,7 +64,7 @@ export async function begin(incident: string) {
 // Operators shown online in the console (Supabase Realtime presence, keyed by uid); null when presence is unavailable.
 async function onlineOperators(): Promise<Set<string> | null> {
   const { admin } = await lib();
-  const ch = admin.channel("ichido:operators");
+  const ch = admin.channel("ichido:operator-presence", { config: { private: true } });
   try {
     return await new Promise((resolve) => {
       const timer = setTimeout(() => resolve(null), PRESENCE_WAIT_MS);

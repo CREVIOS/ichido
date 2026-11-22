@@ -1,4 +1,6 @@
 """Run: uv run python -m unittest"""
+import io
+import logging
 import os
 import unittest
 from pathlib import Path
@@ -75,6 +77,19 @@ class ProvidersTest(unittest.TestCase):
         # Soniox cannot transcribe Nepali; the web app keeps Nepali callers on the typed path.
         self.assertNotIn("ne-NP", app.LANGS)
         self.assertNotIn("ne-NP", app.VOICES)
+
+
+class WorkerLogsTest(unittest.TestCase):
+    def test_stdout_or_ipc_handler_accepts_only_application_events(self):
+        output = io.StringIO()
+        handler = logging.StreamHandler(output)
+        root = logging.getLogger()
+        with mock.patch.object(root, "handlers", [handler]):
+            app.restrict_job_logs()
+            for name, message in (("livekit.agents", "private transcript"), ("livekit.plugins.soniox", "provider payload"),
+                                  ("asyncio", "raw exception"), ("ichido-agent", "session_error")):
+                root.handle(logging.LogRecord(name, logging.ERROR, __file__, 0, message, (), None))
+        self.assertEqual(output.getvalue(), "session_error\n")
 
 
 class NeverRepliesTest(unittest.TestCase):

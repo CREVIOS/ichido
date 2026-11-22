@@ -1,9 +1,10 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { actorFrom, admin } from "@/lib/server";
+import { actorFrom, reply } from "@/lib/server";
 import { eligibleReplies } from "@/lib/case-tools";
 import { suggest } from "@/lib/decide";
+import { boundedText, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 
 // Ichido as an MCP server (Streamable HTTP) for operators' and managers' own AI clients.
@@ -74,9 +75,10 @@ const handler = createMcpHandler((server) => {
     inputSchema: incident, annotations: { readOnlyHint: true, openWorldHint: true },
   }, async ({ incident: id }, ctx) => {
     const me = who(ctx.http?.authInfo?.extra);
-    const { data } = await admin.from("desk").select("id").eq("id", id).eq("operator_id", me.uid).is("finished_at", null).maybeSingle();
+    const db = asUser(me.token);
+    const { data } = await db.from("desk").select("id").eq("id", id).eq("operator_id", me.uid).is("finished_at", null).maybeSingle();
     if (!data) throw new Error("conflict: claim this open case in the console first");
-    return json((await suggest(id)) ?? { suggestion: null, reason: "GEMINI_API_KEY is not set" });
+    return json((await suggest(id, db)) ?? { suggestion: null, reason: "GEMINI_API_KEY is not set" });
   });
 }, { serverInfo: { name: "ichido", version: "1.0.0" } });
 
@@ -90,8 +92,22 @@ async function verify(req: Request, token?: string) {
 
 const authed = withMcpAuth(handler, verify, { required: true });
 async function route(req: Request) {
-  const log = requestLog("/api/mcp", req);
-  const res = await authed(req);
+  const log = requestLog("/api/mcp");
+  const origin = req.headers.get("origin");
+  if (origin && origin !== new URL(req.url).origin) return reply(403, { error: "forbidden" });
+  const body = req.method === "POST" ? await boundedText(req, 16384) : undefined;
+  if (body instanceof Response) return body;
+  const blocked = await limitSource(req.headers, "mcp_auth_failure", 12, 60, true);
+  if (blocked) return blocked;
+  const limited = await limitSource(req.headers, "mcp_requests", 180, 60);
+  if (limited) return limited;
+  const headers = new Headers(req.headers);
+  for (const h of ["forwarded", "x-forwarded-host", "x-forwarded-proto"]) headers.delete(h);
+  const res = await authed(new Request(req.url, { method: req.method, headers, body, signal: req.signal }));
+  if (res.status === 401 || res.status === 403) {
+    const denied = await limitSource(req.headers, "mcp_auth_failure", 12, 60);
+    if (denied) return denied;
+  }
   log.info("mcp", { status: res.status, duration_ms: log.ms() });
   return res;
 }

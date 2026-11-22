@@ -6,8 +6,9 @@ import { API_URL, bearer } from "@/lib/supabase";
 import { livekit } from "@/lib/voice";
 import { Button, T } from "@/components/ui";
 import { MOBILE, VOICE, type Lang } from "@content/catalogue";
+import { callerTranscript, type SignedSpeech } from "@content/speech";
 
-export type SignedSpeech = { text: string; sig: string };
+export type { SignedSpeech };
 type State = "idle" | "connecting" | "live" | "unavailable";
 const AGENT_WAIT_MS = 12_000;
 
@@ -15,8 +16,8 @@ const AGENT_WAIT_MS = 12_000;
 // caller's own identity; the agent's audio plays through the native audio session without attaching anything.
 function wire(r: Room, onFinal: (t: string) => void, onPartial: (t: string) => void) {
   r.registerTextStreamHandler("lk.transcription", async (reader, info) => {
-    const text = await reader.readAll();
-    if (info.identity !== r.localParticipant.identity) return;
+    const text = await callerTranscript(reader, info.identity === r.localParticipant.identity);
+    if (text === null) return;
     if (reader.info.attributes?.["lk.transcription_final"] !== "true") return onPartial(text);
     onPartial("");
     if (text.trim()) onFinal(text.trim());
@@ -85,8 +86,7 @@ export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text
       if (room.current !== r) return r.disconnect(); // stopped or unmounted meanwhile
       if (!(await agentJoined)) return fail();
       setState("live");
-    } catch (e) {
-      console.warn("voice intake failed", e instanceof Error ? e.message : e);
+    } catch {
       fail();
     }
   }

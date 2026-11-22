@@ -5,16 +5,17 @@ import { Mic, Square } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { VOICE, VOICE_LANGS, type Lang } from "@/content/catalogue";
+import { callerTranscript, type SignedSpeech } from "@/content/speech";
 
-export type SignedSpeech = { text: string; sig: string };
+export type { SignedSpeech };
 type State = "idle" | "connecting" | "live" | "unavailable";
 const AGENT_WAIT_MS = 12_000;
 
 // Caller transcripts arrive on lk.transcription under the caller's own identity; the agent's audio is attached for playback.
 function wire(r: Room, audioEl: () => HTMLElement | null, onFinal: (t: string) => void, onPartial: (t: string) => void) {
   r.registerTextStreamHandler("lk.transcription", async (reader, info) => {
-    const text = await reader.readAll();
-    if (info.identity !== r.localParticipant.identity) return;
+    const text = await callerTranscript(reader, info.identity === r.localParticipant.identity);
+    if (text === null) return;
     if (reader.info.attributes?.["lk.transcription_final"] !== "true") return onPartial(text);
     onPartial("");
     if (text.trim()) onFinal(text.trim());

@@ -23,7 +23,16 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
   const id = h.incident;
   const [{ data: d }, { data: events }, { data: replies }, { data: job }, { data: card }] = await Promise.all([
     admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at, stated_amount, fraud_at").eq("id", id).single(),
-    admin.from("case_event").select("id, at, actor, actor_name, kind, data").eq("incident", id).order("id"),
+    admin.from("case_event").select(`
+      id, at, actor, kind, fault:data->>fault, source:data->>source, lang:data->>lang,
+      level:data->>level, reason:data->>reason, result:data->>result,
+      card_back:data->>card_back, cash_received:data->>cash_received, intent:data->>intent,
+      state:data->>state, eta:data->>eta, choice:data->>choice, recipient:data->>recipient,
+      from:data->>from, to:data->>to, rating:data->>rating, notice:data->>notice,
+      flag:data->>flag, on:data->>on, amount:data->>amount, status:data->>status, due:data->>due,
+      target_s:data->>target_s, claim_s:data->>claim_s, first_reply_s:data->>first_reply_s,
+      guard_arrival_s:data->>guard_arrival_s, total_s:data->>total_s,
+      company:data->>company, promise_kind:data->>kind, minutes:data->>minutes`).eq("incident", id).order("id"),
     admin.from("reply").select("intent, sent_at").eq("incident", id).order("sent_at"),
     admin.from("field_job").select("state, eta").eq("incident", id).maybeSingle(),
     admin.from("caller_card").select("choice, teachback_result, rating, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
@@ -96,11 +105,12 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
 
       <Section title={D.timeline}>
         <ol className="flex flex-col">
-          {(events ?? []).map((e) => (
-            <li key={e.id} className="grid grid-cols-[132px_72px_minmax(0,1fr)] gap-x-3 border-t py-1.5 text-[13px]">
-              <span className="mono text-muted-foreground">{at(e.at)}</span>
-              <span className="text-muted-foreground">{e.actor_name ?? ACTOR[e.actor]}</span>
-              <span className="text-foreground">{eventText(e.kind, e.data as Record<string, string>, d.fault)}</span>
+          {/* Staff names never reach the recipient: assignee, operator and the previous holder of a takeover are shown as roles. */}
+          {(events ?? []).map(({ id: eventId, at: time, actor, kind, promise_kind, ...details }) => (
+            <li key={eventId} className="grid grid-cols-[132px_72px_minmax(0,1fr)] gap-x-3 border-t py-1.5 text-[13px]">
+              <span className="mono text-muted-foreground">{at(time)}</span>
+              <span className="text-muted-foreground">{ACTOR[actor]}</span>
+              <span className="text-foreground">{eventText(kind, { ...details, kind: promise_kind, assignee: ACTOR.field, operator: ACTOR.operator, ...(kind === "takeover" && { from: ACTOR.operator }) }, d.fault)}</span>
             </li>
           ))}
         </ol>

@@ -1,5 +1,6 @@
 import { after } from "next/server";
-import { admin, reply, deviceStation } from "@/lib/server";
+import { admin, reply } from "@/lib/server";
+import { authenticateDevice, boundedJson } from "@/lib/request-security";
 import { requestLog, errorFields } from "@/lib/log";
 
 // Device telemetry, every 60 s, with the same per-station secret as /api/device.
@@ -11,19 +12,16 @@ const int = (v: unknown, min: number, max: number) => (Number.isInteger(v) && (v
 const optional = (v: unknown) => (v === -1 ? null : int(v, 0, 600_000));
 
 export async function POST(req: Request): Promise<Response> {
-  const log = requestLog("/api/device/heartbeat", req);
-  const auth = deviceStation(req);
-  if (auth.id === null) {
-    log.warn("device_auth_failed", { status: 401, code: auth.reason, station: auth.station });
-    return reply(401, { error: "unauthorised" });
-  }
-  const station = auth.id;
-  const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const log = requestLog("/api/device/heartbeat");
+  const station = await authenticateDevice(req, "/api/device/heartbeat");
+  if (station instanceof Response) return station;
+  const b = await boundedJson(req, 1024);
+  if (b instanceof Response) return b;
   const t = b && {
     uptime_s: int(b.uptime_s, 0, 2 ** 40),
     free_heap: int(b.free_heap, 0, 2 ** 31 - 1),
     rssi: int(b.rssi, -127, 0),
-    fw: typeof b.fw === "string" && /^[A-Za-z0-9._+-]{1,32}$/.test(b.fw) ? b.fw : undefined,
+    fw: typeof b.fw === "string" && /^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(b.fw) ? b.fw : undefined,
     ack_ms: optional(b.ack_ms),
     poll_ms: optional(b.poll_ms),
   };
@@ -47,8 +45,12 @@ export async function POST(req: Request): Promise<Response> {
   const urls = JSON.parse(process.env.BETTERSTACK_DEVICE_HEARTBEATS_JSON ?? "{}") as Record<string, string>;
   const url = Object.hasOwn(urls, station) ? urls[station] : undefined;
   if (url) {
+    if (!URL.canParse(url) || new URL(url).origin !== "https://uptime.betterstack.com") {
+      log.warn("heartbeat_forward_failed", { station, code: "invalid_destination" });
+      return new Response(null, { status: 204 });
+    }
     after(async () => {
-      const res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(3000) }).catch((e: unknown) => e);
+      const res = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3000) }).catch((e: unknown) => e);
       if (!(res instanceof Response) || !res.ok) {
         log.warn("heartbeat_forward_failed", { station, status: res instanceof Response ? res.status : undefined, ...(res instanceof Response ? {} : errorFields(res)) });
       }

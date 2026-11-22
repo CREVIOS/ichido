@@ -17,11 +17,12 @@ export function usePrefs(): [Prefs, (p: Prefs) => void] {
   useEffect(() => {
     AsyncStorage.getItem(KEY)
       .then((v) => { const p = JSON.parse(v ?? "null") as Partial<Prefs> | null; if (p) setPrefs({ large: p.large === true, slow: p.slow === true }); })
-      .catch((e: unknown) => console.warn("caller prefs unavailable", e));
+      .catch((error: unknown) => console.warn(error instanceof SyntaxError ? "caller_prefs_invalid" : "caller_prefs_read_failed"));
   }, []);
   const set = (p: Prefs) => {
     setPrefs(p);
-    AsyncStorage.setItem(KEY, JSON.stringify(p)).catch((e: unknown) => console.warn("caller prefs not saved", e));
+    AsyncStorage.setItem(KEY, JSON.stringify(p)).catch((error: unknown) =>
+      console.warn("caller_prefs_write_failed", error instanceof TypeError ? "type" : "storage"));
   };
   return [prefs, set];
 }

@@ -28,9 +28,8 @@ function History({ me }: { me: Me }) {
       if (signal.aborted) return;
       setResult({ rows, limit });
       setFailed(false);
-    } catch (error) {
+    } catch {
       if (signal.aborted) return;
-      console.error("Case history read failed", error);
       setFailed(true);
     }
   }, [filters, limit]);
@@ -53,8 +52,7 @@ function History({ me }: { me: Me }) {
       link.download = CASES.filename;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) {
-      console.error("Case export failed", error);
+    } catch {
       toast.error(CASES.exportError);
     } finally {
       setExporting(false);

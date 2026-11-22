@@ -5,7 +5,7 @@ import { admin, priv } from "@/lib/server";
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
 // never the caller's words or draft.
 
-export type Ctx = { incident: string };
+export type Ctx = { incident: string; db?: typeof admin };
 type DeskFacts = { confirmed_rev: number | null; card_back: string; remote_release: string | null; fault: string };
 const WHY_NOT: Record<string, string> = {
   awaiting: "caller has not confirmed yet", held: "card is not confirmed as still inside",
@@ -31,13 +31,14 @@ export const TOOL_DECLARATIONS = [
 ];
 
 export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
-  const { data: d } = await admin.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at, fraud_at").eq("id", ctx.incident).single();
+  const db = ctx.db ?? admin;
+  const { data: d } = await db.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at, fraud_at").eq("id", ctx.incident).single();
   if (!d) return { error: "not_found" };
   switch (name) {
     case "get_case": {
       const [{ data: c }, { data: j }] = await Promise.all([
-        admin.from("caller_card").select("choice, field_state, eta, needs_human, flags").eq("id", ctx.incident).maybeSingle(),
-        admin.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
+        db.from("caller_card").select("choice, field_state, eta, needs_human, flags").eq("id", ctx.incident).maybeSingle(),
+        db.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
       ]);
       return {
         ...d, pack: packOfFault(d.fault), caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
@@ -45,21 +46,21 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
       };
     }
     case "list_replies": {
-      const { data: c } = await admin.from("caller_card").select("flags").eq("id", ctx.incident).maybeSingle();
+      const { data: c } = await db.from("caller_card").select("flags").eq("id", ctx.incident).maybeSingle();
       return eligibleReplies(d, c?.flags ?? []);
     }
     case "list_guards": {
       const [{ data: g }, { data: jobs }] = await Promise.all([
-        priv().from("staff").select("uid, display_name").eq("role", "field"),
-        admin.from("field_job").select("assignee").neq("state", "done"),
+        ctx.db ? db.rpc("mcp_field_staff") : priv().from("staff").select("uid, display_name").eq("role", "field"),
+        db.from("field_job").select("assignee").neq("state", "done"),
       ]);
-      return (g ?? []).map((x) => ({ uid: x.uid, name: x.display_name, open_jobs: (jobs ?? []).filter((j) => j.assignee === x.uid).length }));
+      return (g ?? []).map((x: { uid: string; display_name: string }) => ({ uid: x.uid, name: x.display_name, open_jobs: (jobs ?? []).filter((j) => j.assignee === x.uid).length }));
     }
     case "station_status": {
       const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
       const [{ data: h }, { count }] = await Promise.all([
-        admin.from("device_health").select("last_seen, rssi, firmware").eq("station", d.station).maybeSingle(),
-        admin.from("desk").select("id", { count: "exact", head: true }).eq("station", d.station).gte("created_at", since),
+        db.from("device_health").select("last_seen, rssi, firmware").eq("station", d.station).maybeSingle(),
+        db.from("desk").select("id", { count: "exact", head: true }).eq("station", d.station).gte("created_at", since),
       ]);
       return { station: d.station, device: h ? { seconds_since_heartbeat: Math.round((Date.now() - Date.parse(h.last_seen)) / 1000), rssi: h.rssi, firmware: h.firmware } : null, cases_last_7_days: count ?? 0 };
     }

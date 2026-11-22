@@ -34,11 +34,14 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <http_parser.h>
+#include <StreamString.h>
 #include <WiFiClientSecure.h>
 #include <Preferences.h>
 #include <Update.h>
 #include <WiFiManager.h>
 #include <esp_ota_ops.h>
+#include <esp_flash_encrypt.h>
 #include "mbedtls/base64.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/sha256.h"
@@ -49,13 +52,17 @@
 #include <U8g2lib.h>
 #endif
 
-#define FW_VERSION "1.3.0"
+#define FW_VERSION "1.4.0"
 
 #ifndef PORTAL_PASSWORD
 #define PORTAL_PASSWORD ""
 #endif
 #ifndef OTA_ROOT_CA
 #define OTA_ROOT_CA ROOT_CA
+#endif
+
+#if defined(ICHIDO_REQUIRE_ENCRYPTED_NVS) && !CONFIG_NVS_ENCRYPTION
+#error "This build requires an ESP32 core built with CONFIG_NVS_ENCRYPTION"
 #endif
 
 const int PIN_BUTTON = 14;
@@ -147,301 +154,6 @@ void setRgb(bool r, bool g, bool b) {
   digitalWrite(PIN_R, r); digitalWrite(PIN_G, g); digitalWrite(PIN_B, b);
 }
 
-String sha256Hex(const uint8_t *data, size_t len) {
-  uint8_t h[32];
-  mbedtls_sha256(data, len, h, 0);
-  char hex[65];
-  for (int i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", h[i]);
-  return String(hex);
-}
-
-// ---------- settings and setup portal ----------
-
-void loadSettings() {
-  appUrl = store.getString("app_url", APP_URL);
-  stationId = store.getString("station", STATION_ID);
-  deviceSecret = store.getString("secret", DEVICE_SECRET);
-}
-
-String portalPassword() {
-  String p = PORTAL_PASSWORD;
-  if (p.length() >= 8 && p.length() <= 63) return p;
-  String seed = "ichido-portal\n" + deviceSecret;
-  return sha256Hex((const uint8_t *)seed.c_str(), seed.length()).substring(0, 12);
-}
-
-// True when the button is held from power-on for SETUP_HOLD_MS. Short bounces do not end the hold.
-bool heldForSetup() {
-  if (digitalRead(PIN_BUTTON) != LOW) return false;
-  unsigned long t0 = millis(), lastLow = t0;
-  while (millis() - lastLow < DEBOUNCE_MS) {
-    if (digitalRead(PIN_BUTTON) == LOW) lastLow = millis();
-    if (lastLow - t0 >= SETUP_HOLD_MS) return true;
-    bool on = (millis() / 125) % 2;
-    setRgb(on, on, on);
-    delay(5);
-  }
-  setRgb(false, false, false);
-  return false;
-}
-
-bool validUrl(const String &u) {
-  return (u.startsWith("https://") || u.startsWith("http://")) && u.length() <= 128 && u.indexOf(' ') < 0;
-}
-
-bool validStation(const String &s) {
-  if (s.isEmpty() || s.length() > 32) return false;
-  for (char c : s) if (!isalnum(c) && c != '-' && c != '_') return false;
-  return true;
-}
-
-// Open the captive portal; save what the installer entered, then restart into normal operation.
-void runSetupPortal() {
-  WiFiManager wm;
-  WiFiManagerParameter pUrl("app_url", "App URL", appUrl.c_str(), 128);
-  WiFiManagerParameter pStation("station", "Station ID", stationId.c_str(), 32);
-  WiFiManagerParameter pSecret("secret", "Device secret (leave empty to keep)", "", 128, "type='password'");
-  wm.addParameter(&pUrl);
-  wm.addParameter(&pStation);
-  wm.addParameter(&pSecret);
-  bool saved = false;
-  wm.setSaveConfigCallback([&saved]() { saved = true; });
-  wm.setBreakAfterConfig(true);          // finish on save even if the new Wi-Fi does not connect here
-  wm.setConfigPortalBlocking(false);     // so the LED keeps blinking; the 5-minute limit is enforced below
-
-  String ap = "Ichido-" + stationId, pass = portalPassword();
-  Serial.printf("setup portal: Wi-Fi \"%s\", password %s, open for %lu s\n", ap.c_str(), pass.c_str(), PORTAL_MS / 1000);
-#ifdef HAS_DISPLAY
-  drawScreen("Setup mode", "Wi-Fi:", ap);
-#endif
-  wm.startConfigPortal(ap.c_str(), pass.c_str());
-  unsigned long t0 = millis();
-  while (!saved && millis() - t0 < PORTAL_MS) {
-    wm.process();
-    bool on = (millis() / 600) % 2;
-    setRgb(on, false, on);
-    delay(10);
-  }
-
-  if (saved) {
-    String url = pUrl.getValue(), station = pStation.getValue(), secret = pSecret.getValue();
-    url.trim(); station.trim(); secret.trim();
-    if (validUrl(url)) store.putString("app_url", url); else Serial.println("setup: app URL not saved (invalid)");
-    if (validStation(station)) store.putString("station", station); else Serial.println("setup: station not saved (invalid)");
-    if (secret.length() >= 16) store.putString("secret", secret);
-    else if (!secret.isEmpty()) Serial.println("setup: device secret not saved (shorter than 16 characters)");
-    String ssid = wm.getWiFiSSID();
-    if (!ssid.isEmpty()) { store.putString("ssid", ssid); store.putString("pass", wm.getWiFiPass()); }
-    Serial.println("setup: saved");
-    setRgb(true, false, true);
-    delay(1000);
-  } else {
-    Serial.println("setup portal timed out");
-  }
-  wm.stopConfigPortal();
-  ESP.restart();
-}
-
-// ---------- server requests ----------
-
-// The transport clients are passed in and declared before HTTPClient by the caller, so they outlive it.
-// HTTPS with the configured root CA; plain HTTP is allowed only for a LAN dev server.
-bool begin(HTTPClient &http, WiFiClientSecure &tls, WiFiClient &plain, const String &path) {
-  String url = appUrl + path;
-  bool ok = url.startsWith("https://") ? (tls.setCACert(ROOT_CA), http.begin(tls, url)) : http.begin(plain, url);
-  if (!ok) return false;
-  http.setTimeout(4000);
-  http.addHeader("X-Station", stationId);
-  http.addHeader("Authorization", "Bearer " + deviceSecret);
-  return true;
-}
-
-bool sendFault(const String &eventId) {
-  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
-  if (!begin(http, tls, plain, "/api/device")) return false;
-  http.addHeader("Content-Type", "text/plain");
-  unsigned long t0 = millis();
-  int code = http.POST(eventId);
-  http.end();
-  Serial.printf("fault %s -> %d\n", eventId.c_str(), code);
-  if (code == 204) ackRttMs = millis() - t0;
-  return code == 204;
-}
-
-void poll() {
-  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
-  if (!begin(http, tls, plain, "/api/device")) return;
-#ifdef HAS_DISPLAY
-  http.addHeader("X-Display", "1");
-#endif
-  unsigned long t0 = millis();
-  int code = http.GET();
-  if (code == 200) {
-    pollRttMs = millis() - t0;
-    String body = http.getString();
-    body.trim();
-    // First line: the state. With X-Display, then key=value lines: code=, ttl= (seconds left), guard=.
-    int nl = body.indexOf('\n');
-    String first = nl < 0 ? body : body.substring(0, nl);
-    first.trim();
-    if (isKnownState(first)) {
-      state = first; haveState = true; lastFreshMs = millis();
-      String c = "", g = "";
-      long ttl = 0;
-      while (nl >= 0) {
-        int next = body.indexOf('\n', nl + 1);
-        String line = body.substring(nl + 1, next < 0 ? body.length() : next);
-        line.trim();
-        if (line.startsWith("code=")) c = line.substring(5);
-        else if (line.startsWith("ttl=")) ttl = line.substring(4).toInt();
-        else if (line.startsWith("guard=")) g = line.substring(6);
-        nl = next;
-      }
-      pairCode = validCode(c) && ttl > 0 ? c : "";
-      codeUntilMs = millis() + (unsigned long)ttl * 1000;
-      guardState = g;
-    }
-  }
-  http.end();
-}
-
-void heartbeat() {
-  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
-  if (!begin(http, tls, plain, "/api/device/heartbeat")) return;
-  http.addHeader("Content-Type", "application/json");
-  char body[192];
-  snprintf(body, sizeof body,
-           "{\"uptime_s\":%llu,\"free_heap\":%u,\"rssi\":%d,\"fw\":\"%s\",\"ack_ms\":%ld,\"poll_ms\":%ld}",
-           (unsigned long long)(esp_timer_get_time() / 1000000), (unsigned)ESP.getFreeHeap(), (int)WiFi.RSSI(),
-           FW_VERSION, ackRttMs, pollRttMs);
-  int code = http.POST(body);
-  http.end();
-  Serial.printf("heartbeat -> %d\n", code);
-  if (code == 204 && onProbation) {
-    esp_ota_mark_app_valid_cancel_rollback();   // the new image reached the server: keep it
-    onProbation = false;
-    Serial.println("firmware " FW_VERSION " confirmed");
-  }
-}
-
-// ---------- signed firmware updates ----------
-
-// Reads one string field from the server's compact JSON manifest. Values with escapes are refused.
-String jsonField(const String &body, const char *key) {
-  String k = String("\"") + key + "\":\"";
-  int a = body.indexOf(k);
-  if (a < 0) return "";
-  a += k.length();
-  int b = body.indexOf('"', a);
-  if (b < 0) return "";
-  String v = body.substring(a, b);
-  return v.indexOf('\\') >= 0 ? "" : v;
-}
-
-// a > b for dotted numeric versions ("1.10.0" > "1.9.3").
-bool isNewer(const String &a, const char *b) {
-  int x[3] = {0, 0, 0}, y[3] = {0, 0, 0};
-  if (sscanf(a.c_str(), "%d.%d.%d", &x[0], &x[1], &x[2]) < 1) return false;
-  sscanf(b, "%d.%d.%d", &y[0], &y[1], &y[2]);
-  for (int i = 0; i < 3; i++) if (x[i] != y[i]) return x[i] > y[i];
-  return false;
-}
-
-// The signature covers "ichido-fw/1\n<version>\n<sha256 hex>" (see scripts/sign-firmware.mjs), so neither
-// the image nor its version can be swapped. Fails closed while config.h holds the placeholder key.
-bool manifestSigned(const String &version, const String &sha, const String &sigB64) {
-  uint8_t sig[512];
-  size_t sigLen = 0;
-  if (mbedtls_base64_decode(sig, sizeof sig, &sigLen, (const uint8_t *)sigB64.c_str(), sigB64.length()) != 0) return false;
-  String msg = "ichido-fw/1\n" + version + "\n" + sha;
-  uint8_t hash[32];
-  mbedtls_sha256((const uint8_t *)msg.c_str(), msg.length(), hash, 0);
-  mbedtls_pk_context pk;
-  mbedtls_pk_init(&pk);
-  int parsed = mbedtls_pk_parse_public_key(&pk, (const uint8_t *)OTA_PUBLIC_KEY, sizeof OTA_PUBLIC_KEY);
-  bool ok = parsed == 0 && mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256, hash, sizeof hash, sig, sigLen) == 0;
-  mbedtls_pk_free(&pk);
-  if (parsed != 0) Serial.println("firmware: no signing key in config.h, updates disabled");
-  return ok;
-}
-
-// Streams the image into the idle OTA slot while hashing it; commits only if the hash matches.
-// ponytail: needs a Content-Length (static hosting gives one); chunked downloads are refused.
-bool installImage(const String &url, const String &sha) {
-  bool https = url.startsWith("https://");
-  if (!https && !(url.startsWith("http://") && appUrl.startsWith("http://"))) return false;   // http only for LAN dev
-  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
-  if (!(https ? (tls.setCACert(OTA_ROOT_CA), http.begin(tls, url)) : http.begin(plain, url))) return false;
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.setTimeout(15000);
-  int code = http.GET();
-  int size = http.getSize();
-  if (code != 200 || size <= 0 || !Update.begin(size)) {
-    Serial.printf("firmware download -> %d, size %d\n", code, size);
-    http.end();
-    return false;
-  }
-  mbedtls_sha256_context ctx;
-  mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts(&ctx, 0);
-  WiFiClient *s = http.getStreamPtr();
-  uint8_t buf[1024];
-  int done = 0;
-  unsigned long lastData = millis();
-  while (done < size && millis() - lastData < 15000) {
-    int n = s->read(buf, min((int)sizeof buf, size - done));
-    if (n <= 0) { delay(5); continue; }
-    lastData = millis();
-    mbedtls_sha256_update(&ctx, buf, n);
-    if (Update.write(buf, n) != (size_t)n) break;
-    done += n;
-  }
-  uint8_t h[32];
-  mbedtls_sha256_finish(&ctx, h);
-  mbedtls_sha256_free(&ctx);
-  http.end();
-  char hex[65];
-  for (int i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", h[i]);
-  if (done != size || !sha.equalsIgnoreCase(hex)) {
-    Serial.printf("firmware rejected: %d/%d bytes, hash %s\n", done, size, done == size ? "mismatch" : "-");
-    Update.abort();
-    return false;
-  }
-  return Update.end();   // boots the new slot next; the old slot stays for rollback
-}
-
-void checkFirmware() {
-  WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
-  if (!begin(http, tls, plain, "/api/device/firmware")) return;
-  http.addHeader("X-Firmware", FW_VERSION);
-  int code = http.GET();
-  String body = code == 200 ? http.getString() : "";
-  http.end();
-  Serial.printf("firmware check -> %d\n", code);
-  if (code != 200) return;   // 204: no update published
-  String version = jsonField(body, "version"), url = jsonField(body, "url");
-  String sha = jsonField(body, "sha256"), sig = jsonField(body, "signature");
-  if (!isNewer(version, FW_VERSION)) return;
-  if (sha.length() != 64 || !manifestSigned(version, sha, sig)) {
-    Serial.printf("firmware %s refused: manifest not signed by our key\n", version.c_str());
-    return;
-  }
-  Serial.printf("firmware %s: downloading\n", version.c_str());
-  setRgb(true, true, true);
-#ifdef HAS_DISPLAY
-  drawScreen("Help Point", "Updating", "firmware...");
-#endif
-  if (!installImage(url, sha)) return;
-  Serial.printf("firmware %s installed, restarting\n", version.c_str());
-  delay(200);
-  ESP.restart();
-}
-
-bool runningOnProbation() {
-  esp_ota_img_states_t st;
-  return esp_ota_get_state_partition(esp_ota_get_running_partition(), &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
-}
-
 // ---------- status light and button ----------
 
 #ifdef HAS_DISPLAY
@@ -506,7 +218,10 @@ void retryPending() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Ichido Help Point firmware %s\n", FW_VERSION);
+  // The offline signer accepts only images built without installer or station credentials.
+  constexpr bool shareable = sizeof(WIFI_SSID) == 1 && sizeof(WIFI_PASS) == 1 &&
+                             sizeof(DEVICE_SECRET) == 1 && sizeof(PORTAL_PASSWORD) == 1;
+  Serial.println(shareable ? "ichido-release/2:" FW_VERSION : "Ichido private USB build " FW_VERSION);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_R, OUTPUT); pinMode(PIN_G, OUTPUT); pinMode(PIN_B, OUTPUT);
 #ifdef HAS_DISPLAY
@@ -514,7 +229,17 @@ void setup() {
   oled.begin();
   drawScreen("Ichido Help Point", "Starting...", "firmware " FW_VERSION);
 #endif
-  store.begin("helppoint", false);
+  // The core initializes the default NVS partition with encryption when CONFIG_NVS_ENCRYPTION is enabled.
+#if defined(ICHIDO_REQUIRE_ENCRYPTED_NVS) && CONFIG_IDF_TARGET_ESP32
+  if (!esp_flash_encryption_enabled()) {
+    Serial.println("Device disabled: protected NVS keys require flash encryption");
+    for (;;) delay(1000);
+  }
+#endif
+  if (!store.begin("helppoint", false)) {
+    Serial.println("Device disabled: NVS unavailable");
+    for (;;) delay(1000);
+  }
   loadSettings();
   // Any reboot before the first heartbeat (including opening the portal) rolls a new image back.
   onProbation = runningOnProbation();
@@ -523,7 +248,11 @@ void setup() {
   pendingEvent = store.getString("pending", "");     // resend an alert interrupted by a reboot
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onPress, FALLING);
   WiFi.mode(WIFI_STA);
-  WiFi.begin(store.getString("ssid", WIFI_SSID).c_str(), store.getString("pass", WIFI_PASS).c_str());
+#if CONFIG_MBEDTLS_HAVE_TIME_DATE
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+#endif
+  String ssid = store.getString("ssid", WIFI_SSID);
+  if (!ssid.isEmpty()) WiFi.begin(ssid.c_str(), store.getString("pass", WIFI_PASS).c_str());
 }
 
 void loop() {

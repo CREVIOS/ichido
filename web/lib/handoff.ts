@@ -1,24 +1,23 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { PACKS, packOfFault } from "@/content/catalogue";
-import { admin, event, fail, priv } from "@/lib/server";
+import { PACKS, PACK_RECIPIENTS, packOfFault } from "@/content/catalogue";
+import { admin, fail, priv } from "@/lib/server";
+import { rpc } from "@/lib/access";
 
 // Hand-off links: a read-only record of one case for the recipients of its pack (an ATM's bank, police or security
 // company; a hospital department or medical interpreter; a city section; the railway; a disaster HQ…).
-const TTL_MS = 24 * 60 * 60_000;
+export type Recipient = keyof typeof PACK_RECIPIENTS;
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function createHandoff(incident: string, recipient: string, by: { uid: string; name: string }) {
-  const { data: d } = await admin.from("desk").select("id, fault").eq("id", incident).maybeSingle();
+export async function createHandoff(incident: string, recipient: string, by: { uid: string }) {
+  const { data: d } = await admin.from("desk").select("fault").eq("id", incident).maybeSingle();
   if (!d) fail(404, "not_found");
   if (!Object.hasOwn(PACKS[packOfFault(d!.fault)].recipients, recipient)) fail(400, "bad_request");
   const token = randomBytes(24).toString("base64url");
-  const expires_at = new Date(Date.now() + TTL_MS).toISOString();
-  const { data, error } = await priv().from("handoff")
-    .insert({ incident, token_hash: hash(token), recipient, created_by: by.uid, expires_at }).select("id").single();
-  if (error) throw error;
-  await event(incident, "operator", "handoff", { recipient }, by.name);
-  return { id: data.id, path: `/h/${token}`, expires_at };
+  const [link] = await rpc<{ id: string; expires_at: string }[]>("create_handoff", {
+    p_uid: by.uid, p_incident: incident, p_hash: hash(token), p_recipient: recipient,
+  });
+  return { id: link.id, expires_at: link.expires_at, path: `/h/${token}` };
 }
 
 export async function listHandoffs(incident: string) {
@@ -28,18 +27,13 @@ export async function listHandoffs(incident: string) {
   return data ?? [];
 }
 
-export async function revokeHandoff(id: string, by: { name: string }) {
-  const { data } = await priv().from("handoff").update({ revoked_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null).select("incident, recipient").maybeSingle();
-  if (!data) fail(409, "conflict");
-  await event(data!.incident, "operator", "handoff_revoked", { recipient: data!.recipient }, by.name);
+export async function revokeHandoff(id: string, by: { uid: string }) {
+  await rpc("revoke_handoff", { p_uid: by.uid, p_id: id });
 }
 
 // Resolve a token for the public page; counts the view and writes it to the timeline. Null when unknown, expired or revoked.
 export async function openHandoff(token: string) {
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
-  const { data: h } = await priv().from("handoff").select("id, incident, recipient, expires_at, revoked_at, views").eq("token_hash", hash(token)).maybeSingle();
-  if (!h || h.revoked_at || Date.parse(h.expires_at) < Date.now()) return null;
-  await priv().from("handoff").update({ views: h.views + 1 }).eq("id", h.id);
-  await event(h.incident, "system", "handoff_viewed", { recipient: h.recipient });
-  return h;
+  if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return null;
+  const [link] = await rpc<{ incident: string; recipient: Recipient; expires_at: string }[]>("view_handoff", { p_hash: hash(token) });
+  return link ?? null;
 }

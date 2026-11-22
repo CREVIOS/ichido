@@ -1,5 +1,5 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
@@ -20,7 +20,6 @@ export default function StationPage() {
 
 function StationForm() {
   const { station } = useParams<{ station: string }>();
-  const router = useRouter();
   // The phone's own language when it is one we offer; the caller can change it any time.
   const detected = useSyncExternalStore(noop, preferredLang, () => "bn" as Lang);
   const [chosen, setLang] = useState<Lang | null>(null);
@@ -35,10 +34,10 @@ function StationForm() {
   // A phone already paired goes straight to its case; a staff session must not be reused for a caller.
   useEffect(() => {
     cmd<{ incident: string | null; staff: boolean }>("mine").then((m) => {
-      if (m.incident) router.replace("/caller");
+      if (m.incident) location.replace("/caller");
       setStaffSession(m.staff);
     }).catch(() => setStaffSession(false));
-  }, [router]);
+  }, []);
 
   async function withSession(run: () => Promise<void>) {
     setBusy(true); setError("");
@@ -57,7 +56,11 @@ function StationForm() {
   }
   const connect = (e: React.FormEvent) => {
     e.preventDefault();
-    return withSession(async () => { await cmd("pair", { station, code, lang }); router.push("/caller"); });
+    return withSession(async () => {
+      await cmd("pair", { station, code, lang });
+      // Load a new document so the caller microphone Permissions-Policy takes effect.
+      location.replace("/caller");
+    });
   };
   const alertSilently = () => withSession(async () => { await cmd("silent_alert", { station }); setSilent(true); });
 

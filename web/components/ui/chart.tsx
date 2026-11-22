@@ -82,7 +82,7 @@ function ChartContainer({
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([, config]) => config.theme ?? config.color
+    ([key, entry]) => /^[a-zA-Z0-9_-]+$/.test(key) && (entry.theme ?? entry.color)
   )
 
   if (!colorConfig.length) {
@@ -90,9 +90,8 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   }
 
   return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
+    <style>
+      {Object.entries(THEMES)
           .map(
             ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
@@ -107,9 +106,8 @@ ${colorConfig
 }
 `
           )
-          .join("\n"),
-      }}
-    />
+          .join("\n")}
+    </style>
   )
 }
 

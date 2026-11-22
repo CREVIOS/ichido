@@ -1,4 +1,5 @@
-import { admin, priv, reply, deviceStation } from "@/lib/server";
+import { admin, priv, reply } from "@/lib/server";
+import { authenticateDevice, boundedText } from "@/lib/request-security";
 import { requestLog, errorFields } from "@/lib/log";
 import { isFault } from "@/content/catalogue";
 import { defaultFault } from "@/lib/faults";
@@ -9,14 +10,12 @@ import { displayLines } from "@/lib/access";
 // X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; by default the
 // station pack's situation for a press (an ATM: card retained). The database refuses a fault from another pack.
 export async function POST(req: Request): Promise<Response> {
-  const log = requestLog("/api/device", req);
-  const auth = deviceStation(req);
-  if (auth.id === null) {
-    log.warn("device_auth_failed", { status: 401, code: auth.reason, station: auth.station });
-    return reply(401, { error: "unauthorised" });
-  }
-  const station = auth.id;
-  const key = (await req.text()).trim();
+  const log = requestLog("/api/device");
+  const station = await authenticateDevice(req, "/api/device");
+  if (station instanceof Response) return station;
+  const body = await boundedText(req, 64);
+  if (body instanceof Response) return body;
+  const key = body.trim();
   const fault = req.headers.get("x-fault") || await defaultFault(station);
   if (!isFault(fault)) {
     log.warn("device_fault", { station, status: 400, code: "bad_fault" });
@@ -42,21 +41,18 @@ export async function POST(req: Request): Promise<Response> {
 // A Help Point with a display sends X-Display: 1 and also gets key=value lines (lib/access.ts displayLines).
 // Polled every 2 s per device, so only failures are logged; liveness comes from the heartbeat.
 export async function GET(req: Request): Promise<Response> {
-  const log = requestLog("/api/device", req);
-  const auth = deviceStation(req);
-  if (auth.id === null) {
-    log.warn("device_auth_failed", { status: 401, code: auth.reason, station: auth.station });
-    return reply(401, { error: "unauthorised" });
-  }
-  const { data, error } = await admin.from("light").select("state").eq("station", auth.id).maybeSingle();
+  const log = requestLog("/api/device");
+  const station = await authenticateDevice(req, "/api/device");
+  if (station instanceof Response) return station;
+  const { data, error } = await admin.from("light").select("state").eq("station", station).maybeSingle();
   // A lookup failure must not look like a healthy idle station; the device shows "offline" instead.
   if (error) {
-    log.error("device_poll", { station: auth.id, status: 503, ...errorFields(error) });
+    log.error("device_poll", { station, status: 503, ...errorFields(error) });
     return reply(503, { error: "unavailable" });
   }
-  const extra = req.headers.get("x-display") === "1" ? await displayLines(auth.id) : "";
+  const extra = req.headers.get("x-display") === "1" ? await displayLines(station) : "";
   if (extra === null) {
-    log.error("device_poll", { station: auth.id, status: 503, code: "display" });
+    log.error("device_poll", { station, status: 503, code: "display" });
     return reply(503, { error: "unavailable" });
   }
   return new Response((data?.state ?? "idle") + extra, { headers: { "content-type": "text/plain", "cache-control": "no-store" } });
