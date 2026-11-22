@@ -1,20 +1,5 @@
-// Mobile app (mobile/). Caller-facing strings in all three languages; staff strings in Japanese, as in STAFF.
-export const MOBILE = {
-  // Role entry is shown to everyone, so each label carries Japanese and English.
-  entry: {
-    caller: { ja: "お客様", en: "Caller" },
-    staff: { ja: "スタッフ", en: "Staff" },
-    signedIn: (name: string) => `${name} としてサインイン中`,
-  },
-  station: {
-    label: { bn: "Help Point-এর নাম বা লিংক", en: "Help Point name or link", ja: "Help Point の 名前 か リンク" },
-    hint: { bn: "স্টিকারে লেখা আছে, যেমন TABLE-A", en: "It is printed on the sticker, for example TABLE-A", ja: "ステッカーに 書いて あります（れい：TABLE-A）" },
-    open: { bn: "খুলুন", en: "Open", ja: "ひらく" },
-  },
-  back: { bn: "ফিরে যান", en: "Back", ja: "もどる" },
-  // Voice buttons without the symbols the web strings carry; the app draws an icon instead.
-  speak: { bn: "কথা বলুন", en: "Speak", ja: "はなす" },
-  stopSpeaking: { bn: "থামুন", en: "Stop", ja: "とめる" },
+// Staff-only Expo screens. Caller-facing mobile wording lives in catalogue.ts.
+export const MOBILE_STAFF = {
   // Seeded local demo accounts (supabase/seed.sql), prefilled on the sign-in form.
   demoAccount: { operator: "operator@ichido.demo", field: "guard1@ichido.demo", manager: "manager@ichido.demo" } as Record<string, string>,
 

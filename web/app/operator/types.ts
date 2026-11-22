@@ -10,6 +10,10 @@ export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
   teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
 };
+export type OpenDesk = Desk & {
+  case_event: { at: string }[]; reply: { id: string }[]; escalation: { reason: string }[];
+};
+export type Targets = Partial<Record<string, number>>;
 export type CaseEvent = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
 export type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
 export type Job = { assignee: string; state: FieldState; eta: string | null };

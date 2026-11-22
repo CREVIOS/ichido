@@ -1,13 +1,9 @@
 import { CalendarDays, ChartLine, Code, GripVertical } from "lucide-react";
-import { BLUE, GREEN, LineChart } from "@/components/charts";
+import { DailyArea } from "@/components/insight-charts";
 import { HOME, INSIGHTS } from "@/content/catalogue";
 
 const M = HOME.measure;
-const labels = M.received.map((_, i) => `${i + 1}`);
-const series = [
-  { name: INSIGHTS.series.received, color: BLUE, values: M.received },
-  { name: INSIGHTS.series.guided, color: GREEN, values: M.guided },
-];
+const data = M.received.map((n, i) => ({ day: `${i + 1}`, received: n, guided: M.guided[i] }));
 
 // Illustration of the insights board (sample numbers, labelled as such).
 export function MeasurePreview() {
@@ -15,7 +11,7 @@ export function MeasurePreview() {
     <div aria-hidden className="pointer-events-none relative flex select-none gap-3 overflow-hidden rounded-xl border bg-[oklch(0.95_0_0)] p-4 pr-0 sm:p-8 sm:pr-0">
       <span className="absolute top-3 right-4 font-mono text-[10px] tracking-wide text-faint uppercase">{M.sample}</span>
       <div className="hidden w-[250px] shrink-0 flex-col gap-3 md:flex">
-        <Card title={INSIGHTS.metrics.daily.title} active><LineChart compact height={110} labels={labels} series={series} /></Card>
+        <Card title={INSIGHTS.metrics.daily.title} active><DailyArea compact labels={INSIGHTS.series} data={data} /></Card>
         <Card title={INSIGHTS.metrics.reply.title}><span className="num text-[26px] tracking-[-0.03em] text-foreground">{M.reply}</span></Card>
         <Card title={INSIGHTS.guidedRate}><span className="num text-[26px] tracking-[-0.03em] text-foreground">{M.rate}</span></Card>
       </div>
@@ -27,7 +23,7 @@ export function MeasurePreview() {
           <span className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2"><CalendarDays className="size-3.5 stroke-[1.5]" />{INSIGHTS.range}<span className="text-foreground">{INSIGHTS.period(14)}</span></span>
           <span className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2"><ChartLine className="size-3.5 stroke-[1.5]" />{INSIGHTS.interval}<span className="text-foreground">{INSIGHTS.everyDay}</span></span>
         </span>
-        <LineChart height={260} labels={labels} series={series} />
+        <DailyArea labels={INSIGHTS.series} data={data} />
       </div>
     </div>
   );

@@ -39,6 +39,9 @@ export const STATIONS = {
   empty: "ステーションが登録されていません。docs/DEPLOY.md の手順で追加してください。",
   // A device is online if it reported within this many seconds (heartbeat every 60 s).
   onlineWithinS: 180,
+  map: "地図",
+  openCases: (n: number) => `対応中 ${n}件`,
+  noLocation: "位置が未登録のステーションは地図に表示されません。",
 };
 
 // Errors staff can see, by the stable code the server returns.
@@ -54,8 +57,6 @@ export const staffError = (code: string) => (Object.hasOwn(STAFF_ERRORS, code) ?
 
 // Response-time targets for the queue. Amber at WARN of the target, red once it passes.
 export const SLA = {
-  claimS: 60,
-  firstReplyS: 180,
   warn: 0.75,
   label: { claim: "担当まで", reply: "初回返答まで" } as Record<string, string>,
   late: (m: number) => `${m}分超過`,
@@ -66,6 +67,8 @@ export const SLA = {
 export const DESK = {
   title: "監視センター",
   alerts: "新着案件の通知",
+  escalations: (n: number) => `エスカレーション ${n}件`,
+  escalationReason: { unclaimed: "担当者未決定", no_reply: "初回返答の遅れ", guard_late: "警備員の出発連絡待ち" } as Record<string, string>,
   newCase: (station: string) => `新しい案件：${station}`,
   alertsStorage: "通知設定を保存できません。このタブにのみ適用します。",
   alertsSound: "通知音を再生できません。",
@@ -241,6 +244,8 @@ export const INSIGHTS = {
   choiceNote: "「待つ／帰る」を選べる返答を受けたお客様のみ",
   privacy: "件数のみを集計しています。お客様の言葉や個人を特定できる情報は表示しません。",
   definition: "定義",
+  unit: "件数",
+  target: (t: string) => `目標 ${t}`,
   range: "期間",
   interval: "間隔",
   everyDay: "毎日",
@@ -253,5 +258,49 @@ export const INSIGHTS = {
     hours: { title: "時間帯", def: "障害通知の時刻（日本時間）を2時間ごとに集計。もっとも多い時間帯を強調します。" },
     choices: { title: "お客様の選択", def: "「待つ／帰る」を選べる返答を受けたお客様が、どちらを選んだか。" },
     ratings: { title: "お客様の評価", def: "案内確認で終了したあと、お客様が3つの顔から1回だけ選んだ評価。自由記述は集めません。" },
+  },
+};
+
+// Hand-off record: read-only links for the bank, the police or the security company.
+export const HANDOFF = {
+  title: "引継票",
+  lead: "銀行・警察・警備会社へ、この案件の記録を読み取り専用のリンクで渡します。ファイルをメールで送る必要はありません。24時間で失効し、閲覧は経過に記録されます。お客様の自由記述は含みません。",
+  recipient: { bank: "銀行", police: "警察", security: "警備会社" } as Record<string, string>,
+  create: (r: string) => `${r}宛`,
+  copy: "リンクをコピー",
+  copied: "リンクをコピーしました",
+  revoke: "失効",
+  until: (t: string) => `${t} まで`,
+  revoked: "失効済み",
+  expired: "期限切れ",
+  views: (n: number) => `閲覧 ${n}回`,
+  doc: {
+    title: "引継票",
+    subtitle: "ATM障害対応の記録（読み取り専用）",
+    to: (r: string) => `${r} 御中`,
+    caseId: "案件番号",
+    station: "ATM",
+    branch: "取扱店",
+    fault: "障害",
+    source: "経路",
+    opened: "受付",
+    closed: "終了",
+    status: "状態",
+    lang: "お客様の言語",
+    confirmed: "お客様が確認した内容",
+    decisions: "対応",
+    replies: "送信した承認済み返答",
+    release: "遠隔解除",
+    guard: "現地確認",
+    choice: "お客様の選択",
+    outcome: "案内の確認",
+    rating: "お客様の評価",
+    timeline: "経過",
+    summary: "対応記録（自動作成・要確認）",
+    footer: (t: string) => `このページは ${t} まで有効な読み取り専用リンクです。閲覧は案件の経過に記録されます。お客様の自由記述と、個人を特定できる情報は含みません。`,
+    print: "印刷",
+    gone: "このリンクは無効か、期限が切れています。発行した担当者に再発行を依頼してください。",
+    none: "—",
+    open: "対応中",
   },
 };

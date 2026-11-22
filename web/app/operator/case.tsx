@@ -6,9 +6,10 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, DESK, FACTS, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
+import { HandoffPanel } from "./handoff";
 import { hhmm, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Reply, type Run } from "./types";
 
 // True while a caller is connected: paired, and not reset since.
@@ -53,6 +54,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <Timeline events={events} />
+        {d.operator_id && <HandoffPanel incident={d.id} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
@@ -127,8 +129,8 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </div>
           <div className="surface flex flex-col gap-2 p-4">
             <span className="flex justify-between"><span className="label">{DESK.confirmed}</span><span className="label num">{DESK.rev(d.confirmed_rev)}</span></span>
-            <span className="text-[15px] text-foreground">{FACTS.card_back[d.card_back].ja}</span>
-            <span className="text-[15px] text-foreground">{FACTS.cash_received[d.cash_received].ja}</span>
+            <span className="text-[15px] text-foreground">{FACT_STAFF.card_back[d.card_back]}</span>
+            <span className="text-[15px] text-foreground">{FACT_STAFF.cash_received[d.cash_received]}</span>
           </div>
         </div>
       )}
