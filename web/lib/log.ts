@@ -27,6 +27,7 @@ export type Fields = {
   free_heap?: number;
   rssi?: number;
   fw?: string;
+  fw_target?: string;       // firmware version the server offers (/api/device/firmware)
   ack_ms?: number;
   poll_ms?: number;
   // unhandled errors (see errorFields)

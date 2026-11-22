@@ -7,6 +7,9 @@ node_modules/
 .DS_Store
 .aislop/
 secrets.h
+# firmware build output and the OTA signing key
+build/
+*.pem
 __pycache__/
 .venv/
 supabase/.temp/
