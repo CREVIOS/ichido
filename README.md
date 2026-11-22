@@ -17,11 +17,12 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | `/` | everyone | Overview and links |
 | `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
 | `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
-| `/stations` | operator | Each Help Point's live health (last heartbeat, signal, firmware, open cases) and a printable QR sticker per station |
+| `/stations` | operator | Live map of stations (MapLibre + OpenFreeMap/OSM) with device-health pins, each Help Point's last heartbeat, signal, firmware and open cases, and a printable QR sticker per station |
+| `/h/[token]` | bank, police, security company | Read-only hand-off record (引継票) of one case: facts, decisions, timeline, after-call summary. Expires in 24 h, revocable, every view audited, never the caller's free text |
 | `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code |
 | `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close |
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
-| `/insights` | operator, manager | Metric cards with definitions: daily cases vs guided, funnel, time to first reply, languages, busiest hours, wait/leave, ratings — counts only |
+| `/insights` | operator, manager | Metric cards with definitions and Recharts charts: daily cases vs guided, funnel with conversion, time to first reply against the target, languages, busiest hours, wait/leave, ratings — counts only |
 
 The same screens also ship as a React Native app in `mobile/` (see below).
 

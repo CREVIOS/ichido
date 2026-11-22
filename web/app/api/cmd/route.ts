@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
+import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
@@ -71,6 +72,23 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (!s) return { suggestion: null };
     await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, model: s.model });
     return { suggestion: s };
+  },
+
+  // Read-only hand-off links for the bank, the police or the security company (lib/handoff.ts).
+  async handoff_create(a, b) {
+    const op = staff(a, "operator");
+    return createHandoff(str(b, "incident"), str(b, "recipient"), op);
+  },
+
+  async handoff_list(a, b) {
+    staff(a, "operator");
+    return { links: await listHandoffs(str(b, "incident")) };
+  },
+
+  async handoff_revoke(a, b) {
+    const op = staff(a, "operator");
+    await revokeHandoff(str(b, "id"), op);
+    return {};
   },
 
   async staff_list(a) {
