@@ -1,5 +1,5 @@
 import { ArrowUp, Check, ChartLine, CircleDashed, Download, GripVertical, Link2, ListFilter, Lock, MessageSquare, Paperclip, Plus, Search, Workflow } from "lucide-react";
-import { DailyArea, HourBars } from "@/components/insight-charts";
+import { DailyArea, HourBars } from "@/components/lazy-charts";
 import { Dot } from "@/components/kit";
 import { Mark } from "@/components/mark";
 import { ENTERPRISE, HOME, LANGS, MANUAL_VERSION, REPLIES, pick, type ReplySlots } from "@/content/catalogue";
