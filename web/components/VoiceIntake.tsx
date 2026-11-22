@@ -63,14 +63,14 @@ export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text
 
   return (
     <div className="stack" style={{ "--gap": "6px" } as React.CSSProperties}>
-      <p className="small secondary">{COPY.notice[lang]}</p>
+      <p className="tiny muted">{COPY.notice[lang]}</p>
       {state === "live" ? (
-        <button className="btn danger big" onClick={stop}>{COPY.stop[lang]}</button>
+        <button className="btn dark block" onClick={stop}>{COPY.stop[lang]}</button>
       ) : (
-        <button className="btn primary big" disabled={state === "connecting"} onClick={start}>{COPY.start[lang]}</button>
+        <button className="btn blue block" disabled={state === "connecting"} onClick={start}>{COPY.start[lang]}</button>
       )}
-      {state === "live" && <p className="small muted">{partial || COPY.hearing[lang]}</p>}
-      {state === "unavailable" && <p className="small secondary">{COPY.unavailable[lang]}</p>}
+      {state === "live" && <p className="small soft">{partial || COPY.hearing[lang]}</p>}
+      {state === "unavailable" && <p className="small soft">{COPY.unavailable[lang]}</p>}
     </div>
   );
 }

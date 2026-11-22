@@ -1,5 +1,6 @@
 import { timingSafeEqual, createHash } from "node:crypto";
 import { admin, reply } from "@/lib/server";
+import { DEVICE_FAULT } from "@/content/catalogue";
 
 // The ESP32 prop authenticates with a per-station secret: Authorization: Bearer <secret>, X-Station: <id>.
 function station(req: Request): string | null {
@@ -18,7 +19,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!id) return reply(401, { error: "unauthorised" });
   const key = (await req.text()).trim();
   if (!/^[0-9a-f]{32}$/.test(key)) return reply(400, { error: "bad event id" });
-  const { error } = await admin.rpc("record_fault", { p_station: id, p_key: key, p_source: "device" });
+  const { error } = await admin.rpc("record_fault", { p_station: id, p_key: key, p_source: "device", p_fault: DEVICE_FAULT });
   if (error) return reply(500, { error: "not recorded" });
   return new Response(null, { status: 204 });
 }

@@ -46,7 +46,8 @@ test("typed journey: alert → corrected report → approved reply → guard →
   assert.equal((await dev(key)).status, 204);
   assert.equal((await dev(key)).status, 204);
   assert.equal((await fetch(`${APP}/api/device`, { method: "POST", headers: { "x-station": "TABLE-A", authorization: "Bearer wrong" }, body: key })).status, 401);
-  const { data: open } = await op.c.from("desk").select("id").is("finished_at", null);
+  const { data: open } = await op.c.from("desk").select("id, fault").is("finished_at", null);
+  assert.equal(open[0]?.fault, "card_retained");
   assert.equal(open.length, 1);
   const incident = open[0].id;
 
@@ -80,20 +81,23 @@ test("typed journey: alert → corrected report → approved reply → guard →
 
   // Dispatch: only the assigned guard sees and can update the job.
   await ok(cmd(op, "assign", { incident, assignee: g1.uid }));
-  assert.equal((await g1.c.from("field_job").select("incident")).data.length, 1);
-  assert.deepEqual((await g2.c.from("field_job").select("incident")).data, []);
+  assert.equal((await g1.c.from("field_job").select("incident").eq("case_closed", false)).data.length, 1);
+  assert.deepEqual((await g2.c.from("field_job").select("incident").eq("case_closed", false)).data, []);
   assert.equal((await cmd(g2, "field", { incident, state: "on_way", eta: "30-45" })).status, 403);
   await ok(cmd(g1, "field", { incident, state: "on_way", eta: "30-45" }));
-  const { data: cc } = await a.c.from("caller_card").select("field_state, eta_text").single();
-  assert.deepEqual(cc, { field_state: "on_way", eta_text: "30-45" });
+  const { data: cc } = await a.c.from("caller_card").select("field_state, eta").single();
+  assert.deepEqual(cc, { field_state: "on_way", eta: "30-45" });
 
   // Caller chooses, explains the next step; the operator confirms understanding and the case closes.
   await ok(cmd(a, "choose", { choice: "leave" }));
   await ok(cmd(a, "teachback", { text: "আমি ব্যাংকের ফোনের জন্য অপেক্ষা করব, তারপর শাখায় যাব।" }));
-  const { summary } = await ok(cmd(op, "outcome", { incident, result: "understood" }));
-  assert.match(summary, /カードが戻ってこなかった/);
+  await ok(cmd(op, "outcome", { incident, result: "understood" }));
+  assert.equal((await g1.c.from("field_job").select("incident").eq("case_closed", false)).data.length, 0);
   const { data: done } = await a.c.from("caller_card").select("status").single();
   assert.equal(done.status, "guided");
   // A guard cannot act as an operator.
-  assert.equal((await cmd(g1, "simulate", { station: "TABLE-A" })).status, 403);
+  assert.equal((await cmd(g1, "simulate", { station: "TABLE-A", fault: "card_retained" })).status, 403);
+  // Insights: counts for staff, refused for callers.
+  assert.ok((await op.c.rpc("insights", { p_days: 7 })).data.funnel.guided >= 1);
+  assert.ok((await a.c.rpc("insights", { p_days: 7 })).error);
 });

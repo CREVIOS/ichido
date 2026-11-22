@@ -48,25 +48,25 @@ function StationForm() {
   }
 
   return (
-    <main className="phone" lang={lang}>
+    <main className="phone" lang={lang} style={{ justifyContent: "center" }}>
       <div className="row">
-        <strong>一度 Ichido</strong><span className="grow" />
+        <span className="row" style={{ "--gap": "8px" } as React.CSSProperties}><span className="brand-mark" aria-hidden>一</span><span style={{ fontWeight: 500 }}>ichido</span></span><span className="grow" />
         <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} style={{ width: "auto" }} aria-label="Language">
           {(Object.keys(LANG_NAME) as Lang[]).map((l) => <option key={l} value={l}>{LANG_NAME[l]}</option>)}
         </select>
       </div>
-      <p className="mono small muted">{station}</p>
+      <span className="tag">Help Point · <b className="mono">{station}</b></span>
       <h1>{COPY.title[lang]}</h1>
-      <form className="stack" onSubmit={connect}>
+      <form className="card" onSubmit={connect}>
         <label className="stack" style={{ "--gap": "4px" } as React.CSSProperties}>
-          <span className="label">{COPY.code[lang]}</span>
+          <span className="field-label">{COPY.code[lang]}</span>
           <input type="text" inputMode="text" autoCapitalize="characters" autoComplete="off" value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())} className="mono" style={{ fontSize: 24, letterSpacing: 4 }} maxLength={6} required />
+            onChange={(e) => setCode(e.target.value.toUpperCase())} className="mono" style={{ fontSize: 30, letterSpacing: "0.2em", textAlign: "center" }} maxLength={6} required />
         </label>
-        {bad && <p className="chip alert">{COPY.bad[lang]}</p>}
-        <button className="btn primary big" disabled={busy || code.length < 6}>{COPY.go[lang]}</button>
+        {bad && <p className="notice">{COPY.bad[lang]}</p>}
+        <button className="btn dark block" disabled={busy || code.length < 6}>{COPY.go[lang]}</button>
       </form>
-      <p className="small secondary">{COPY.why[lang]}</p>
+      <p className="small soft">{COPY.why[lang]}</p>
     </main>
   );
 }

@@ -2,56 +2,66 @@
 import { useCallback, useState } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
-import { StaffGate, signOut } from "@/components/StaffLogin";
-import { FIELD_STATE } from "@/content/catalogue";
+import { StaffGate, signOut } from "@/components/StaffGate";
+import { Tag } from "@/components/ui";
+import { FAULTS, FIELD_STATE, ETA_OPTIONS, type FieldState, type L10n } from "@/content/catalogue";
 
-type Job = { incident: string; station: string; state: string; eta_text: string | null; updated_at: string };
+type Job = { incident: string; station: string; fault: string; state: FieldState; eta: string | null; updated_at: string };
+const gap = (g: number) => ({ "--gap": `${g}px` }) as React.CSSProperties;
+const DEFAULT_ETA = ETA_OPTIONS[2];
 
 export default function FieldPage() {
-  return (
-    <StaffGate title="警備員　サインイン" hint="guard1@ichido.demo">
-      {() => <Jobs />}
-    </StaffGate>
-  );
+  return <StaffGate allow={["field"]} hint="guard1@ichido.demo" title="警備員">{(me) => <Jobs name={me.name} />}</StaffGate>;
 }
 
-// Only this guard's assignments (enforced by row-level security). No identity checks or card handback here.
-function Jobs() {
+// Only this guard's open assignments (row-level security). No identity checks or card handback here.
+function Jobs({ name }: { name: string }) {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [eta, setEta] = useState("30-45");
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [eta, setEta] = useState(DEFAULT_ETA);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    const { data } = await sb().from("field_job").select("*").eq("case_closed", false).neq("state", "done").order("updated_at", { ascending: false });
-    setJobs((data ?? []) as Job[]);
+    const db = sb();
+    const [j, s] = await Promise.all([
+      db.from("field_job").select("*").eq("case_closed", false).neq("state", "done").order("updated_at", { ascending: false }),
+      db.from("station").select("id, label"),
+    ]);
+    setJobs((j.data ?? []) as Job[]);
+    setLabels(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n }[]).map((x) => [x.id, x.label.ja])));
   }, []);
   useLive(["field_job"], load);
   const act = (incident: string, state: string, withEta?: string) =>
     cmd("field", { incident, state, eta: withEta }).then(() => setError("")).catch((e: Error) => setError(e.message));
 
   return (
-    <main className="phone ink">
-      <div className="row"><strong>一度　警備員</strong><span className="grow" /><span className="small muted">自分の割当のみ</span><button className="btn" onClick={signOut}>⎋</button></div>
-      {error && <p className="chip alert">{error}</p>}
-      {jobs.length === 0 && <p className="muted">割当はありません。</p>}
+    <main className="phone" lang="ja">
+      <header className="row between">
+        <span className="row" style={gap(8)}><span className="brand-mark" aria-hidden>一</span><span style={{ fontWeight: 500 }}>警備員 · {name}</span></span>
+        <button className="btn ghost" onClick={signOut}>サインアウト</button>
+      </header>
+      <h1>割当</h1>
+      {error && <p className="notice">{error}</p>}
+      {jobs.length === 0 && <section className="card"><p className="soft">現在、割当はありません。</p></section>}
       {jobs.map((j) => (
-        <div key={j.incident} className="stack">
-          <div className="card stack" style={{ "--gap": "6px" } as React.CSSProperties}>
-            <span className="mono small secondary">{j.station}</span>
-            <strong style={{ fontSize: 20 }}>長崎駅前 店舗外ATM（架空）</strong>
-            <span style={{ color: "var(--alert)" }}>障害：取引後にカードが排出されない</span>
-            <span className="chip field">{FIELD_STATE[j.state].ja}{j.eta_text ? `　目安 ${j.eta_text}分` : ""}</span>
-          </div>
-          <div className="row">
-            <label className="small muted" htmlFor={`eta-${j.incident}`}>到着目安（分）</label>
-            <select id={`eta-${j.incident}`} value={eta} onChange={(e) => setEta(e.target.value)} style={{ width: "auto" }}>
-              {["10-20", "20-30", "30-45", "45-60", ""].map((v) => <option key={v} value={v}>{v || "未定"}</option>)}
+        <section key={j.incident} className="card">
+          <div className="row between"><span className="mono tiny muted">{j.station}</span><span className="chip field">{FIELD_STATE[j.state].ja}</span></div>
+          <span style={{ fontSize: 22, letterSpacing: "-0.02em" }}>{labels[j.station] ?? j.station}</span>
+          <span style={{ color: "var(--red)" }}>{FAULTS[j.fault]?.ja ?? j.fault}</span>
+          {j.eta && <Tag label="到着目安" value={`${j.eta.replace("-", "〜")}分`} />}
+          <hr className="hairline" />
+          <label className="stack" style={gap(6)}>
+            <span className="field-label">到着目安（あなたの見込み）</span>
+            <select value={eta} onChange={(e) => setEta(e.target.value)}>
+              {ETA_OPTIONS.map((v) => <option key={v} value={v}>{v ? `${v.replace("-", "〜")}分` : "未定"}</option>)}
             </select>
+          </label>
+          <button className="btn dark block" onClick={() => act(j.incident, "on_way", eta || undefined)}>向かっています</button>
+          <div className="row" style={gap(8)}>
+            <button className="btn grow" onClick={() => act(j.incident, "arrived")}>到着</button>
+            <button className="btn grow" onClick={() => act(j.incident, "done")}>対応完了</button>
           </div>
-          <button className="btn big" style={{ background: "var(--field-soft)", color: "var(--field)" }} onClick={() => act(j.incident, "on_way", eta || undefined)}>向かっています</button>
-          <button className="btn big" onClick={() => act(j.incident, "arrived")}>到着</button>
-          <button className="btn big" onClick={() => act(j.incident, "done")}>対応完了（カードの扱いは銀行所定の手続きへ）</button>
-          <p className="small muted">この画面では本人確認・カード返却は扱いません。</p>
-        </div>
+          <p className="tiny muted">本人確認・カードの返却はこの画面では扱いません。カードの扱いは銀行所定の手続きによります。</p>
+        </section>
       ))}
     </main>
   );

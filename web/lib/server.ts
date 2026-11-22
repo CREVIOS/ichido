@@ -37,8 +37,8 @@ export function reply(status: number, body: object): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
 }
 
-export async function event(incident: string, actor: string, kind: string, detail_ja: string, actor_name?: string) {
-  const { error } = await admin.from("case_event").insert({ incident, actor, kind, detail_ja, actor_name });
+export async function event(incident: string, actor: string, kind: string, data: Record<string, unknown>, actor_name?: string) {
+  const { error } = await admin.from("case_event").insert({ incident, actor, kind, data, actor_name });
   if (error) throw error;
 }
 
