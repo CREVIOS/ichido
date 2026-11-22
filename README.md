@@ -33,7 +33,7 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 ```
 
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
-- **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime. Race-sensitive commands (`record_fault`, `redeem_pair`) are SQL functions in one transaction. `insights()` returns counts only.
+- **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
 - **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers.
 - **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication.
 - **Content** (`web/content/catalogue.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
@@ -44,7 +44,8 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 - **The check happens on the caller's side.** A Japanese operator cannot check Bengali, so the caller confirms or corrects the read-back; the operator always sees the original words.
 - **Never asks for a PIN, card, account or ID number.** Text that looks like a number is withheld before it leaves the server.
 - **No card handback, ID check or "collect your card" signal** anywhere. What happens to a held card is the bank's procedure.
-- **A caller reaches a case only with the operator's single-use, five-minute code.** Scanning the sticker alone reveals nothing.
+- **A caller reaches a case only with the operator's single-use, five-minute code.** Scanning the sticker alone reveals nothing; guesses are rate-limited. If a caller loses their phone, the operator resets the connection and issues a new code, or closes the case.
+- **The operator never sees the caller's draft**, only what the caller confirmed. A teach-back in another language is shown with a labelled machine translation, or flagged for a bilingual colleague.
 - **Each role sees only what it needs**, enforced by RLS: callers their own case, guards their own assignments, managers counts.
 
 ## Run it locally
@@ -59,7 +60,7 @@ npm ci
 npm run dev                        # http://localhost:3000
 ```
 
-Demo accounts (local only): `operator@ichido.demo`, `guard1@ichido.demo`, `guard2@ichido.demo`, `manager@ichido.demo`, password `ichido-demo`.
+Demo accounts (local only): `operator@ichido.demo`, `operator2@ichido.demo`, `guard1@ichido.demo`, `guard2@ichido.demo`, `manager@ichido.demo`, password `ichido-demo`.
 
 **Voice (optional):** create a LiveKit Cloud project, then
 
@@ -71,7 +72,7 @@ uv run python app.py download-files
 uv run python app.py dev
 ```
 
-and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `web/.env.local`. Without them, the caller uses the typed path.
+and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `web/.env.local`, plus the same random `AGENT_BRIDGE_SECRET` in both `web/.env.local` and `agent/.env` (the agent speaks only text the server signed with it). Without voice keys, the caller uses the typed path.
 
 **Extraction from free text (optional):** set `OPENAI_API_KEY`. Without it, callers set the facts with the on-screen choices.
 
@@ -89,7 +90,11 @@ cd web
 npm run test:fresh     # resets the local DB, then runs the journey and number-withholding tests
 ```
 
-The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case. It checks that duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, numbers are withheld, stale revisions cannot be confirmed, only catalogue replies can be sent, and insights are refused to callers.
+The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.
+
+```sh
+cd agent && AGENT_BRIDGE_SECRET=test uv run python -m unittest test_signing.py   # agent accepts only server-signed speech
+```
 
 ## What is real and what is simulated
 
