@@ -61,7 +61,8 @@ test("the operator directory and private presence both require the operator role
     });
     t.after(() => account.c.removeChannel(channel));
     const { status, reason } = await new Promise((resolve) => {
-      channel.subscribe((status, reason) => resolve({ status, reason }), 5000);
+      // Local Realtime answers a denied private join after about 5 s, so wait longer than that.
+      channel.subscribe((status, reason) => resolve({ status, reason }), 15000);
     });
     if (account === op) {
       assert.equal(status, "SUBSCRIBED");

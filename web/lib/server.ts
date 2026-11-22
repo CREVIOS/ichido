@@ -51,6 +51,17 @@ export class HttpError extends Error {
 
 export const fail = (status: number, message: string): never => { throw new HttpError(status, message); };
 
+// SQL commands raise a stable code (supabase/migrations/*_commands.sql); map it to HTTP.
+const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400, rate_limited: 429 };
+export async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await admin.rpc(fn, args);
+  if (error) {
+    if (Object.hasOwn(STATUS, error.message)) fail(STATUS[error.message], error.message);
+    throw error;
+  }
+  return data as T;
+}
+
 export function reply(status: number, body: object): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
 }

@@ -2,11 +2,15 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useMemo, useState } from "react";
 import Map, { Marker, NavigationControl, Popup } from "react-map-gl/maplibre";
+import { setWorkerUrl } from "maplibre-gl";
 import { Truck } from "lucide-react";
 import { Pill } from "@/components/charts";
 import { DISASTER_STAFF, STATIONS } from "@/content/catalogue";
 import { cn } from "@/lib/utils";
 import { MAP_STYLE } from "@/lib/map-style";
+
+// MapLibre 6 looks for its worker next to its own chunk, which the bundler renames; point it at the emitted asset.
+setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
 
 // disaster: inside a disaster area. mobile: a mobile branch (no Help Point device). selected: picked for a disaster area.
 export type MapStation = {

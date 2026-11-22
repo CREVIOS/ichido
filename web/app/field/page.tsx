@@ -8,9 +8,10 @@ import { AppShell, Chip, Dot, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BOT, DESK, ETA_OPTIONS, FIELD, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
+import { BOT, DESK, ETA_OPTIONS, FIELD, OPS, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
-type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null };
+type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
+type Site = { label: string; company: string };
 const UNKNOWN_ETA = "";
 const STEPS = ["on_way", "arrived", "done"] as const;
 const NEXT: Partial<Record<FieldState, (typeof STEPS)[number]>> = { requested: "on_way", on_way: "arrived", arrived: "done" };
@@ -23,15 +24,15 @@ export default function FieldPage() {
 // Only this guard's open assignments (row-level security). No identity checks or card handback here.
 function Jobs({ me }: { me: Me }) {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [sites, setSites] = useState<Record<string, Site>>({});
   const load = useCallback(async () => {
     const db = sb();
     const [j, s] = await Promise.all([
       db.from("field_job").select("*").neq("state", "done").order("assigned_at"),
-      db.from("station").select("id, label"),
+      db.from("station").select("id, label, security_company"),
     ]);
     setJobs((j.data ?? []) as Job[]);
-    setLabels(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n }[]).map((x) => [x.id, x.label.ja])));
+    setSites(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n; security_company: string }[]).map((x) => [x.id, { label: x.label.ja, company: x.security_company }])));
   }, []);
   useLive(["field_job"], load);
 
@@ -39,13 +40,13 @@ function Jobs({ me }: { me: Me }) {
     <AppShell nav={navFor(me.role, { "/field": jobs.length })} footer={<MeFooter me={me} />} title={FIELD.title}>
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4 lg:p-8">
         {jobs.length === 0 && <p className="py-16 text-center text-[14px] text-muted-foreground">{FIELD.none}</p>}
-        {jobs.map((j) => <JobCard key={`${j.incident}-${j.generation}`} j={j} label={labels[j.station] ?? j.station} />)}
+        {jobs.map((j) => <JobCard key={`${j.incident}-${j.generation}`} j={j} label={sites[j.station]?.label ?? j.station} company={sites[j.station]?.company} />)}
       </div>
     </AppShell>
   );
 }
 
-function JobCard({ j, label }: { j: Job; label: string }) {
+function JobCard({ j, label, company }: { j: Job; label: string; company?: string }) {
   // The estimate starts unknown; only the guard's own pick is ever sent.
   const [eta, setEta] = useState(UNKNOWN_ETA);
   const act = (state: string) =>
@@ -60,8 +61,10 @@ function JobCard({ j, label }: { j: Job; label: string }) {
       <div className="flex flex-col gap-1">
         <span className="text-[22px] leading-tight tracking-[-0.03em] text-foreground">{label}</span>
         <span className="text-[14px]">{isFault(j.fault) ? STAFF_JA.fault[j.fault] : DESK.unknownFault}</span>
+        {company && <span className="text-[12px] text-muted-foreground">{OPS.field.via(company)}</span>}
       </div>
       {j.state === "requested" && j.reminded_gen === j.generation && <Notice tone="warn">{BOT.fieldBanner}</Notice>}
+      {j.reestimate_gen === j.generation && <Notice tone="warn">{j.state === "arrived" ? OPS.field.arrivedLong : OPS.field.reestimate}</Notice>}
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
       {(j.state === "requested" || j.state === "on_way") && (
         <div className="flex flex-col gap-1.5 border-t pt-4">

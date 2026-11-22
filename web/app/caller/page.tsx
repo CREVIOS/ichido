@@ -11,6 +11,7 @@ import { Guidance } from "./guidance";
 import { DisasterNotice } from "./disaster";
 import { BankStatus, CallerFlags, FollowUp, type FollowUpCase } from "./faults";
 import { PrefsBar, speechRate, usePrefs } from "./prefs";
+import { CallerNotice, FraudScreen } from "./ops";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
 const noop = () => () => {};
@@ -51,6 +52,7 @@ export default function CallerPage() {
   if (card === null) return follow ? <FollowUp f={follow} prefs={prefs} onPrefs={setPrefs} /> : <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
+  if (card.fraud) return <FraudScreen lang={lang} />;
   // The current guidance only: a reply withdrawn after a fault-type change no longer shows.
   const latest = replies.find((r) => r.id === card.reply_id);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
@@ -64,6 +66,7 @@ export default function CallerPage() {
         <StatusLabel status={card.status} lang={lang} />
       </div>
       {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
+      {card.notice && <CallerNotice code={card.notice} lang={lang} />}
       <DisasterNotice station={card.station} lang={lang} />
       {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} textOnly={card.text_only} />}
       {confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} />}

@@ -1,5 +1,6 @@
 import { createHook, sleep } from "workflow";
 import { begin, botToken, mark, observe, prepare, record, remind, route, type Signal } from "@/lib/bot-steps";
+import { expirePromise, openPromises } from "@/lib/promise-steps";
 
 // Ichido Bot: one durable run per case, from the fault until the case closes. It routes, prepares, reminds and
 // records; a person claims, replies, dispatches and closes. Commands resume the run through its start hook
@@ -58,6 +59,12 @@ export async function caseBot(incident: string) {
         guardScheduled = job.generation;
         dues.push(job.due);
       }
+    }
+
+    // Promises (a call-back, a re-check, the guard's estimate, arrived without done): expire once due.
+    for (const p of await openPromises(incident)) {
+      if (s.now >= p.due) await expirePromise(incident, p.id);
+      else dues.push(p.due);
     }
 
     const next = signal.then(() => true);
