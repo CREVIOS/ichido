@@ -21,6 +21,8 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
 | `/insights` | operator, manager | Case funnel, cases per day, busiest hours, languages, median time to first reply — counts only |
 
+The same screens also ship as a React Native app in `mobile/` (see below).
+
 ## How it works
 
 ```
@@ -75,6 +77,19 @@ uv run python app.py dev
 and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `web/.env.local`, plus the same random `AGENT_BRIDGE_SECRET` in both `web/.env.local` and `agent/.env` (the agent speaks only text the server signed with it). Without voice keys, the caller uses the typed path.
 
 **Extraction from free text (optional):** set `OPENAI_API_KEY`. Without it, callers set the facts with the on-screen choices.
+
+**Mobile app (optional):** `mobile/` is an Expo app with every role (caller, operator, guard, insights) against the same backend and the same `web/content/catalogue.ts`. It needs a development build because of LiveKit's native WebRTC module:
+
+```sh
+cd mobile
+cp .env.example .env               # Supabase URL + publishable key, and the web origin (EXPO_PUBLIC_API_URL)
+npm install
+npx expo run:ios                   # Xcode 26; or run:android. Opens ichido://s/TABLE-A deep links
+```
+
+Without a development build, `npx expo start --go` runs every screen except voice in Expo Go.
+
+See `mobile/README.md` for env vars, deep links and checks.
 
 **Device:** copy `firmware/help_point/secrets.example.h` to `secrets.h`, fill it in, then
 
