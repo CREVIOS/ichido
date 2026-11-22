@@ -31,13 +31,13 @@ Operator (browser) ───────▶ /api/cmd ────┼──▶ Su
 Caller phone ─────────────▶ /api/cmd ────┘            ▲
      │ WebRTC                                        │ draft (structured facts)
      ▼                                               │
-LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LLM)
+LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversational LLM)
 ```
 
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
 - **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
-- **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers.
-- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, and a heartbeat every 60 s (`public.device_health`).
+- **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers. Background voice cancellation (LiveKit Cloud) cleans the caller's audio; a multilingual turn detector ends Japanese and English turns, and Bengali uses VAD endpointing.
+- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
 - **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
@@ -73,9 +73,9 @@ Demo accounts (local only): `operator@ichido.demo`, `operator2@ichido.demo`, `gu
 
 ```sh
 cd agent
-cp .env.example .env               # LiveKit, Google STT, Azure Speech keys
+cp .env.example .env               # LiveKit, Soniox and ElevenLabs keys
 uv sync
-uv run python app.py download-files
+uv run python app.py download-files   # Silero VAD and the turn detector; without them the agent uses VAD endpointing
 uv run python app.py dev
 ```
 
@@ -86,21 +86,26 @@ and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `web/.env.loca
 **Device:** copy `firmware/help_point/secrets.example.h` to `secrets.h`, fill it in, then
 
 ```sh
+arduino-cli lib install WiFiManager     # setup portal (tzapu, MIT)
 arduino-cli compile --fqbn esp32:esp32:esp32 firmware/help_point
 arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 ```
+
+The `secrets.h` values are first-boot defaults. To change Wi-Fi, app URL, station or secret later without
+reflashing, hold the button for 8 s while powering on and use the setup portal. For signed OTA updates, see
+[docs/DEPLOY.md](docs/DEPLOY.md#firmware-updates).
 
 ## Tests
 
 ```sh
 cd web
-npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health and device-heartbeat tests
+npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health, device-heartbeat and firmware-manifest tests
 ```
 
 The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.
 
 ```sh
-cd agent && AGENT_BRIDGE_SECRET=test uv run python -m unittest test_signing.py   # agent accepts only server-signed speech
+cd agent && uv run python -m unittest   # only server-signed speech, per-language STT/TTS, turn detector and noise-cancellation fallbacks
 ```
 
 ## What is real and what is simulated
@@ -109,14 +114,14 @@ cd agent && AGENT_BRIDGE_SECRET=test uv run python -m unittest test_signing.py  
 |---|---|---|
 | Case flow across caller, operator and guard screens with live updates | The ATM (ESP32 prop or on-screen action) | Real telephony and the ATM's own handset |
 | Row-level security and single-use pairing | The bank, branch, security company and manual | Connection to a monitoring system |
-| Voice agent code (LiveKit, Google STT, Azure TTS) | Synthetic history in the insights page (local only, optional) | Native review of all Bengali and Japanese wording |
+| Voice agent code (LiveKit, Soniox STT, ElevenLabs TTS) | Synthetic history in the insights page (local only, optional) | Native review of all Bengali and Japanese wording |
 | ESP32 firmware | | |
 
 ## How AI tools were used
 
 - Research, planning and review of the plan: Claude (Anthropic) and Codex (OpenAI).
 - Code: written with Claude Code; reviewed and tested by the team.
-- In the product: speech recognition (Google), speech synthesis (Azure) and optional structured extraction of two facts from free text (OpenAI). The product never lets a model write a reply to the caller.
+- In the product: speech recognition (Soniox), speech synthesis (ElevenLabs), noise cancellation and end-of-turn detection (LiveKit) and optional structured extraction of two facts from free text (OpenAI). The product never lets a model write a reply to the caller.
 
 ## Licence
 

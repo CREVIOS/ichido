@@ -11,8 +11,8 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY app.py ./
 RUN chown -R agent /home/agent
 USER agent
-# Model files are fetched at build time (into the runtime user's cache) so a cold start does not download them.
-# app.py reads AGENT_BRIDGE_SECRET at import; a throwaway value is enough to run the downloader.
-RUN AGENT_BRIDGE_SECRET=build uv run --no-sync python app.py download-files
+# Model files (Silero VAD, multilingual turn detector) are fetched at build time into the runtime user's cache,
+# so a cold start does not download them and the turn detector is available from the first call.
+RUN uv run --no-sync python app.py download-files
 
 CMD ["uv", "run", "--no-sync", "python", "app.py", "start"]
