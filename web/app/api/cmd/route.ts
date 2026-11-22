@@ -205,6 +205,20 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const c = caller(a);
     if (typeof b.rev !== "number") fail(400, "bad_request");
     await rpc("cmd_confirm", { p_uid: c.uid, p_rev: b.rev });
+    // The words stay in the caller's language; staff get a labelled machine translation beside them.
+    const { data: d } = await admin.from("desk").select("id, lang, caller_words").eq("id", c.incident!).single();
+    if (d?.caller_words && d.lang !== "ja") {
+      const ja = await toJapanese(d.caller_words);
+      if (ja) await admin.from("desk").update({ caller_words_ja: ja }).eq("id", d.id);
+    }
+    return {};
+  },
+
+  async set_lang(a, b) {
+    const c = caller(a);
+    const lang = str(b, "lang");
+    if (!(LANGS as readonly string[]).includes(lang)) fail(400, "bad_request");
+    await rpc("cmd_set_lang", { p_uid: c.uid, p_lang: lang });
     return {};
   },
 

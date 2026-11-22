@@ -1,16 +1,17 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { LANGS, LANG_NAME, STATION, errorText, type Lang } from "@/content/catalogue";
+import { LangSelect, preferredLang } from "@/components/lang-select";
+import { STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
+const noop = () => () => {};
 
 // Neutral landing behind the Help Point sticker: scanning alone reveals nothing.
 export default function StationPage() {
@@ -20,7 +21,10 @@ export default function StationPage() {
 function StationForm() {
   const { station } = useParams<{ station: string }>();
   const router = useRouter();
-  const [lang, setLang] = useState<Lang>("bn");
+  // The phone's own language when it is one we offer; the caller can change it any time.
+  const detected = useSyncExternalStore(noop, preferredLang, () => "bn" as Lang);
+  const [chosen, setLang] = useState<Lang | null>(null);
+  const lang = chosen ?? detected;
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,10 +57,8 @@ function StationForm() {
   }
 
   return (
-    <Phone lang={lang} center right={<Chip>Help Point · <span className="mono">{station}</span></Chip>}>
-      <ToggleGroup value={[lang]} onValueChange={(v: string[]) => v[0] && setLang(v[0] as Lang)} className="grid w-full grid-cols-3 gap-0.5 rounded-lg bg-secondary p-0.5">
-        {LANGS.map((l) => <ToggleGroupItem key={l} value={l} lang={l} className="h-9 min-w-0 rounded-md px-1 text-[14px] data-[pressed]:bg-card data-[pressed]:text-foreground data-[pressed]:shadow-xs">{LANG_NAME[l]}</ToggleGroupItem>)}
-      </ToggleGroup>
+    <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      <Chip className="self-start">Help Point · <span className="mono">{station}</span></Chip>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (
         <div className="flex flex-col gap-3">

@@ -1,13 +1,16 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Phone } from "@/components/phone";
-import { Chip, StatusLabel } from "@/components/kit";
-import { FAULTS, LANGS, LANG_NAME, STATION, UI, pick, type Lang } from "@/content/catalogue";
+import { StatusLabel } from "@/components/kit";
+import { LangSelect, preferredLang } from "@/components/lang-select";
+import { FAULTS, STATION, UI, pick, type Lang } from "@/content/catalogue";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
 import type { CallerCase, Draft, Reply, Station } from "./types";
+
+const noop = () => () => {};
 
 export default function CallerPage() {
   const [card, setCard] = useState<CallerCase | null | undefined>(undefined);
@@ -35,22 +38,14 @@ export default function CallerPage() {
   useLive(["caller_card", "draft", "reply"], load);
 
   if (card === undefined) return null;
-  if (card === null) return (
-    <Phone center>
-      {/* The phone has no case yet, so no language: say it in every caller language. */}
-      {LANGS.map((l, i) => {
-        const text = (staffSession ? STATION.staffSession : UI.notConnected)[l];
-        return i === 0 ? <h1 key={l} lang={l} className="text-[24px] leading-snug">{text}</h1> : <p key={l} lang={l} className="text-[15px]">{text}</p>;
-      })}
-    </Phone>
-  );
+  if (card === null) return <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
   const latest = replies.at(-1);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
 
   return (
-    <Phone lang={lang} right={<Chip>{LANG_NAME[lang]}</Chip>}>
+    <Phone lang={lang} right={<LangSelect value={lang} onChange={(l) => cmd("set_lang", { lang: l }).then(load).catch(() => undefined)} />}>
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>
         <StatusLabel status={card.status} lang={lang} />
@@ -72,5 +67,17 @@ function ShowStaff({ card, lang }: { card: CallerCase; lang: Lang }) {
       <span lang="ja" className="text-[17px]">{FAULTS[card.fault]?.ja}。</span>
       <span lang="ja" className="text-[13px] opacity-80">{UI.caseNo.ja}：<span className="font-mono">{card.id.slice(0, 8)}</span></span>
     </div>
+  );
+}
+
+// This phone has no case yet, so no chosen language: one message, in the phone's language, with the picker.
+function NotConnected({ staff }: { staff: boolean }) {
+  const detected = useSyncExternalStore(noop, preferredLang, () => "bn" as Lang);
+  const [chosen, setLang] = useState<Lang | null>(null);
+  const lang = chosen ?? detected;
+  return (
+    <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      <h1 className="text-[24px] leading-snug">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</h1>
+    </Phone>
   );
 }

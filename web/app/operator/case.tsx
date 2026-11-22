@@ -126,6 +126,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           <div className="surface flex flex-col gap-2 p-4">
             <span className="label">{DESK.original(LANG_NAME[lang])}</span>
             <span lang={lang} className="text-[17px] leading-7 text-foreground">{d.caller_words ?? DESK.choiceOnly}</span>
+            {d.caller_words && lang !== "ja" && (d.caller_words_ja
+              ? <span className="flex items-start gap-2 text-[14px] leading-6"><Chip className="shrink-0">{DESK.teach.mt}</Chip>{d.caller_words_ja}</span>
+              : <span className="text-[12px] text-muted-foreground">{DESK.teach.noMt(LANG_NAME[lang])}</span>)}
           </div>
           <div className="surface flex flex-col gap-2 p-4">
             <span className="flex justify-between"><span className="label">{DESK.confirmed}</span><span className="label num">{DESK.rev(d.confirmed_rev)}</span></span>
