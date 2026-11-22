@@ -43,12 +43,13 @@ Each Help Point needs a station row. Run this once per station in the SQL editor
 callers in their language:
 
 ```sql
-insert into public.station (id, label, branch, counter_hours, security_company) values (
+insert into public.station (id, label, branch, counter_hours, security_company, lat, lng) values (
   'TABLE-A',
   '{"ja": "…", "bn": "…", "en": "…"}',      -- machine location
   '{"ja": "…", "bn": "…", "en": "…"}',      -- branch name
   '{"ja": "…", "bn": "…", "en": "…"}',      -- counter hours
-  '…'                                         -- security company
+  '…',                                        -- security company
+  32.75, 129.87                               -- location for the operator's map (optional)
 );
 insert into public.light (station) values ('TABLE-A');
 ```

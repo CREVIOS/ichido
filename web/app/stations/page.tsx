@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { Clock, Cpu, Landmark, QrCode, RadioTower, Signal, TriangleAlert } from "lucide-react";
 import { sb } from "@/lib/supabase";
@@ -10,8 +11,12 @@ import { Pill, SegBar } from "@/components/charts";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { STATIONS, type L10n } from "@/content/catalogue";
+import type { MapStation } from "@/components/station-map";
 
-type Station = { id: string; label: L10n };
+// MapLibre needs the browser; load it only there.
+const StationMap = dynamic(() => import("@/components/station-map").then((m) => m.StationMap), { ssr: false, loading: () => <div className="h-[340px] border-b bg-secondary" /> });
+
+type Station = { id: string; label: L10n; lat: number | null; lng: number | null };
 type Health = { station: string; last_seen: string; rssi: number; firmware: string; uptime_s: number };
 
 // Signal strength as 0–6 bars: −50 dBm or better is full, −95 dBm or worse is empty.
@@ -35,7 +40,7 @@ function Board({ me }: { me: Me }) {
   const load = useCallback(async () => {
     const db = sb();
     const [s, h, d] = await Promise.all([
-      db.from("station").select("id, label").order("id"),
+      db.from("station").select("id, label, lat, lng").order("id"),
       db.from("device_health").select("station, last_seen, rssi, firmware, uptime_s"),
       db.from("desk").select("station").is("finished_at", null),
     ]);
@@ -52,6 +57,11 @@ function Board({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={STATIONS.title}>
       <p className="border-b px-5 py-3 text-[13px] text-muted-foreground lg:px-6">{STATIONS.lead}</p>
+      <StationMap stations={stations.filter((s) => s.lat != null && s.lng != null).map((s): MapStation => {
+        const h = health[s.id];
+        const age = h ? Math.round((now - Date.parse(h.last_seen)) / 1000) : null;
+        return { id: s.id, label: s.label.ja, lat: s.lat!, lng: s.lng!, open: open[s.id] ?? 0, state: age == null ? "never" : age <= STATIONS.onlineWithinS ? "online" : "stale" };
+      })} />
       <div className="overflow-x-auto">
         <div className="min-w-[1010px]">
           <div className="flex h-10 items-center border-b text-[13px] text-muted-foreground">

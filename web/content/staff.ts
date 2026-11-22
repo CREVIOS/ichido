@@ -39,6 +39,9 @@ export const STATIONS = {
   empty: "ステーションが登録されていません。docs/DEPLOY.md の手順で追加してください。",
   // A device is online if it reported within this many seconds (heartbeat every 60 s).
   onlineWithinS: 180,
+  map: "地図",
+  openCases: (n: number) => `対応中 ${n}件`,
+  noLocation: "位置が未登録のステーションは地図に表示されません。",
 };
 
 // Errors staff can see, by the stable code the server returns.
