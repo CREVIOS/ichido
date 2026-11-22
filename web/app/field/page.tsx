@@ -24,7 +24,7 @@ function Jobs({ me }: { me: Me }) {
   const load = useCallback(async () => {
     const db = sb();
     const [j, s] = await Promise.all([
-      db.from("field_job").select("*").neq("state", "done").order("updated_at", { ascending: false }),
+      db.from("field_job").select("*").neq("state", "done").order("assigned_at"),
       db.from("station").select("id, label"),
     ]);
     setJobs((j.data ?? []) as Job[]);

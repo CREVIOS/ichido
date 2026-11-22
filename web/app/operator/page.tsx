@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
@@ -73,6 +73,14 @@ function Console({ me }: { me: Me }) {
   const label = useMemo<Record<string, string>>(() => Object.fromEntries((snapshot?.stations ?? []).map((s) => [s.id, s.label.ja])), [snapshot]);
   const listed = snapshot && [...snapshot.open, ...snapshot.done].find((row) => row.id === sel);
   const current = sel ? listed ?? (snapshot?.selection === sel ? snapshot.archived : null) : open?.[0];
+  // Pin the auto-selected case in the URL, so it stays on screen after it closes (for the record and hand-off)
+  // and a newly arriving case never pulls the operator away mid-task.
+  const pin = !sel && current ? current.id : null;
+  useEffect(() => {
+    if (!pin) return;
+    history.replaceState(null, "", `#${pin}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  }, [pin]);
   let empty = CASES.loading;
   if (snapshot?.selection === sel) {
     empty = sel ? staffError("not_found") : snapshot.done.length ? DESK.pickCase : DESK.empty;
