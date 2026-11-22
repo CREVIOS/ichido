@@ -4,13 +4,13 @@ import { toast } from "sonner";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
-import { AppShell, Chip, Dot } from "@/components/kit";
+import { AppShell, Chip, Dot, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DESK, ETA_OPTIONS, FIELD, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
+import { BOT, DESK, ETA_OPTIONS, FIELD, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
-type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
+type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null };
 const UNKNOWN_ETA = "";
 const STEPS = ["on_way", "arrived", "done"] as const;
 const NEXT: Partial<Record<FieldState, (typeof STEPS)[number]>> = { requested: "on_way", on_way: "arrived", arrived: "done" };
@@ -61,6 +61,7 @@ function JobCard({ j, label }: { j: Job; label: string }) {
         <span className="text-[22px] leading-tight tracking-[-0.03em] text-foreground">{label}</span>
         <span className="text-[14px]">{isFault(j.fault) ? STAFF_JA.fault[j.fault] : DESK.unknownFault}</span>
       </div>
+      {j.state === "requested" && j.reminded_gen === j.generation && <Notice tone="warn">{BOT.fieldBanner}</Notice>}
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
       {(j.state === "requested" || j.state === "on_way") && (
         <div className="flex flex-col gap-1.5 border-t pt-4">

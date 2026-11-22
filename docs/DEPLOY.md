@@ -74,9 +74,37 @@ Import the repository and set **Root Directory** to `web`. Set these environment
 | `BETTERSTACK_SOURCE_TOKEN`, `BETTERSTACK_INGEST_HOST` | optional: Better Stack logs (section 5) |
 | `BETTERSTACK_DEVICE_HEARTBEATS_JSON` | optional: `{"TABLE-A":"<heartbeat URL>"}` (section 5) |
 | `FIRMWARE_MANIFEST_JSON` | optional: signed Help Point firmware manifest from `scripts/sign-firmware.mjs` (section 4) |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | optional: Gemini decision support, also precomputed by the Ichido Bot when the caller confirms |
+| `BOT_REMIND_AT` | optional: when the Ichido Bot reminds, as a share of each `ichido.sla_target` (default `0.75`, when the console's countdown turns amber) |
 
 `VERCEL_GIT_COMMIT_SHA` is set by Vercel. It appears in `/api/health` and in every log line. After the first
 deploy, check `https://<app>/api/health` → `{"ok":true,"db":"ok","version":"<sha>"}`.
+
+### Ichido Bot (Vercel Workflow)
+
+Each case runs a durable workflow, `web/workflows/case-bot.ts`, built with the Workflow DevKit (`workflow`
+package, `withWorkflow` in `next.config.ts`). A fault from a Help Point or a manual registration starts it;
+claim, caller confirmation, reply, dispatch, guard update, reset, guidance and abandon wake it through the
+run's start hook (`ichido-bot:<case id>`, server-side only: there is no public webhook). Each wake re-reads the
+case from the database, so a lost wake only delays the bot until the next event or timer.
+
+The bot **recommends** the operator with the fewest open cases (online operators first, from console presence),
+**prepares** the Gemini suggestion so the AI card opens instantly, **reminds** the operator before the
+first-reply target and the guard and operator while a dispatched guard has not set off, and **records** the
+after-call summary and durations (counts only) when the case closes. It never claims, replies, dispatches or
+closes. The pg_cron escalation (`ichido.escalate_due`) is unchanged; the bot's panel shows it beside its steps.
+
+On Vercel the workflow needs no extra service: the Vercel World provides storage, queueing and the run
+dashboard (Project → Observability → Workflows). Two settings matter:
+
+- **Settings → Environment Variables → Enable access to System Environment Variables** must be on. The SDK
+  recognises a Vercel deployment by `VERCEL_DEPLOYMENT_ID`; without it, it falls back to the Local World and
+  every run fails on the read-only filesystem.
+- **Fluid compute** (the default for new projects) keeps step functions cheap while they wait on Supabase.
+
+If the app has a `proxy.ts` later, exclude `/.well-known/workflow/` from its matcher. Locally the Local World
+keeps runs in `web/.workflow-data/` (git-ignored); inspect them with `npx workflow web` or
+`npx workflow inspect runs`. Cases opened before the bot existed have no run and simply show no bot panel.
 
 ## 3. LiveKit Cloud (voice agent)
 
@@ -210,9 +238,13 @@ Useful events:
 | `device_firmware` | firmware check: `fw`, `fw_target`, `code` (`offered`, `current`, `none`, `bad_manifest`) |
 | `voice_token` | LiveKit token issued or refused (`code`) |
 | `unhandled_error` | anything uncaught on the server (`instrumentation.ts`) |
+| `bot_start` | Ichido Bot run started for a case: `incident`, `run_id`, `code` (`started` / `start_failed`) |
+| `bot_signal` | a command woke the case's run: `cmd`, `code` = `no_run` (case closed or older than the bot) / `signal_failed` |
+| `bot_step` | one bot step: `step`, `incident`, `code` (outcome, e.g. `routed_online`, `no_key`, `reminded`, `replied`, `recorded`), `duration_ms` |
 | `job_start`, `job_end`, `stt_latency`, `tts`, `say`, `say_rejected`, `session_error`, `audio_setup`, `turn_detector_unavailable`, `noise_cancellation_unavailable` | agent |
 
-Suggested alerts: `level = "error"` over 0 in 5 min; `message = "device_auth_failed"` over 10 in 5 min.
+Suggested alerts: `level = "error"` over 0 in 5 min; `message = "device_auth_failed"` over 10 in 5 min;
+`message = "bot_step" and code = "failed"` (Gemini could not prepare a suggestion) over 5 in 15 min.
 
 **Uptime.** Uptime → Monitors → Create: URL `https://<app>/api/health`, alert when the status is not 2xx.
 It returns 503 when the database does not answer.

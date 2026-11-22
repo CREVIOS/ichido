@@ -19,6 +19,12 @@ export type Fields = {
   station?: string;
   incident?: string;
   session?: string;         // training session id (lib/training.ts)
+  // Ichido Bot (lib/bot-steps.ts)
+  step?: string;
+  run_id?: string;
+  presence?: string;        // online operators seen, or "unavailable"
+  model_ms?: number;
+  total_s?: number;
   fault?: string;
   repeat?: boolean;
   ttl_s?: number;

@@ -1,6 +1,7 @@
 import { admin, priv, reply, deviceStation } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
 import { DEVICE_FAULT } from "@/content/catalogue";
+import { startBot } from "@/lib/bot";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
 export async function POST(req: Request): Promise<Response> {
@@ -23,6 +24,7 @@ export async function POST(req: Request): Promise<Response> {
     log.error("device_fault", { station, fault: DEVICE_FAULT, status: 500, duration_ms: log.ms(), ...errorFields(error) });
     return reply(500, { error: "not recorded" });
   }
+  if (!seen) await startBot(incident as string);   // a second press on an open case finds its run already there
   log.info("device_fault", { station, fault: DEVICE_FAULT, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
   return new Response(null, { status: 204 });
 }

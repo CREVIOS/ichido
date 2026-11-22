@@ -2,7 +2,7 @@
 // Operators can send only intents in REPLIES; callers see the pre-written text in their language.
 // Bengali, Vietnamese, Indonesian, Nepali and Japanese below are drafts awaiting native review (see README).
 
-import { DESK } from "./staff.ts";
+import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 
 export const MANUAL_VERSION = "retained-card/v1";
 
@@ -163,7 +163,7 @@ export const replyOf = (intent: unknown): Reply | undefined =>
   typeof intent === "string" && Object.hasOwn(REPLIES, intent) ? REPLIES[intent] : undefined;
 export const CHOICE_INTENTS = Object.keys(REPLIES).filter((k) => REPLIES[k].offersChoice);
 
-export const ACTOR: Record<string, string> = { device: "機械", caller: "お客様", agent: "AI", operator: "担当者", field: "警備員", system: "システム" };
+export const ACTOR: Record<string, string> = { device: "機械", caller: "お客様", agent: "AI", operator: "担当者", field: "警備員", system: "システム", bot: "Ichido Bot" };
 
 // One-tap rating after a guided case closes: 1 = hard, 2 = okay, 3 = good. Faces only, no free text.
 export const RATINGS = [3, 2, 1] as const;
@@ -173,6 +173,8 @@ export const RATING: Record<number, L10n> = {
   1: { bn: "কঠিন ছিল", en: "Hard", ja: "むずかしかった", vi: "Khó khăn", id: "Sulit", ne: "गाह्रो भयो" },
 };
 const RATING_JA: Record<number, string> = { 3: "よかった", 2: "ふつう", 1: "むずかしかった" };
+
+const num = (v: unknown) => (v == null || v === "" ? undefined : Number(v));
 
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
@@ -200,6 +202,12 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "lang_changed": return `お客様が言語を変更（${LANG_NAME[d.from as Lang] ?? d.from ?? "—"} → ${LANG_NAME[d.to as Lang] ?? d.to}）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
+    case "bot_routed": return BOT.routed(d.operator ?? "—");
+    case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
+    case "bot_remind": return d.reason === "guard_late"
+      ? BOT.remind.guard_late(d.assignee ?? "—", BOT.secs(num(d.target_s)))
+      : BOT.remind.no_reply(BOT.secs(num(d.target_s)));
+    case "bot_closed": return BOT.closed({ claim_s: num(d.claim_s), first_reply_s: num(d.first_reply_s), guard_arrival_s: num(d.guard_arrival_s), total_s: num(d.total_s) });
     default: return kind;
   }
 }
@@ -351,7 +359,6 @@ export const UI = {
 } satisfies Record<string, L10n>;
 
 export * from "./staff.ts";
-import { HANDOFF, STAFF_JA } from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./mobile.ts";

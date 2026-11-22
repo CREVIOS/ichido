@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.example
+
+# Workflow DevKit: generated routes and the local world
+/app/.well-known/workflow/
+.workflow-data/
+/.swc

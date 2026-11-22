@@ -15,7 +15,9 @@ export type Insights = {
   choices: Record<string, number>;
   ratings: Record<string, number>;
   targets: Partial<Record<string, number>>;
+  bot: { records: number; claim_s: number | null; first_reply_s: number | null; guard_arrival_s: number | null; total_s: number | null };
 };
+const dur = (s: number | null) => (s == null ? "—" : INSIGHTS.duration(s));
 
 const HOURS_PER_SLOT = 2;
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
@@ -96,6 +98,18 @@ export const METRICS = {
     card: (d: Insights) => { const t = total(RATINGS.map((r) => d.ratings[r] ?? 0)); return centre(t ? `${pct(d.ratings[3] ?? 0, t)}%` : "—", RATING[3].ja); },
     detail: (d: Insights) => <Donut total={INSIGHTS.count(total(RATINGS.map((r) => d.ratings[r] ?? 0)))} totalLabel={INSIGHTS.metrics.ratings.title}
       data={RATINGS.map((r) => ({ key: `r${r}`, label: RATING[r].ja, value: d.ratings[r] ?? 0 }))} />,
+  },
+  bot: {
+    card: (d: Insights) => centre(dur(d.bot.total_s), `${INSIGHTS.bot.total}・${INSIGHTS.bot.median}`),
+    detail: (d: Insights) => (
+      <div className="flex flex-col gap-6">
+        <Big>{dur(d.bot.total_s)}</Big>
+        <Pair items={[
+          [INSIGHTS.bot.claim, dur(d.bot.claim_s)], [INSIGHTS.bot.reply, dur(d.bot.first_reply_s)],
+          [INSIGHTS.bot.guard, dur(d.bot.guard_arrival_s)], [INSIGHTS.bot.records, INSIGHTS.count(d.bot.records)],
+        ]} />
+      </div>
+    ),
   },
 } satisfies Record<string, { card: (d: Insights) => ReactNode; detail: (d: Insights) => ReactNode }>;
 

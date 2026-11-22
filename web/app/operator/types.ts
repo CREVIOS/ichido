@@ -18,7 +18,13 @@ export type CaseEvent = { id: number; actor: string; actor_name: string | null; 
 export type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
 export type Job = { assignee: string; state: FieldState; eta: string | null };
 export type Guard = { uid: string; display_name: string };
-export type Run = (name: string, body?: Record<string, unknown>) => Promise<unknown>;
+export type BotStep = { step: string; status: "waiting" | "done" | "skipped"; code: string | null; due_at: string | null; data: Record<string, unknown>; at: string };
+export type Suggestion = {
+  intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; reasons: string[]; risks: string[];
+  model: string; steps: { tool: string; ms: number }[]; ms: number;
+};
+export type Prepared = { rev: number; suggestion: Suggestion };
+export type Run =(name: string, body?: Record<string, unknown>) => Promise<unknown>;
 
 export const hhmm = (t: string) => new Date(t).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
 export const when = (t: string) =>

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { cmd } from "@/lib/supabase";
@@ -7,23 +7,32 @@ import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DESK, replyOf, staffError } from "@/content/catalogue";
-import type { Desk, Run } from "./types";
+import type { BotStep, Desk, Prepared, Run, Suggestion } from "./types";
 
-type Step = { tool: string; ms: number };
-type Suggestion = { intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; reasons: string[]; risks: string[]; model: string; steps: Step[]; ms: number };
-type State = { status: "idle" | "loading" | "off" | "failed" } | { status: "ready"; s: Suggestion };
+type Step = Suggestion["steps"][number];
+type State = { status: "idle" | "loading" | "preparing" | "off" | "failed" } | { status: "ready"; s: Suggestion };
 
-// Gemini's recommendation for this case, refreshed when the caller confirms new facts. The operator adopts it or ignores it.
-export function SuggestCard({ d, run }: { d: Desk; run: Run }) {
-  const [state, setState] = useState<State>({ status: "idle" });
-  const ask = useCallback(() => {
-    setState({ status: "loading" });
+// What the Ichido Bot prepared for the confirmed revision, so the card shows at once without calling Gemini.
+function botState(d: Desk, prepared: Prepared | null, step: BotStep | undefined): State {
+  if (prepared && prepared.rev === d.confirmed_rev) return { status: "ready", s: prepared.suggestion };
+  if (!step || d.confirmed_rev == null) return { status: "idle" };
+  if (step.data.rev !== d.confirmed_rev) return { status: "preparing" };
+  return { status: step.code === "no_key" ? "off" : step.code === "failed" ? "failed" : "idle" };
+}
+
+// Gemini's recommendation for this case: precomputed by the Ichido Bot when the caller confirms, refreshed on request.
+// The operator adopts it or ignores it.
+export function SuggestCard({ d, run, prepared, step }: { d: Desk; run: Run; prepared: Prepared | null; step?: BotStep }) {
+  // A manual refresh belongs to the revision it was asked for; a newer confirmation goes back to the bot's state.
+  const [manual, setManual] = useState<{ rev: number | null; state: State } | null>(null);
+  const state = manual && manual.rev === d.confirmed_rev ? manual.state : botState(d, prepared, step);
+  const ask = () => {
+    const rev = d.confirmed_rev;
+    setManual({ rev, state: { status: "loading" } });
     cmd<{ suggestion: Suggestion | null }>("suggest", { incident: d.id })
-      .then((r) => setState(r.suggestion ? { status: "ready", s: r.suggestion } : { status: "off" }))
-      .catch((e: Error) => { setState({ status: "failed" }); if (e.message !== "server") toast.error(staffError(e.message)); });
-  }, [d.id]);
-  // Ask once the caller has confirmed, and again whenever they confirm a new revision.
-  useEffect(() => { if (d.confirmed_rev != null) queueMicrotask(ask); }, [d.confirmed_rev, ask]);
+      .then((r) => setManual({ rev, state: r.suggestion ? { status: "ready", s: r.suggestion } : { status: "off" } }))
+      .catch((e: Error) => { setManual({ rev, state: { status: "failed" } }); if (e.message !== "server") toast.error(staffError(e.message)); });
+  };
 
   const adopt = async (s: Suggestion) => {
     if (!s.intent || !(await run("send", { incident: d.id, intent: s.intent }))) return;
@@ -36,7 +45,7 @@ export function SuggestCard({ d, run }: { d: Desk; run: Run }) {
       action={state.status === "ready" ? <Chip>{DESK.ai.by(state.s.model)}</Chip> : undefined}>
       {state.status === "off" && <Notice>{DESK.ai.off}</Notice>}
       {state.status === "failed" && <Notice tone="warn">{DESK.ai.failed}</Notice>}
-      {state.status === "loading" && <div className="flex flex-col gap-2"><span className="text-[13px] text-muted-foreground">{DESK.ai.thinking}</span><Skeleton className="h-16 w-full" /></div>}
+      {(state.status === "loading" || state.status === "preparing") && <div className="flex flex-col gap-2"><span className="text-[13px] text-muted-foreground">{DESK.ai.thinking}</span><Skeleton className="h-16 w-full" /></div>}
       {state.status === "ready" && <Body s={state.s} onAdopt={() => adopt(state.s)} />}
       <div className="flex items-center justify-between gap-3">
         <span className="text-[12px] leading-5 text-muted-foreground">{DESK.ai.note}</span>

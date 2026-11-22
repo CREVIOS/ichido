@@ -6,11 +6,15 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
-import { hhmm, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Reply, type Run } from "./types";
+import { BotPanel } from "./bot";
+import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
+
+type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null };
+const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null };
 
 // True while a caller is connected: paired, and not reset since.
 const isPaired = (events: CaseEvent[]) => {
@@ -23,23 +27,29 @@ function useCase(id: string) {
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [job, setJob] = useState<Job | null>(null);
+  const [bot, setBot] = useState<BotState>(NO_BOT);
   // Staff never read the caller's draft; only what the caller confirmed reaches the desk.
   const load = useCallback(async () => {
     const db = sb();
-    const [c, e, r, j] = await Promise.all([
+    const [c, e, r, j, b, x, p, rec] = await Promise.all([
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
+      db.from("bot_step").select("step, status, code, due_at, data, at").eq("incident", id),
+      db.from("escalation").select("reason").eq("incident", id),
+      db.from("bot_suggestion").select("rev, suggestion").eq("incident", id).maybeSingle(),
+      db.from("case_record").select("summary").eq("incident", id).maybeSingle(),
     ]);
     setCard(c.data as CallerCard); setEvents((e.data ?? []) as CaseEvent[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
+    setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null });
   }, [id]);
-  useLive(["caller_card", "case_event", "reply", "field_job"], load);
-  return { card, events, replies, job };
+  useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation"], load);
+  return { card, events, replies, job, bot };
 }
 
 export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
-  const { card, events, replies, job } = useCase(d.id);
+  const { card, events, replies, job, bot } = useCase(d.id);
   const [guards, setGuards] = useState<Guard[]>([]);
   useEffect(() => { cmd<{ field: Guard[] }>("staff_list").then((r) => setGuards(r.field)).catch(() => setGuards([])); }, []);
 
@@ -53,28 +63,31 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
       <div className="flex min-w-0 flex-col gap-8 p-5 lg:p-8">
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
+        <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <Timeline events={events} />
         {d.operator_id && <HandoffPanel incident={d.id} />}
         {closed && d.status === "guided" && (
-          <Panel title={DESK.record} action={<Chip>{DESK.recordDraft}</Chip>}>
-            <p className="text-[14px] leading-6 text-foreground">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
+          <Panel title={DESK.record} action={<Chip>{bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
+            <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
           </Panel>
         )}
       </div>
       <aside className="flex flex-col gap-8 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
-        <Actions d={d} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} run={run} />
+        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} run={run} />
       </aside>
     </div>
   );
 }
 
-function Actions({ d, mine, closed, paired, lang, replies, job, guards, card, run }: {
-  d: Desk; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; run: Run;
+function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, run }: {
+  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; run: Run;
 }) {
+  const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
   if (closed) return <Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>;
   if (!d.operator_id) return (
     <Panel title={DESK.unclaimed}>
       <p className="text-[14px]">{DESK.unclaimedBody}</p>
+      {routed && <Notice tone="info">{routed.uid === me ? BOT.routedMe : BOT.routed(String(routed.operator))}</Notice>}
       <Button size="lg" onClick={() => run("claim", { incident: d.id })}>{DESK.claim}</Button>
     </Panel>
   );
@@ -82,7 +95,7 @@ function Actions({ d, mine, closed, paired, lang, replies, job, guards, card, ru
   return (
     <>
       {!paired && <PairCard incident={d.id} />}
-      <SuggestCard d={d} run={run} />
+      <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />

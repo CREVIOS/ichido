@@ -22,6 +22,7 @@ export const NAV = {
   stations: "ステーション",
   insights: "インサイト",
   training: "AI応対トレーニング",
+  automation: "自動化",
   field: "割当",
 };
 
@@ -259,7 +260,9 @@ export const INSIGHTS = {
     hours: { title: "時間帯", def: "障害通知の時刻（日本時間）を2時間ごとに集計。もっとも多い時間帯を強調します。" },
     choices: { title: "お客様の選択", def: "「待つ／帰る」を選べる返答を受けたお客様が、どちらを選んだか。" },
     ratings: { title: "お客様の評価", def: "案内確認で終了したあと、お客様が3つの顔から1回だけ選んだ評価。自由記述は集めません。" },
+    bot: { title: "対応時間", def: "Ichido Bot が案件の終了時に経過記録から算出した時間の中央値。障害通知から担当決定・初回返答・終了まで、警備員は出動依頼から到着まで。" },
   },
+  bot: { records: "記録件数", claim: "担当まで", reply: "初回返答まで", guard: "警備員の到着まで", total: "終了まで", median: "中央値" },
 };
 
 // Hand-off record: read-only links for the bank, the police or the security company.
@@ -315,4 +318,48 @@ export const STAFF_JA = {
     done: "現地対応完了（カードの扱いは銀行所定の手続き）",
   } as Record<string, string>,
   fault: { card_retained: "取引後にカードが排出されない" } as Record<string, string>,
+};
+
+// Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.
+const secs = (s: number | undefined | null) => (s == null || Number.isNaN(s) ? "—" : s < 90 ? `${Math.round(s)}秒` : `${(s / 60).toFixed(1)}分`);
+export const BOT = {
+  name: "Ichido Bot",
+  note: "担当者の推奨、AI提案の事前準備、期限前の通知、対応記録の作成を自動で行います。担当の決定、返答の送信、出動依頼、案件の終了は担当者が行います。",
+  steps: {
+    route: "担当者の推奨", claim: "担当者の決定", prepare: "AI提案の事前準備",
+    remind_reply: "初回返答の事前通知", remind_guard: "警備員の出発確認", record: "対応記録の作成",
+  } as Record<string, string>,
+  order: ["route", "claim", "prepare", "remind_reply", "remind_guard", "record"],
+  status: { waiting: "待機中", done: "完了", skipped: "省略" } as Record<string, string>,
+  code: {
+    claimed: "担当者が既に決定しています", closed: "案件が終了したため不要です", no_operator: "オペレーターが登録されていません",
+    no_key: "AI提案は未設定です（GEMINI_API_KEY）", failed: "AI提案を取得できませんでした", replied: "期限前に返答が送信されました",
+    moved: "警備員が出発済みです", reminded: "通知しました",
+  } as Record<string, string>,
+  due: (t: string) => `${t} に通知予定`,
+  routed: (name: string) => `推奨担当：${name}`,
+  routedMe: "推奨担当はあなたです。担当する場合はボタンを押してください。",
+  escalated: "エスカレーション発生",
+  prepared: (code: string) => `AI提案を事前に準備しました（${code}）`,
+  remind: {
+    no_reply: (target: string) => `初回返答の目標時間（${target}）が近づいています`,
+    guard_late: (name: string, target: string) => `警備員（${name}）の出発連絡がまだありません（目標 ${target}）`,
+  },
+  toast: {
+    no_reply: (station: string) => `${station}：初回返答の目標時間が近づいています`,
+    guard_late: (station: string) => `${station}：警備員の出発連絡がまだありません`,
+  } as Record<string, (station: string) => string>,
+  fieldBanner: "監視センターが出発のご連絡をお待ちしています。出発される際は「向かっています」を押してください。",
+  closed: (d: { claim_s?: number; first_reply_s?: number; guard_arrival_s?: number; total_s?: number }) =>
+    `対応記録を作成しました（担当まで ${secs(d.claim_s)}・初回返答まで ${secs(d.first_reply_s)}・警備員到着まで ${secs(d.guard_arrival_s)}・合計 ${secs(d.total_s)}）`,
+  recordBy: "Ichido Bot が作成・要確認",
+  secs,
+  automation: {
+    title: "自動化",
+    lead: "対応中の案件ごとに Ichido Bot のワークフローが動いています。各案件の現在のステップを表示します。",
+    empty: "実行中のワークフローはありません。",
+    current: "現在のステップ",
+    finished: "全ステップ完了",
+    steps: "ステップ",
+  },
 };

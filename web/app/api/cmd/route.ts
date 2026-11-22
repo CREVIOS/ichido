@@ -8,6 +8,8 @@ import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
+import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
+import { saveSuggestion } from "@/lib/bot-steps";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -60,17 +62,20 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async simulate(a, b) {
     staff(a, "operator");
     if (!isFault(b.fault)) fail(400, "bad_request");
-    return { incident: await rpc("record_fault", { p_station: str(b, "station"), p_key: randomBytes(16).toString("hex"), p_source: "simulator", p_fault: b.fault }) };
+    const incident = await rpc<string>("record_fault", { p_station: str(b, "station"), p_key: randomBytes(16).toString("hex"), p_source: "simulator", p_fault: b.fault });
+    await startBot(incident);
+    return { incident };
   },
 
   // Gemini decision support for the operator who owns the case. Recorded on the timeline; never sent to the caller.
   async suggest(a, b) {
     const op = staff(a, "operator");
     const incident = str(b, "incident");
-    const { data: d } = await admin.from("desk").select("id").eq("id", incident).eq("operator_id", op.uid).is("finished_at", null).maybeSingle();
+    const { data: d } = await admin.from("desk").select("confirmed_rev").eq("id", incident).eq("operator_id", op.uid).is("finished_at", null).maybeSingle();
     if (!d) fail(409, "conflict");
     const s = await suggest(incident);
     if (!s) return { suggestion: null };
+    if (d!.confirmed_rev != null) await saveSuggestion(incident, d!.confirmed_rev, s);   // the console's AI card shows the latest
     await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, model: s.model });
     return { suggestion: s };
   },
@@ -283,6 +288,7 @@ export async function POST(req: Request): Promise<Response> {
     incident = actor.kind === "caller" ? actor.incident ?? undefined : typeof body.incident === "string" && UUID.test(body.incident) ? body.incident : undefined;
     session = typeof body.session === "string" && UUID.test(body.session) ? body.session : undefined;
     const out = await commands[name](actor, body);
+    if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
     return reply(200, out);
   } catch (e) {

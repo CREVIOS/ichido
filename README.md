@@ -16,6 +16,7 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 |---|---|---|
 | `/` | everyone | Overview and links |
 | `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
+| `/automation` | monitoring-centre operator | Every open case's Ichido Bot workflow and the step it is on |
 | `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
 | `/stations` | operator | Live map of stations (MapLibre + OpenFreeMap/OSM) with device-health pins, each Help Point's last heartbeat, signal, firmware and open cases, and a printable QR sticker per station |
 | `/h/[token]` | bank, police, security company | Read-only hand-off record (引継票) of one case: facts, decisions, timeline, after-call summary. Expires in 24 h, revocable, every view audited, never the caller's free text |
@@ -40,6 +41,7 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
 - **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
+- **Ichido Bot** (`web/workflows/case-bot.ts`, Workflow DevKit): one durable workflow per case, from the fault until it closes. It **routes** (recommends the operator with the fewest open cases, online ones first, as 推奨担当 on the timeline: the operator still claims), **prepares** (Gemini's suggestion is computed when the caller confirms, so the AI card opens instantly; もう一度提案 still refreshes it), **reminds** (a timeline event and console toast before the first-reply target; a banner on the guard's screen and a toast for the operator while a dispatched guard has not set off) and **records** (the after-call summary and the time to claim, first reply, guard arrival and close, counts only, also in insights). Commands wake the run; each wake re-reads the case. The bot never claims, replies, dispatches, closes or writes to a caller, and its steps (status, time) show in the case's Ichido Bot panel, live. See [docs/DEPLOY.md](docs/DEPLOY.md#ichido-bot-vercel-workflow).
 - **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers. Background voice cancellation (LiveKit Cloud) cleans the caller's audio; a multilingual turn detector ends Japanese, English and Indonesian turns, and Bengali and Vietnamese use VAD endpointing.
 - **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
@@ -63,6 +65,7 @@ claude   # .mcp.json in this repo points Claude Code at http://localhost:3123/ap
 | Voice out | ElevenLabs (`eleven_v4_turbo`) via LiveKit | Read aloud server-signed text only |
 | Free text → facts, teach-back → Japanese | OpenAI `gpt-6.1-terra` (Responses API, strict JSON) | Fill two facts; labelled machine translation for staff |
 | Operator decision support | Google Gemini (`gemini-4-hydrogen`) with function calling | Read the case through four tools and recommend one approved reply and a guard, with reasons, risks and a timed trace. Validated against the catalogue; recorded on the timeline; the operator decides |
+| Case orchestration | Ichido Bot (Vercel Workflow DevKit, no model of its own) | Recommend an operator, precompute the Gemini suggestion, remind before targets, write the after-call record. Never claims, replies, dispatches or closes |
 
 No model writes a message to the caller, and Gemini never sees the caller's words — only the facts they confirmed.
 
@@ -140,6 +143,8 @@ npm run test:fresh     # resets the local DB, then runs the journey, race, numbe
 ```
 
 The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.
+
+The Ichido Bot test (`tests/bot.test.mjs`) checks the routing suggestion, the prepared suggestion (or a recorded skip without `GEMINI_API_KEY`), both reminders, the record at close, and that the bot never claims, replies or dispatches. Its reminder checks need a short schedule on the server under test, e.g. `BOT_REMIND_AT=0.02 npm run dev` (reminders after 2% of each target); with the default they are skipped with a note.
 
 ```sh
 cd agent && uv run python -m unittest   # only server-signed speech, per-language STT/TTS, turn detector and noise-cancellation fallbacks

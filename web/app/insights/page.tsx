@@ -22,13 +22,13 @@ function Board({ me }: { me: Me }) {
   const [error, setError] = useState("");
   const [sel, setSel] = useState<MetricKey>("daily");
   const load = useCallback(async () => {
-    const [main, ratings, t] = await Promise.all([
-      sb().rpc("insights", { p_days: days }), sb().rpc("insights_ratings", { p_days: days }),
+    const [main, ratings, bot, t] = await Promise.all([
+      sb().rpc("insights", { p_days: days }), sb().rpc("insights_ratings", { p_days: days }), sb().rpc("insights_bot", { p_days: days }),
       sb().schema("ichido").from("sla_target").select("reason, seconds"),  // operators only; managers see no target line
     ]);
-    const error = main.error ?? ratings.error;
+    const error = main.error ?? ratings.error ?? bot.error;
     const targets = Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds]));
-    if (error) setError(staffError(error.message)); else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, targets }); }
+    if (error) setError(staffError(error.message)); else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, bot: bot.data, targets }); }
   }, [days]);
   useLive(["desk"], load);
   const m = METRICS[sel];

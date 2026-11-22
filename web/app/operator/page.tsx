@@ -9,6 +9,7 @@ import { AppShell, Dot, MoreMenu, Notice } from "@/components/kit";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CASES, DESK, DEVICE_FAULT, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
 import { CaseAlerts } from "./alerts";
+import { BotReminders } from "./bot";
 import { CaseView } from "./case";
 import { Peers, Queue, useClock, useQueueKeys } from "./queue";
 import type { Desk, OpenDesk, Run, Station, Targets } from "./types";
@@ -120,6 +121,7 @@ function Console({ me }: { me: Me }) {
         </DropdownMenu>}
         {watching.length > 0 && <span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:inline-flex"><Dot s="live" />{DESK.alsoViewing(watching.join("・"))}</span>}
         <CaseAlerts open={open} labels={label} />
+        <BotReminders open={open} labels={label} me={me.uid} />
         <MoreMenu label={DESK.manualFault} items={stations.map((s) => ({ label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) }))} />
       </>}
     >
