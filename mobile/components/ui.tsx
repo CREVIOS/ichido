@@ -6,9 +6,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { router } from "expo-router";
-import { ChevronLeft, ChevronRight, Ellipsis, type LucideIcon } from "lucide-react-native";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Ellipsis, Languages, type LucideIcon } from "lucide-react-native";
 import { color, control, dot, font, radius, shadow, space, tier, tint, type, type TintKey } from "@/theme";
-import { LANGS, LANG_NAME, MOBILE, type Lang } from "@content/catalogue";
+import { LANGS, LANG_NAME, MOBILE, UI, type Lang } from "@content/catalogue";
 import { BUBBLE, ICHI } from "@/components/mark";
 
 // Pick the face by script: Hind Siliguri for Bengali, Noto Sans Devanagari for Nepali, Noto Sans JP for Japanese,
@@ -320,11 +320,30 @@ export function Fact({ label, value, tone }: { label: string; value: ReactNode; 
   );
 }
 
+// One compact picker: the current language; tap to open the list, pick one, it closes. Names in their own script.
 export function LangPicker({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    // Six languages: two rows of three, in LANGS order.
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }} accessibilityRole="radiogroup">
-      {LANGS.map((l) => <Toggle key={l} on={l === lang} label={LANG_NAME[l]} onPress={() => onChange(l)} style={{ flexBasis: "31%", flexGrow: 1, paddingHorizontal: 6 }} />)}
+    <View style={{ alignSelf: "stretch" }}>
+      <Pressable accessibilityRole="button" accessibilityLabel={UI.language[lang]} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
+        style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 8, height: control.height, paddingHorizontal: space.md, borderRadius: radius.control,
+          backgroundColor: pressed ? color.press : color.surface, borderWidth: 1, borderColor: color.line })}>
+        <Languages size={16} strokeWidth={1.5} color={color.muted} />
+        <Text style={[type.body, { flex: 1, color: color.ink }]}>{LANG_NAME[lang]}</Text>
+        <ChevronDown size={16} strokeWidth={1.5} color={color.muted} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
+      </Pressable>
+      {open && (
+        <View accessibilityRole="radiogroup" style={{ marginTop: 6, borderRadius: radius.control, borderWidth: 1, borderColor: color.line, backgroundColor: color.surface, overflow: "hidden" }}>
+          {LANGS.map((l, i) => (
+            <Pressable key={l} accessibilityRole="radio" accessibilityState={{ checked: l === lang }} onPress={() => { onChange(l); setOpen(false); }}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", height: control.height, paddingHorizontal: space.md,
+                backgroundColor: pressed ? color.press : "transparent", borderTopWidth: i ? 1 : 0, borderTopColor: color.line })}>
+              <Text style={[type.body, { flex: 1, color: color.ink }]}>{LANG_NAME[l]}</Text>
+              {l === lang && <Check size={16} strokeWidth={1.5} color={color.ink} />}
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }

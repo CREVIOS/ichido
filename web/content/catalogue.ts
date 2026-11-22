@@ -197,6 +197,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "handoff": return `引継票を発行（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
     case "handoff_viewed": return `引継票が閲覧されました（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
     case "handoff_revoked": return `引継票を失効（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
+    case "lang_changed": return `お客様が言語を変更（${LANG_NAME[d.from as Lang] ?? d.from ?? "—"} → ${LANG_NAME[d.to as Lang] ?? d.to}）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     default: return kind;
@@ -234,6 +235,7 @@ const HANDSET_HINT: L10n = {
 };
 
 export const UI = {
+  language: { bn: "ভাষা", en: "Language", ja: "ことば", vi: "Ngôn ngữ", id: "Bahasa", ne: "भाषा" },
   aiNotice: {
     bn: "আমি একটি AI সহকারী। আপনার কথা জাপানি অপারেটরের কাছে পৌঁছে দেব। সিদ্ধান্ত নেবেন একজন মানুষ।",
     en: "I'm an AI assistant. I pass what you say to a Japanese operator. A person makes every decision.",

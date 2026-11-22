@@ -7,7 +7,7 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { hasVoice } from "@/lib/voice";
-import { Brand, Button, Card, Icon, Input, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
+import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { color, radius, shadow, space, tint } from "@/theme";
 import {
   FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
@@ -49,20 +49,15 @@ export default function CallerScreen() {
   useLive(["caller_card", "draft", "reply"], load);
 
   if (card === undefined) return null;
-  if (card === null) return (
-    <Screen back eyebrow={<Brand />}>
-      {/* The phone has no case yet, so no language: say it in every caller language. */}
-      {LANGS.map((l, i) => <T key={l} v={i === 0 ? "h1" : "body"}>{(staffSession ? STATION.staffSession : UI.notConnected)[l]}</T>)}
-      <Button kind="secondary" label={`${MOBILE.back.bn} · ${MOBILE.back.en}`} onPress={() => router.replace("/")} />
-    </Screen>
-  );
+  if (card === null) return <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
   const latest = replies.at(-1);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
 
   return (
-    <Screen eyebrow={<Brand />} right={<Tag value={LANG_NAME[lang]} />} onRefresh={load}>
+    <Screen eyebrow={<Brand />} onRefresh={load}>
+      <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => undefined); }} />
       <View style={{ gap: 6 }}>
         <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
         <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
@@ -234,5 +229,17 @@ function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onN
         })}
       </View>
     </View>
+  );
+}
+
+// No case yet: one message in one language, with the picker to change it.
+function NotConnected({ staff }: { staff: boolean }) {
+  const [lang, setLang] = useState<Lang>("bn");
+  return (
+    <Screen back eyebrow={<Brand />}>
+      <LangPicker lang={lang} onChange={setLang} />
+      <T v="h1">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</T>
+      <Button kind="secondary" label={MOBILE.back[lang]} onPress={() => router.replace("/")} />
+    </Screen>
   );
 }

@@ -4,7 +4,7 @@ import { FAULTS, MOBILE, SLA, isFault, type Fact, type Lang, type Status, STAFF_
 // Row shapes and formatting shared by the operator screens (same columns the web console reads).
 export type Desk = {
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
-  card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; clarifying: boolean;
+  card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
   remote_release: string | null; abandoned: boolean; created_at: string; finished_at: string | null;
 };
 

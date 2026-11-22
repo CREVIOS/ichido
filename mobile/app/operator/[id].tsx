@@ -160,6 +160,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           <Inset>
             <T v="small">{O.original(LANG_NAME[lang])}</T>
             <T v="h2" weight={400}>{d.caller_words ?? O.byChoice}</T>
+            {d.caller_words && lang !== "ja" && d.caller_words_ja && (
+              <View style={{ gap: 6 }}><Tag value={O.machineTranslation} /><T v="body" tone="ink">{d.caller_words_ja}</T></View>
+            )}
           </Inset>
           <Inset>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}><T v="small">{O.confirmed}</T><T v="small" mono>{O.rev(d.confirmed_rev)}</T></View>
