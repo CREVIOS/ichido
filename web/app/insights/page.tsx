@@ -22,8 +22,9 @@ function Board({ me }: { me: Me }) {
   const [error, setError] = useState("");
   const [sel, setSel] = useState<MetricKey>("daily");
   const load = useCallback(async () => {
-    const { data, error } = await sb().rpc("insights", { p_days: days });
-    if (error) setError(staffError(error.message)); else { setError(""); setData(data as Insights); }
+    const [main, ratings] = await Promise.all([sb().rpc("insights", { p_days: days }), sb().rpc("insights_ratings", { p_days: days })]);
+    const error = main.error ?? ratings.error;
+    if (error) setError(staffError(error.message)); else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {} }); }
   }, [days]);
   useLive(["desk"], load);
   const m = METRICS[sel];

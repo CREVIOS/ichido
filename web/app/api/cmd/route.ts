@@ -197,6 +197,13 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
+  async rate(a, b) {
+    const c = caller(a);
+    if (typeof b.rating !== "number" || !Number.isInteger(b.rating)) fail(400, "bad_request");
+    await rpc("cmd_rate", { p_uid: c.uid, p_rating: b.rating });
+    return {};
+  },
+
   // Field (security guard)
   async field(a, b) {
     const f = staff(a, "field");

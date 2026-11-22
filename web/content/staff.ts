@@ -10,14 +10,34 @@ export const STAFF = {
   noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
   signInLead: "スタッフ用アカウントでサインインしてください。アカウントは管理者が発行します。",
   menu: "メニュー",
+  palette: { title: "コマンド", hint: "検索・移動・操作", placeholder: "ページ・案件・操作を検索…", empty: "見つかりません", pages: "ページ", cases: "対応中の案件", actions: "操作", shortcut: "⌘K" },
+  keys: { next: "次の案件 (J)", prev: "前の案件 (K)", claim: "担当する (C)" },
   roleName: { operator: "オペレーター", field: "警備員", manager: "マネージャー" } as Record<string, string>,
 };
 
 // Staff navigation, per role.
 export const NAV = {
   operator: "監視センター",
+  stations: "ステーション",
   insights: "インサイト",
   field: "割当",
+};
+
+// Stations and their Help Point devices.
+export const STATIONS = {
+  title: "ステーション",
+  lead: "各ATMの Help Point の稼働状況。端末は60秒ごとに通信します。",
+  head: { station: "ATM", device: "Help Point", seen: "最終通信", signal: "電波", firmware: "ファームウェア", open: "対応中", sticker: "ステッカー" },
+  online: "稼働中",
+  stale: "応答なし",
+  never: "未接続",
+  ago: (s: number) => (s < 60 ? `${s}秒前` : s < 3600 ? `${Math.floor(s / 60)}分前` : `${Math.floor(s / 3600)}時間前`),
+  dbm: (n: number) => `${n} dBm`,
+  print: "印刷",
+  openSticker: "QRステッカー",
+  empty: "ステーションが登録されていません。docs/DEPLOY.md の手順で追加してください。",
+  // A device is online if it reported within this many seconds (heartbeat every 60 s).
+  onlineWithinS: 180,
 };
 
 // Errors staff can see, by the stable code the server returns.
@@ -31,6 +51,16 @@ export const STAFF_ERRORS: Record<string, string> = {
 };
 export const staffError = (code: string) => (Object.hasOwn(STAFF_ERRORS, code) ? STAFF_ERRORS[code] : STAFF_ERRORS.server);
 
+// Response-time targets for the queue. Amber at WARN of the target, red once it passes.
+export const SLA = {
+  claimS: 60,
+  firstReplyS: 180,
+  warn: 0.75,
+  label: { claim: "担当まで", reply: "初回返答まで" } as Record<string, string>,
+  late: (m: number) => `${m}分超過`,
+  left: (s: number) => `残り ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`,
+};
+
 // Operator console.
 export const DESK = {
   title: "監視センター",
@@ -38,6 +68,8 @@ export const DESK = {
   recent: "最近の案件",
   empty: "対応中の案件はありません。Help Point のボタンが押されるか、受話器での申告を手動で登録すると、ここに表示されます。",
   pickCase: "左の一覧から案件を選んでください。",
+  online: (n: number) => `ほかに ${n}人がオンライン`,
+  alsoViewing: (names: string) => `${names} も表示中`,
   manualFault: "障害を手動登録",
   manualFaultAt: (label: string) => `受話器での申告を登録：${label}`,
   minutesAgo: (n: number) => (n < 1 ? "たった今" : n < 60 ? `${n}分前` : `${Math.floor(n / 60)}時間前`),
@@ -171,5 +203,6 @@ export const INSIGHTS = {
     langs: { title: "言語", def: "多言語窓口でお客様が選んだ言語ごとの件数。多言語窓口を使わずに終わった案件も含みます。" },
     hours: { title: "時間帯", def: "障害通知の時刻（日本時間）を2時間ごとに集計。もっとも多い時間帯を強調します。" },
     choices: { title: "お客様の選択", def: "「待つ／帰る」を選べる返答を受けたお客様が、どちらを選んだか。" },
+    ratings: { title: "お客様の評価", def: "案内確認で終了したあと、お客様が3つの顔から1回だけ選んだ評価。自由記述は集めません。" },
   },
 };

@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Menu, MoreHorizontal, type LucideIcon } from "lucide-react";
+import { Menu, MoreHorizontal, Search, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Mark } from "@/components/mark";
+import { Palette, usePalette, type PaletteItem } from "@/components/palette";
 export { Mark } from "@/components/mark";
 import { STATUS, STAFF, type Lang, type Status } from "@/content/catalogue";
 
@@ -22,11 +23,16 @@ export function Logo({ className }: { className?: string }) {
   );
 }
 
-function SideNav({ nav, side, footer }: { nav: NavItem[]; side?: ReactNode; footer?: ReactNode }) {
+function SideNav({ nav, side, footer, onSearch }: { nav: NavItem[]; side?: ReactNode; footer?: ReactNode; onSearch: () => void }) {
   const path = usePathname();
   return (
     <div className="flex h-full flex-col gap-5 px-3 py-4">
-      <div className="px-2"><Logo /></div>
+      <div className="flex items-center justify-between pl-2">
+        <Logo />
+        <button type="button" onClick={onSearch} data-close className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground hover:bg-accent" aria-label={STAFF.palette.title}>
+          <Search className="size-3.5 stroke-[1.5]" /><span className="mono text-[11px]">{STAFF.palette.shortcut}</span>
+        </button>
+      </div>
       <nav className="flex flex-col gap-px" aria-label={STAFF.menu}>
         {nav.map((n) => (
           <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}
@@ -44,14 +50,16 @@ function SideNav({ nav, side, footer }: { nav: NavItem[]; side?: ReactNode; foot
 }
 
 // Staff app frame: a quiet sidebar on the canvas, the work on a white sheet beside it.
-export function AppShell({ nav, side, footer, title, crumb, actions, children }: {
-  nav: NavItem[]; side?: ReactNode; footer?: ReactNode; title: ReactNode; crumb?: ReactNode; actions?: ReactNode; children: ReactNode;
+export function AppShell({ nav, side, footer, title, crumb, actions, commands = [], children }: {
+  nav: NavItem[]; side?: ReactNode; footer?: ReactNode; title: ReactNode; crumb?: ReactNode; actions?: ReactNode; commands?: PaletteItem[]; children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const palette = usePalette();
   return (
     <div className="flex min-h-dvh">
+      <Palette nav={nav} items={commands} open={palette.open} onOpenChange={palette.setOpen} />
       <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 lg:block">
-        <SideNav nav={nav} side={side} footer={footer} />
+        <SideNav nav={nav} side={side} footer={footer} onSearch={() => palette.setOpen(true)} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col lg:py-2 lg:pr-2">
         <main className="flex min-h-0 flex-1 flex-col bg-card lg:rounded-xl lg:border" style={{ boxShadow: "0 1px 2px oklch(0 0 0 / 0.03)" }}>
@@ -62,7 +70,7 @@ export function AppShell({ nav, side, footer, title, crumb, actions, children }:
               </SheetTrigger>
               <SheetContent side="left" className="w-[280px] bg-background p-0" onClick={(e) => { if ((e.target as HTMLElement).closest("a,button[data-close]")) setOpen(false); }}>
                 <SheetTitle className="sr-only">{STAFF.menu}</SheetTitle>
-                <SideNav nav={nav} side={side} footer={footer} />
+                <SideNav nav={nav} side={side} footer={footer} onSearch={() => palette.setOpen(true)} />
               </SheetContent>
             </Sheet>
             {crumb && <span className="hidden text-[13px] text-muted-foreground sm:inline">{crumb}</span>}

@@ -119,6 +119,15 @@ export const CHOICE_INTENTS = Object.keys(REPLIES).filter((k) => REPLIES[k].offe
 
 export const ACTOR: Record<string, string> = { device: "機械", caller: "お客様", agent: "AI", operator: "担当者", field: "警備員", system: "システム" };
 
+// One-tap rating after a guided case closes: 1 = hard, 2 = okay, 3 = good. Faces only, no free text.
+export const RATINGS = [3, 2, 1] as const;
+export const RATING: Record<number, L10n> = {
+  3: { bn: "ভালো", en: "Good", ja: "よかった" },
+  2: { bn: "মোটামুটি", en: "Okay", ja: "ふつう" },
+  1: { bn: "কঠিন ছিল", en: "Hard", ja: "むずかしかった" },
+};
+const RATING_JA: Record<number, string> = { 3: "よかった", 2: "ふつう", 1: "むずかしかった" };
+
 // Timeline sentences for staff, rendered from event codes and data.
 export function eventText(kind: string, d: Record<string, string | undefined>): string {
   switch (kind) {
@@ -137,6 +146,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "teachback": return "お客様が次の手順を自分の言葉で説明";
     case "human": return "お客様が担当者との会話を希望";
     case "clarify": return "理解が不十分 → 再案内";
+    case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     default: return kind;
   }
@@ -202,6 +212,8 @@ export const UI = {
     en: "The operator has been told. To talk now, use the handset built into the ATM.",
     ja: "係の 人に つたえました。いま はなしたい ときは ATM の 受話器を つかって ください。",
   },
+  rateTitle: { bn: "আজকের সাহায্য কেমন ছিল?", en: "How was the help today?", ja: "きょうの たすけは どうでしたか？" },
+  rateThanks: { bn: "ধন্যবাদ। আপনার উত্তর সংরক্ষিত হয়েছে।", en: "Thank you. Your answer has been saved.", ja: "ありがとう ございました。" },
   showStaff: { bn: "জাপানি কর্মীকে দেখান", en: "Show to staff", ja: "係の 人に みせる" },
   caseNo: { bn: "কেস নম্বর", en: "Case", ja: "案件番号" },
   waiting: {

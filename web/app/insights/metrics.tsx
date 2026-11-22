@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Big, Dots, Funnel, Meter } from "@/components/kit";
 import { BLUE, GREEN, LineChart } from "@/components/charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, type Lang } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, RATING, RATINGS, type Lang } from "@/content/catalogue";
 
 export type Insights = {
   since: string;
@@ -13,6 +13,7 @@ export type Insights = {
   languages: Record<string, number>;
   median_first_reply_s: number | null;
   choices: Record<string, number>;
+  ratings: Record<string, number>;
 };
 
 const HOURS_PER_SLOT = 2;
@@ -94,6 +95,13 @@ export const METRICS = {
     detail: (d: Insights) => {
       const t = (d.choices.wait ?? 0) + (d.choices.leave ?? 0);
       return <Meters rows={Object.keys(DESK.choiceText).map((k) => ({ label: DESK.choiceText[k], value: d.choices[k] ?? 0, shown: `${pct(d.choices[k] ?? 0, t)}%` }))} />;
+    },
+  },
+  ratings: {
+    card: (d: Insights) => { const t = RATINGS.reduce((n, r) => n + (d.ratings[r] ?? 0), 0); return centre(t ? `${pct(d.ratings[3] ?? 0, t)}%` : "—", RATING[3].ja); },
+    detail: (d: Insights) => {
+      const t = RATINGS.reduce((n, r) => n + (d.ratings[r] ?? 0), 0);
+      return <Meters rows={RATINGS.map((r) => ({ label: RATING[r].ja, value: d.ratings[r] ?? 0, shown: `${INSIGHTS.count(d.ratings[r] ?? 0)} · ${pct(d.ratings[r] ?? 0, t)}%` }))} />;
     },
   },
 } satisfies Record<string, { card: (d: Insights) => ReactNode; detail: (d: Insights) => ReactNode }>;
