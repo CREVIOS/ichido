@@ -10,6 +10,8 @@ import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } fro
 import { requestLog, errorFields } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
+import { accessCommands } from "@/lib/access";
+import { disasterCommands } from "@/lib/disaster";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -271,6 +273,10 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     await rpc("cmd_field", { p_uid: f.uid, p_name: f.name, p_incident: str(b, "incident"), p_generation: b.generation, p_state: str(b, "state"), p_eta: eta });
     return {};
   },
+
+  // Text-only path and disaster mode (lib/access.ts, lib/disaster.ts).
+  ...accessCommands,
+  ...disasterCommands,
 };
 
 export async function POST(req: Request): Promise<Response> {

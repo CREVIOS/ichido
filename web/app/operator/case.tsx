@@ -6,11 +6,12 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACCESS_STAFF, ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
+import { DeviceCodeCard, TextOnlyBadge, TextOnlyBanner } from "./access";
 import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
 
 type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null };
@@ -61,6 +62,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   return (
     <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-8 p-5 lg:p-8">
+        {d.text_only && !closed && <TextOnlyBanner />}
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
@@ -94,7 +96,7 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
   if (!mine) return <Panel title={DESK.otherOperator}><p className="text-[14px]">{DESK.otherOperatorBody}</p></Panel>;
   return (
     <>
-      {!paired && <PairCard incident={d.id} />}
+      {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
       <Separator />
@@ -114,14 +116,14 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{isFault(d.fault) ? STAFF_JA.fault[d.fault] : DESK.unknownFault}</span>
-          {d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}
+          <span className="flex flex-wrap items-center gap-2">{d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}{d.text_only && <TextOnlyBadge />}</span>
         </div>
         <MoreMenu label={DESK.caseMenu} items={menu} />
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
         <Fact label={DESK.facts.atm} value={<span className="mono">{d.station}</span>} />
         <Fact label={DESK.facts.release} value={d.remote_release ? REMOTE_RELEASE[d.remote_release] : DESK.releaseNone} />
-        <Fact label={DESK.facts.source} value={DESK.source[d.source] ?? d.source} />
+        <Fact label={DESK.facts.source} value={DESK.source[d.source] ?? ACCESS_STAFF.source[d.source] ?? d.source} />
         <Fact label={DESK.facts.at} value={<span className="num">{hhmm(d.created_at)}</span>} />
         {d.lang && <Fact label={DESK.pair.title} value={LANG_NAME[d.lang]} />}
       </div>

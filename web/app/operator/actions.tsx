@@ -10,7 +10,7 @@ import { DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyOf, s
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
 
 // Seconds left on a single-use code, ticking once a second.
-function useCountdown(until: number | null) {
+export function useCountdown(until: number | null) {
   const [left, setLeft] = useState(0);
   useEffect(() => {
     if (!until) return;

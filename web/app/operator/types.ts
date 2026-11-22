@@ -4,7 +4,7 @@ export type Station = { id: string; label: L10n };
 export type Desk = {
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
-  remote_release: string | null; abandoned: boolean; created_at: string; finished_at: string | null;
+  remote_release: string | null; abandoned: boolean; text_only?: boolean; created_at: string; finished_at: string | null;
 };
 export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;

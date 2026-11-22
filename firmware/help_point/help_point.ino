@@ -10,6 +10,9 @@
 //           Device states: setup hold = white fast blink, setup portal open = magenta slow blink,
 //           firmware download = white steady.
 //           There is deliberately no green "collect your card" signal.
+// Display : optional SSD1306 OLED (HAS_DISPLAY in config.h). Polls with X-Display: 1 and shows the state in words,
+//           the guard's progress, and the 6-character pairing code only while the server offers one (the operator
+//           pressed 端末に表示; it disappears when the caller pairs, the code is replaced or its 5 minutes run out).
 // Heartbeat: every 60 s, POST /api/device/heartbeat with uptime, free heap, Wi-Fi RSSI, firmware version
 //           and the last fault-ack and poll round trips, so the desk can see the device is alive.
 // Setup   : hold the button for 8 s while powering on. The device opens a password-protected Wi-Fi setup
@@ -23,8 +26,10 @@
 // Wiring (classic ESP32 dev board; change the pins below for C3/S3 boards):
 //   button : GPIO14 -> button -> GND (internal pull-up)
 //   LED    : GPIO25 red, GPIO26 green, GPIO27 blue, each through 330 Ω; common cathode to GND.
+//   OLED   : SDA GPIO21, SCL GPIO22, VCC 3V3, GND (SSD1306 128x64, I2C address 0x3C). Optional.
 //
-// Libraries: WiFiManager by tzapu (arduino-cli lib install WiFiManager). Everything else ships with the core.
+// Libraries: WiFiManager by tzapu (MIT) and, with HAS_DISPLAY, U8g2 by olikraus (BSD-2-Clause):
+//   arduino-cli lib install WiFiManager U8g2. Everything else ships with the core.
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -38,8 +43,12 @@
 #include "mbedtls/sha256.h"
 #include "secrets.h"
 #include "config.h"
+#ifdef HAS_DISPLAY
+#include <Wire.h>
+#include <U8g2lib.h>
+#endif
 
-#define FW_VERSION "1.2.0"
+#define FW_VERSION "1.3.0"
 
 #ifndef PORTAL_PASSWORD
 #define PORTAL_PASSWORD ""
@@ -50,6 +59,7 @@
 
 const int PIN_BUTTON = 14;
 const int PIN_R = 25, PIN_G = 26, PIN_B = 27;
+const int PIN_SDA = 21, PIN_SCL = 22;
 
 const unsigned long DEBOUNCE_MS = 40;
 const unsigned long POLL_MS = 2000;
@@ -78,6 +88,42 @@ bool heartbeatSent = false;
 bool onProbation = false;                  // running a freshly installed image that has not proved itself yet
 bool otaChecked = false;
 unsigned long lastOtaMs = 0;
+String pairCode = "";                      // shown on the display while the server offers it
+unsigned long codeUntilMs = 0;
+String guardState = "";                    // requested | on_way | arrived | done, or empty
+
+#ifdef HAS_DISPLAY
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
+String shownKey = "";                      // what is on the screen now, so it is redrawn only on change
+
+// Up to three lines of text, or (with code set) the pairing code in large type.
+void drawScreen(const char *title, const String &l1, const String &l2 = "", const String &code = "") {
+  String key = String(title) + "|" + l1 + "|" + l2 + "|" + code;
+  if (key == shownKey) return;
+  shownKey = key;
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_6x12_tr);
+  oled.drawStr(0, 10, title);
+  oled.drawHLine(0, 13, 128);
+  if (code.length()) {
+    oled.setFont(u8g2_font_logisoso22_tr);
+    oled.drawStr((128 - oled.getStrWidth(code.c_str())) / 2, 44, code.c_str());
+    oled.setFont(u8g2_font_6x12_tr);
+    oled.drawStr(0, 62, l1.c_str());
+  } else {
+    oled.setFont(u8g2_font_helvR10_tr);
+    oled.drawStr(0, 34, l1.c_str());
+    oled.drawStr(0, 52, l2.c_str());
+  }
+  oled.sendBuffer();
+}
+#endif
+
+bool validCode(const String &c) {
+  if (c.length() != 6) return false;
+  for (char ch : c) if (!isupper(ch) && !isdigit(ch)) return false;
+  return true;
+}
 
 // The Arduino core marks a new image valid right at boot unless this returns true; we confirm it ourselves
 // after the first successful heartbeat (see heartbeat()).
@@ -164,6 +210,9 @@ void runSetupPortal() {
 
   String ap = "Ichido-" + stationId, pass = portalPassword();
   Serial.printf("setup portal: Wi-Fi \"%s\", password %s, open for %lu s\n", ap.c_str(), pass.c_str(), PORTAL_MS / 1000);
+#ifdef HAS_DISPLAY
+  drawScreen("Setup mode", "Wi-Fi:", ap);
+#endif
   wm.startConfigPortal(ap.c_str(), pass.c_str());
   unsigned long t0 = millis();
   while (!saved && millis() - t0 < PORTAL_MS) {
@@ -221,13 +270,36 @@ bool sendFault(const String &eventId) {
 void poll() {
   WiFiClientSecure tls; WiFiClient plain; HTTPClient http;
   if (!begin(http, tls, plain, "/api/device")) return;
+#ifdef HAS_DISPLAY
+  http.addHeader("X-Display", "1");
+#endif
   unsigned long t0 = millis();
   int code = http.GET();
   if (code == 200) {
     pollRttMs = millis() - t0;
     String body = http.getString();
     body.trim();
-    if (isKnownState(body)) { state = body; haveState = true; lastFreshMs = millis(); }
+    // First line: the state. With X-Display, then key=value lines: code=, ttl= (seconds left), guard=.
+    int nl = body.indexOf('\n');
+    String first = nl < 0 ? body : body.substring(0, nl);
+    first.trim();
+    if (isKnownState(first)) {
+      state = first; haveState = true; lastFreshMs = millis();
+      String c = "", g = "";
+      long ttl = 0;
+      while (nl >= 0) {
+        int next = body.indexOf('\n', nl + 1);
+        String line = body.substring(nl + 1, next < 0 ? body.length() : next);
+        line.trim();
+        if (line.startsWith("code=")) c = line.substring(5);
+        else if (line.startsWith("ttl=")) ttl = line.substring(4).toInt();
+        else if (line.startsWith("guard=")) g = line.substring(6);
+        nl = next;
+      }
+      pairCode = validCode(c) && ttl > 0 ? c : "";
+      codeUntilMs = millis() + (unsigned long)ttl * 1000;
+      guardState = g;
+    }
   }
   http.end();
 }
@@ -355,6 +427,9 @@ void checkFirmware() {
   }
   Serial.printf("firmware %s: downloading\n", version.c_str());
   setRgb(true, true, true);
+#ifdef HAS_DISPLAY
+  drawScreen("Help Point", "Updating", "firmware...");
+#endif
   if (!installImage(url, sha)) return;
   Serial.printf("firmware %s installed, restarting\n", version.c_str());
   delay(200);
@@ -368,9 +443,33 @@ bool runningOnProbation() {
 
 // ---------- status light and button ----------
 
+#ifdef HAS_DISPLAY
+// Words for the station state. The code is shown only while fresh and unexpired; never while offline.
+void showDisplay(bool stale) {
+  const char *title = "Ichido Help Point";
+  if (stale) return drawScreen(title, "Offline", "Reconnecting...");
+  long left = (long)(codeUntilMs - millis()) / 1000;
+  if (pairCode.length() && left > 0) {
+    char line[32];
+    snprintf(line, sizeof line, "Type on phone  %ld:%02ld", left / 60, left % 60);
+    return drawScreen("Your code", line, "", pairCode);
+  }
+  if (guardState == "on_way") return drawScreen(title, "Staff are on", "the way");
+  if (guardState == "arrived") return drawScreen(title, "Staff have", "arrived");
+  if (state == "field") return drawScreen(title, "Staff visit", "requested");
+  if (state == "received") return drawScreen(title, "Alert sent", "Operator notified");
+  if (state == "review") return drawScreen(title, "Operator is", "checking");
+  if (state == "guided") return drawScreen(title, "Guidance", "confirmed");
+  drawScreen(title, "Press the button", "for help");
+}
+#endif
+
 void showState() {
   unsigned long t = millis();
   bool stale = !haveState || WiFi.status() != WL_CONNECTED || t - lastFreshMs > STALE_MS;
+#ifdef HAS_DISPLAY
+  showDisplay(stale);
+#endif
   bool fast = (t / 250) % 2, slow = (t / 900) % 2;
   if (stale) return setRgb(fast, false, false);
   if (state == "received") return setRgb(true, true, false);
@@ -408,6 +507,11 @@ void setup() {
   Serial.printf("Ichido Help Point firmware %s\n", FW_VERSION);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_R, OUTPUT); pinMode(PIN_G, OUTPUT); pinMode(PIN_B, OUTPUT);
+#ifdef HAS_DISPLAY
+  Wire.begin(PIN_SDA, PIN_SCL);
+  oled.begin();
+  drawScreen("Ichido Help Point", "Starting...", "firmware " FW_VERSION);
+#endif
   store.begin("helppoint", false);
   loadSettings();
   // Any reboot before the first heartbeat (including opening the portal) rolls a new image back.

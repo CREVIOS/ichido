@@ -20,7 +20,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { href: "/automation", label: NAV.automation, icon: Bot },
     { href: "/training", label: NAV.training, icon: GraduationCap },
   ],
-  manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }],
+  manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }, { href: "/stations", label: NAV.stations, icon: Router }],
   field: [{ href: "/field", label: NAV.field, icon: MapPin }],
 };
 export const navFor = (role: Role, counts: Partial<Record<string, number>> = {}) => NAV_BY_ROLE[role].map((n) => ({ ...n, count: counts[n.href] }));

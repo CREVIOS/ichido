@@ -202,7 +202,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
-    default: return kind;
+    default: return accessEventText(kind, d) ?? kind;
   }
 }
 
@@ -356,6 +356,8 @@ export * from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./mobile.ts";
+export * from "./access.ts";
+import { accessEventText } from "./access.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {
