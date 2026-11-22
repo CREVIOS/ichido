@@ -46,7 +46,7 @@ export default function CallerPage() {
     ]);
     setDraft(d.data as Draft); setReplies((r.data ?? []) as Reply[]); setStation(s.data as Station);
   }, []);
-  useLive(["caller_card", "draft", "reply"], load);
+  useLive(["caller_card", "draft", "reply"], load, true, { incident: card?.id });
 
   if (card === undefined) return null;
   if (card === null) return follow ? <FollowUp f={follow} prefs={prefs} onPrefs={setPrefs} /> : <NotConnected staff={staffSession} />;

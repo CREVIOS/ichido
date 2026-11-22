@@ -124,15 +124,17 @@ test("invite → email link sets the password (verifies the address) → forced 
   assert.ifError((await reader.rpc("insights", { p_days: 7 })).error);
   assert.equal((await ok(cmd({ token: minted }, "me"))).role, "operator");
 
-  // Realtime with the same token: an update to a row this operator may read arrives.
+  // Realtime with the same token: the private staff topic for a table this operator may read, and its broadcast.
+  // Local Realtime can take about 5 s to authorise a private join.
   const seen = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("no realtime event")), 15_000);
-    const ch = reader.channel(`auth-test-${stamp}`).on("postgres_changes", { event: "UPDATE", schema: "public", table: "light" }, () => {
+    const timer = setTimeout(() => reject(new Error("no realtime broadcast")), 20_000);
+    const ch = reader.channel("live:light", { config: { private: true } }).on("broadcast", { event: "change" }, () => {
       clearTimeout(timer); reader.removeChannel(ch); resolve();
     });
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED") await service.from("light").update({ updated_at: new Date().toISOString() }).eq("station", "TABLE-A");
-    });
+      else if (status !== "CLOSED") { clearTimeout(timer); reader.removeChannel(ch); reject(new Error(`realtime join: ${status}`)); }
+    }, 15_000);
   });
   await seen;
 

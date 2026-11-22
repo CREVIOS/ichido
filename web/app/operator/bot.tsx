@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Bot } from "lucide-react";
-import { sb } from "@/lib/supabase";
+import { listen } from "@/lib/live";
 import { Chip, Dot, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { BOT, DESK } from "@/content/catalogue";
@@ -59,16 +59,16 @@ export function BotReminders({ open, labels, me }: { open: Desk[] | null; labels
   const latest = useRef({ open, labels });
   useEffect(() => { latest.current = { open, labels }; });
   useEffect(() => {
-    const ch = sb().channel(`bot-remind-${Math.random().toString(36).slice(2)}`);
-    ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "case_event", filter: "kind=eq.bot_remind" }, (p) => {
-      const e = p.new as { id: number; incident: string; data: { reason?: string } };
-      const d = latest.current.open?.find((x) => x.id === e.incident);
-      const say = BOT.toast[e.data.reason ?? ""];
-      if (!d || d.operator_id !== me || !say) return;
-      toast.warning(say(latest.current.labels[d.station] ?? d.station), { id: `bot-${e.id}` });
+    return listen("live:feed", {
+      message: (event, p) => {
+        if (event !== "bot_remind") return;
+        const e = p as { id: number; incident: string; reason?: string };
+        const d = latest.current.open?.find((x) => x.id === e.incident);
+        const say = BOT.toast[e.reason ?? ""];
+        if (!d || d.operator_id !== me || !say) return;
+        toast.warning(say(latest.current.labels[d.station] ?? d.station), { id: `bot-${e.id}` });
+      },
     });
-    ch.subscribe();
-    return () => { sb().removeChannel(ch); };
   }, [me]);
   return null;
 }

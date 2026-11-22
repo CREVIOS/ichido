@@ -11,7 +11,7 @@ The Expo (React Native) app for every Ichido role: caller, operator, security gu
 | Guard | `/field` | own assignments, on the way with own estimate, arrived, done |
 | Insights | `/insights`, `/insights/[metric]` | operator, manager: the web's metric cards (daily cases, funnel, first reply, languages, hours, wait/leave, ratings); each opens its definition, a 7/14/30-day period and a chart |
 
-Every screen refetches on Realtime inserts/updates of the same tables as `web/lib/live.ts`, plus a 5-second poll and pull-to-refresh.
+Every screen refetches on the same Realtime Broadcast topics as `web/lib/live.ts` (a 30-second safety refresh while joined, 5-second polling if a channel drops) and on pull-to-refresh.
 
 ## Design and charts
 

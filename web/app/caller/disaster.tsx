@@ -22,7 +22,7 @@ export function DisasterNotice({ station, lang }: { station: string; lang: Lang 
     asked.current = stamp;
     setInfo(key ? await cmd<Info>("disaster_info").catch(() => null) : null);
   }, [station]);
-  useLive(["station"], load);
+  useLive(["station"], load, true, { station });
   const notice = info?.notice ? DISASTER_NOTICES[info.notice] : undefined;
   if (!info || !notice) return null;
   return (

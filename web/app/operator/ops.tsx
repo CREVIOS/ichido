@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ChevronRight, Siren, Timer } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
-import { useLive } from "@/lib/live";
+import { listen, useLive } from "@/lib/live";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
@@ -167,15 +167,15 @@ export function PromiseAlerts({ open, labels, me }: { open: Desk[] | null; label
   const latest = useRef({ open, labels });
   useEffect(() => { latest.current = { open, labels }; });
   useEffect(() => {
-    const ch = sb().channel(`promise-due-${Math.random().toString(36).slice(2)}`);
-    ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "case_event", filter: "kind=eq.promise_due" }, (p) => {
-      const e = p.new as { id: number; incident: string; data: { kind?: string } };
-      const d = latest.current.open?.find((x) => x.id === e.incident);
-      if (!d || d.operator_id !== me) return;
-      toast.warning(OPS.promise.toast(latest.current.labels[d.station] ?? d.station, e.data.kind ?? ""), { id: `promise-${e.id}` });
+    return listen("live:feed", {
+      message: (event, p) => {
+        if (event !== "promise_due") return;
+        const e = p as { id: number; incident: string; kind?: string };
+        const d = latest.current.open?.find((x) => x.id === e.incident);
+        if (!d || d.operator_id !== me) return;
+        toast.warning(OPS.promise.toast(latest.current.labels[d.station] ?? d.station, e.kind ?? ""), { id: `promise-${e.id}` });
+      },
     });
-    ch.subscribe();
-    return () => { sb().removeChannel(ch); };
   }, [me]);
   return null;
 }
