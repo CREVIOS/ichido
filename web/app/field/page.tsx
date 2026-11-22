@@ -12,6 +12,9 @@ import { DESK, ETA_OPTIONS, FAULTS, FIELD, FIELD_STATE, isFault, type FieldState
 
 type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
 const UNKNOWN_ETA = "";
+const STEPS = ["on_way", "arrived", "done"] as const;
+const NEXT: Partial<Record<FieldState, (typeof STEPS)[number]>> = { requested: "on_way", on_way: "arrived", arrived: "done" };
+const LABEL: Record<(typeof STEPS)[number], string> = { on_way: FIELD.onWay, arrived: FIELD.arrived, done: FIELD.done };
 
 export default function FieldPage() {
   return <StaffGate allow={["field"]} title={FIELD.title}>{(me) => <Jobs me={me} />}</StaffGate>;
@@ -59,17 +62,19 @@ function JobCard({ j, label }: { j: Job; label: string }) {
         <span className="text-[14px]">{isFault(j.fault) ? FAULTS[j.fault].ja : DESK.unknownFault}</span>
       </div>
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
-      <div className="flex flex-col gap-1.5 border-t pt-4">
-        <Label>{FIELD.etaLabel}</Label>
-        <Select value={eta} onValueChange={(v) => setEta(String(v ?? UNKNOWN_ETA))}>
-          <SelectTrigger className="h-10 w-full bg-card"><SelectValue>{(v: string) => (v ? FIELD.etaOption(v) : FIELD.etaUnknown)}</SelectValue></SelectTrigger>
-          <SelectContent>{ETA_OPTIONS.map((v) => <SelectItem key={v || "unknown"} value={v}>{v ? FIELD.etaOption(v) : FIELD.etaUnknown}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <Button size="lg" className="h-11" onClick={() => act("on_way")}>{FIELD.onWay}</Button>
+      {(j.state === "requested" || j.state === "on_way") && (
+        <div className="flex flex-col gap-1.5 border-t pt-4">
+          <Label>{FIELD.etaLabel}</Label>
+          <Select value={eta} onValueChange={(v) => setEta(String(v ?? UNKNOWN_ETA))}>
+            <SelectTrigger className="h-10 w-full bg-card"><SelectValue>{(v: string) => (v ? FIELD.etaOption(v) : FIELD.etaUnknown)}</SelectValue></SelectTrigger>
+            <SelectContent>{ETA_OPTIONS.map((v) => <SelectItem key={v || "unknown"} value={v}>{v ? FIELD.etaOption(v) : FIELD.etaUnknown}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      )}
+      {/* The next step is the big button; the others stay one tap away (re-sending "on the way" updates the estimate). */}
+      <Button size="lg" className="h-11" onClick={() => act(NEXT[j.state] ?? "done")}>{LABEL[NEXT[j.state] ?? "done"]}</Button>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" className="h-10" onClick={() => act("arrived")}>{FIELD.arrived}</Button>
-        <Button variant="secondary" className="h-10" onClick={() => act("done")}>{FIELD.done}</Button>
+        {STEPS.filter((x) => x !== (NEXT[j.state] ?? "done")).map((x) => <Button key={x} variant="secondary" className="h-10" onClick={() => act(x)}>{LABEL[x]}</Button>)}
       </div>
       <p className="text-[12px] leading-5 text-muted-foreground">{FIELD.note}</p>
     </section>
