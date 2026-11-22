@@ -17,10 +17,10 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | `/` | everyone | Overview and links |
 | `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
 | `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
-| `/stations` | operator | Live map of stations (MapLibre + OpenFreeMap/OSM) with device-health pins, each Help Point's last heartbeat, signal, firmware and open cases, and a printable QR sticker per station |
+| `/stations` | operator, manager | Live map of stations (MapLibre + OpenFreeMap/OSM) with device-health pins (offline and never-connected Help Points greyed, mobile branches marked), each Help Point's last heartbeat, signal, firmware and open cases, a printable QR sticker per station, and **disaster / outage mode**: pick stations on the map or in the list, pick one of the bank's approved emergency notices (非常取扱い), set or clear, with a station timeline of every change |
 | `/h/[token]` | bank, police, security company | Read-only hand-off record (引継票) of one case: facts, decisions, timeline, after-call summary. Expires in 24 h, revocable, every view audited, never the caller's free text |
-| `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code |
-| `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close |
+| `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code, and **聞こえない・話せない** ("I can't hear / I can't speak"): a silent, rate-limited alert with no personal data that opens the station's case flagged 文字対応, so the operator shows the code on the Help Point display instead of saying it |
+| `/caller` | caller | AI notice, voice or typed intake (typed only for a 文字対応 case: no voice, no handset hints), read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close; while the station is in a disaster area, the bank's approved notice and the nearest working Help Points and mobile branches |
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
 | `/insights` | operator, manager | Metric cards with definitions and Recharts charts: daily cases vs guided, funnel with conversion, time to first reply against the target, languages, busiest hours, wait/leave, ratings — counts only |
 | `/training` | operator | AI応対トレーニング: practise against a simulated caller (OpenAI, or a scripted fallback offline) in Bengali, English or Japanese with the console's own reply and dispatch cards, then a scorecard (first-reply time, reply choice, held-card rule, guard decision, numbers withheld, request for a person) with a veteran's tip and a score trend. Isolated tables: never touches the desk, guards, pairing, Gemini or insights |
@@ -41,7 +41,7 @@ LiveKit room ◀── agent/app.py (Soniox STT, ElevenLabs TTS; no conversation
 - **Next.js 16** app (`web/`), one route per role. All writes go through `/api/cmd`, which derives the actor from the bearer token and never trusts role or case ids in the body.
 - **Supabase**: Postgres with row-level security on every table, Auth (staff accounts, anonymous callers), Realtime (inserts and updates only). Every state change is a SQL function (`supabase/migrations/*_commands.sql`) that checks its preconditions in the same transaction, so two operators cannot both claim a case and a replaced guard cannot update a job. `insights()` returns counts only.
 - **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers. Background voice cancellation (LiveKit Cloud) cleans the caller's audio; a multilingual turn detector ends Japanese, English and Indonesian turns, and Bengali and Vietnamese use VAD endpointing.
-- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
+- **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, an optional SSD1306 OLED (`HAS_DISPLAY`) that shows the state in words and the pairing code only while the operator has pressed 端末に表示, a heartbeat every 60 s (`public.device_health`), a Wi-Fi setup portal (hold the button 8 s at power-on), and signed over-the-air updates that roll back automatically if the new image never reaches the server.
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
 - **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Bengali, Vietnamese, Indonesian, Nepali, English and Japanese (staff screens Japanese only). `L10n` makes TypeScript refuse a caller string missing any language. The database holds codes and data only.
@@ -65,6 +65,20 @@ claude   # .mcp.json in this repo points Claude Code at http://localhost:3123/ap
 | Operator decision support | Google Gemini (`gemini-4-hydrogen`) with function calling | Read the case through four tools and recommend one approved reply and a guard, with reasons, risks and a timed trace. Validated against the catalogue; recorded on the timeline; the operator decides |
 
 No model writes a message to the caller, and Gemini never sees the caller's words — only the facts they confirmed.
+
+## Two gaps from real cases
+
+- **A path with no voice.** Pairing used to depend on hearing the code over the ATM handset, so a deaf or
+  speech-impaired caller could never connect. They press 聞こえない・話せない on the sticker page; the case
+  appears in the queue flagged 文字対応; the operator presses 端末に表示 and the code appears on the Help Point's
+  display (served on the device's own authenticated status poll, gone when used, replaced, expired or closed).
+  The case then continues by text only.
+- **Disaster / outage mode** (earthquakes, typhoons, store ATM closures). A manager or operator marks the stations
+  in a disaster area with one of the bank's approved notices. Callers paired there see that notice in their
+  language and the nearest working Help Points, computed from station coordinates and device heartbeats
+  (stations in the area and offline devices are left out; stations with `kind = 'mobile_branch'` are listed as
+  mobile branches). Entering and leaving are recorded on a station timeline, on any open case's timeline and in
+  the logs (`disaster_entered` / `disaster_left`).
 
 ## Rules the product keeps
 
@@ -123,7 +137,7 @@ See `mobile/README.md` for env vars, deep links and checks.
 **Device:** copy `firmware/help_point/secrets.example.h` to `secrets.h`, fill it in, then
 
 ```sh
-arduino-cli lib install WiFiManager     # setup portal (tzapu, MIT)
+arduino-cli lib install WiFiManager U8g2   # setup portal (tzapu, MIT); OLED display (olikraus, BSD-2-Clause)
 arduino-cli compile --fqbn esp32:esp32:esp32 firmware/help_point
 arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 ```
@@ -136,7 +150,7 @@ reflashing, hold the button for 8 s while powering on and use the setup portal. 
 
 ```sh
 cd web
-npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health, device-heartbeat and firmware-manifest tests
+npm run test:fresh     # resets the local DB, then runs the journey, race, number-withholding, health, device-heartbeat, firmware-manifest, text-only (access) and disaster tests
 ```
 
 The journey test signs in as an operator, two guards and two anonymous callers and drives the whole case: duplicate device events open one case, pairing codes are single-use, callers and guards see only their own rows, staff never read drafts, numbers (digits or words) are withheld, stale revisions cannot be confirmed, callers cannot act out of order, only catalogue replies can be sent, a replaced guard is locked out, and insights are refused to callers and guards. The race tests cover simultaneous claims, simultaneous edits, the held-card rule, caller reset and pairing rate limits.

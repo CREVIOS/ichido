@@ -7,10 +7,11 @@ import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ANSWER, FACTS, FACT_KEYS, STATUS, UI, errorText, type Fact, type Lang } from "@/content/catalogue";
+import { ACCESS, ANSWER, FACTS, FACT_KEYS, STATUS, UI, errorText, type Fact, type Lang } from "@/content/catalogue";
 import type { Draft } from "./types";
 
-export function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHuman: boolean }) {
+// textOnly: the caller cannot hear or speak, so no voice and no "use the handset" hints.
+export function Intake({ lang, draft, needsHuman, textOnly }: { lang: Lang; draft: Draft; needsHuman: boolean; textOnly: boolean }) {
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,7 +36,7 @@ export function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; 
         <h1 className="text-[24px] leading-snug">{UI.aiNotice[lang]}</h1>
         <Notice>{UI.neverAsk[lang]}</Notice>
       </div>
-      <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} />
+      {!textOnly && <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} />}
       <form className="surface flex flex-col gap-2 p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) send({ text }); }}>
         <label className="px-1 text-[13px] text-muted-foreground" htmlFor="what">{UI.whatHappened[lang]}</label>
         <Textarea id="what" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} className="min-h-20 resize-none border-0 bg-transparent px-1 text-[16px] shadow-none focus-visible:ring-0" />
@@ -45,7 +46,7 @@ export function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; 
       {draft.needs_clarification && <Notice tone="info">{UI.unsure[lang]}</Notice>}
       <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
       <Button size="lg" className="h-11" disabled={busy || !known.length} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
-      {needsHuman ? <Notice tone="info">{UI.humanAsked[lang]}</Notice>
+      {needsHuman ? <Notice tone="info">{(textOnly ? ACCESS.humanAsked : UI.humanAsked)[lang]}</Notice>
         : <Button variant="secondary" size="lg" onClick={() => cmd("human").catch(fail)}>{UI.human[lang]}</Button>}
     </>
   );
@@ -78,13 +79,13 @@ function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; b
 }
 
 const WAITING_HINT_MS = 30_000;
-export function Waiting({ lang }: { lang: Lang }) {
+export function Waiting({ lang, textOnly }: { lang: Lang; textOnly: boolean }) {
   const [late, setLate] = useState(false);
   useEffect(() => { const t = setTimeout(() => setLate(true), WAITING_HINT_MS); return () => clearTimeout(t); }, []);
   return (
     <section className="surface flex flex-col gap-2 p-5">
       <span className="flex items-center gap-2 text-[18px] text-foreground"><span className="size-2 animate-pulse rounded-full bg-info" aria-hidden />{STATUS.review[lang]}</span>
-      {late && <p className="text-[14px] leading-6">{UI.waiting[lang]}</p>}
+      {late && <p className="text-[14px] leading-6">{(textOnly ? ACCESS.waiting : UI.waiting)[lang]}</p>}
     </section>
   );
 }

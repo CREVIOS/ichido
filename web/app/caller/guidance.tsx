@@ -36,7 +36,7 @@ export function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCase; 
       <div className="flex flex-col gap-3">
         <span className="text-[13px] text-muted-foreground">{UI.approved[lang]}</span>
         <p className="text-[22px] leading-[1.45] tracking-[-0.01em] text-foreground">{text}</p>
-        {hasVoice && <Button variant="secondary" className="self-start" onClick={speak}><Volume2 className="stroke-[1.5]" />{UI.listen[lang]}</Button>}
+        {hasVoice && !card.text_only && <Button variant="secondary" className="self-start" onClick={speak}><Volume2 className="stroke-[1.5]" />{UI.listen[lang]}</Button>}
       </div>
       {note && <Notice tone="warn">{note}</Notice>}
       {card.field_state !== "none" && (

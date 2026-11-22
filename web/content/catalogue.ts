@@ -200,7 +200,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "lang_changed": return `お客様が言語を変更（${LANG_NAME[d.from as Lang] ?? d.from ?? "—"} → ${LANG_NAME[d.to as Lang] ?? d.to}）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
-    default: return kind;
+    default: return accessEventText(kind, d) ?? kind;
   }
 }
 
@@ -355,6 +355,8 @@ import { HANDOFF, STAFF_JA } from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./mobile.ts";
+export * from "./access.ts";
+import { accessEventText } from "./access.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {

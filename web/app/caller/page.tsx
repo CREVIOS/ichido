@@ -3,11 +3,12 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Phone } from "@/components/phone";
-import { StatusLabel } from "@/components/kit";
+import { Notice, StatusLabel } from "@/components/kit";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { FAULTS, STATION, UI, pick, type Lang } from "@/content/catalogue";
+import { ACCESS, FAULTS, STATION, UI, pick, type Lang } from "@/content/catalogue";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
+import { DisasterNotice } from "./disaster";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
 const noop = () => () => {};
@@ -50,8 +51,10 @@ export default function CallerPage() {
         <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>
         <StatusLabel status={card.status} lang={lang} />
       </div>
-      {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
-      {confirmed && !latest && <Waiting lang={lang} />}
+      {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
+      <DisasterNotice station={card.station} lang={lang} />
+      {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} textOnly={card.text_only} />}
+      {confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} />}
       {latest && <Guidance lang={lang} card={card} reply={latest} />}
       <ShowStaff card={card} lang={lang} />
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]}</p>

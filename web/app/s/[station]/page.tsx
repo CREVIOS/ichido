@@ -1,14 +1,14 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
-import { ShieldCheck } from "lucide-react";
+import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { STATION, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
 const noop = () => () => {};
@@ -29,6 +29,8 @@ function StationForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [staffSession, setStaffSession] = useState(false);
+  // Pressed "I can't hear / I can't speak": the code will appear on the Help Point screen, not be spoken.
+  const [silent, setSilent] = useState(false);
 
   // A phone already paired goes straight to its case; a staff session must not be reused for a caller.
   useEffect(() => {
@@ -38,8 +40,7 @@ function StationForm() {
     }).catch(() => setStaffSession(false));
   }, [router]);
 
-  async function connect(e: React.FormEvent) {
-    e.preventDefault();
+  async function withSession(run: () => Promise<void>) {
     setBusy(true); setError("");
     try {
       const { data } = await sb().auth.getSession();
@@ -47,14 +48,18 @@ function StationForm() {
         const { error } = await sb().auth.signInAnonymously();
         if (error) throw new Error("server");
       }
-      await cmd("pair", { station, code, lang });
-      router.push("/caller");
+      await run();
     } catch (err) {
       setError(errorText((err as Error).message, lang));
     } finally {
       setBusy(false);
     }
   }
+  const connect = (e: React.FormEvent) => {
+    e.preventDefault();
+    return withSession(async () => { await cmd("pair", { station, code, lang }); router.push("/caller"); });
+  };
+  const alertSilently = () => withSession(async () => { await cmd("silent_alert", { station }); setSilent(true); });
 
   return (
     <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
@@ -68,13 +73,19 @@ function StationForm() {
       ) : (
         <form className="flex flex-col gap-4" onSubmit={connect}>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="code">{STATION.code[lang]}</Label>
+            <Label htmlFor="code">{(silent ? ACCESS.screenCode : STATION.code)[lang]}</Label>
             <input id="code" type="text" inputMode="text" autoCapitalize="characters" autoComplete="one-time-code" value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={CODE_LENGTH} required
               className="h-16 w-full rounded-xl border bg-card text-center font-mono text-[32px] tracking-[0.3em] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40" />
           </div>
           {error && <Notice tone="warn">{error}</Notice>}
           <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
+          {silent ? <Notice tone="info">{ACCESS.alertSent[lang]}</Notice> : (
+            <div className="flex flex-col gap-2">
+              <Button type="button" variant="secondary" size="lg" className="h-11" disabled={busy} onClick={alertSilently}><EarOff className="stroke-[1.5]" />{ACCESS.cantHear[lang]}</Button>
+              <p className="text-[13px] leading-5">{ACCESS.cantHearHint[lang]}</p>
+            </div>
+          )}
         </form>
       )}
       <p className="flex gap-2 text-[13px] leading-5"><ShieldCheck className="mt-0.5 size-4 shrink-0 stroke-[1.5]" />{STATION.why[lang]}</p>
