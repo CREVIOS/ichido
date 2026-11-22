@@ -13,6 +13,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
       SUPABASE_SECRET_KEY: placeholder
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      BETTER_AUTH_SECRET: ci-build-only-not-a-secret-0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      SUPABASE_JWT_SECRET: ci-build-only-not-a-secret-0123456789abcdef
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -29,6 +33,10 @@ jobs:
   supabase:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      mailpit:
+        image: axllent/mailpit:v1.27
+        ports: ['1025:1025', '8025:8025']
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -46,9 +54,17 @@ jobs:
           supabase status -o json | jq -er '
             "NEXT_PUBLIC_SUPABASE_URL=" + .API_URL,
             "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=" + .PUBLISHABLE_KEY,
-            "SUPABASE_SECRET_KEY=" + .SECRET_KEY' > web/.env.local
+            "SUPABASE_SECRET_KEY=" + .SECRET_KEY,
+            "DATABASE_URL=" + .DB_URL,
+            "SUPABASE_JWT_SECRET=" + .JWT_SECRET' > web/.env.local
+          echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> web/.env.local
+          echo 'BETTER_AUTH_URL=http://localhost:3127' >> web/.env.local
+          echo 'MAIL_FROM=Ichido <no-reply@example.jp>' >> web/.env.local
+          echo 'MAILPIT_URL=http://127.0.0.1:8025' >> web/.env.local
           echo 'DEVICE_SECRETS_JSON={"TABLE-A":"local-device-secret"}' >> web/.env.local
       - run: npm ci
+        working-directory: web
+      - run: npm run seed:staff
         working-directory: web
       - name: Run web integration tests
         working-directory: web
