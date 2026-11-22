@@ -8,7 +8,7 @@ export const PACK_DESK = {
   tapsConfirmed: "お客様が確認した申告（選択肢）",
   responder: (r: string) => `${r}へ依頼`,
   dispatchBody: (r: string) => `${r}へ現地対応を依頼します。AIは診断・法律・在留資格の助言を行いません。`,
-  noRecipients: "この種別には引継先がありません。",
+  fieldNote: (r: string) => `${r}として対応します。本人確認や在留カード・保険証・マイナンバーの番号はこの画面では扱いません。診断や法律・在留資格の助言は担当の専門職が行います。`,
   insights: {
     title: "種別ごとの案件",
     def: "ステーションの種別（ATM・病院・市役所・駅・避難所）ごとの受付件数と、案内確認まで到達した件数。件数のみ。",

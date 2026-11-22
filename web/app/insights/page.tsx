@@ -22,14 +22,14 @@ function Board({ me }: { me: Me }) {
   const [error, setError] = useState("");
   const [sel, setSel] = useState<MetricKey>("daily");
   const load = useCallback(async () => {
-    const [main, ratings, bot, t, ops] = await Promise.all([
+    const [main, ratings, bot, t, ops, packs] = await Promise.all([
       sb().rpc("insights", { p_days: days }), sb().rpc("insights_ratings", { p_days: days }), sb().rpc("insights_bot", { p_days: days }),
       sb().schema("ichido").from("sla_target").select("reason, seconds"),  // operators only; managers see no target line
-      sb().rpc("insights_ops", { p_days: days }),
+      sb().rpc("insights_ops", { p_days: days }), sb().rpc("insights_packs", { p_days: days }),
     ]);
-    const error = main.error ?? ratings.error ?? bot.error ?? ops.error;
+    const error = main.error ?? ratings.error ?? bot.error ?? ops.error ?? packs.error;
     const targets = Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds]));
-    if (error) setError(staffError(error.message)); else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, bot: bot.data, targets, ops: ops.data }); }
+    if (error) setError(staffError(error.message)); else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, bot: bot.data, targets, ops: ops.data, packs: packs.data ?? {} }); }
   }, [days]);
   useLive(["desk"], load);
   const m = METRICS[sel];

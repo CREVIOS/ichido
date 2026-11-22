@@ -6,6 +6,7 @@ import { People } from "@/components/people";
 import { MeasurePreview } from "@/components/measure-preview";
 import { Footer, Section, TopNav, dark, light } from "@/components/site";
 import { HOME } from "@/content/catalogue";
+import { Beyond } from "@/components/beyond";
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
       <How />
       <PeopleSection />
       <Measure />
+      <Beyond />
       <Screens />
       <Rules />
       <Cta />

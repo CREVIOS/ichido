@@ -3,7 +3,7 @@
 // Bengali, Vietnamese, Indonesian, Nepali and Japanese below are drafts awaiting native review (see README).
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
-import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, faultEventText } from "./faults.ts";
+import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
 import { PACKS, contentPack, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
@@ -46,6 +46,8 @@ export const DEVICE_FAULT = "card_retained";
 export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
 // A pack's situations (fault codes), in catalogue order; the ATM's are every code no other pack owns.
 export const situationsOf = (pack: PackId) => Object.keys(FAULTS).filter((f) => packOfFault(f) === pack);
+// A pack's approved replies, in catalogue order (the rule names the pack; the ATM's default).
+export const intentsOf = (pack: PackId) => Object.keys(REPLIES).filter((k) => (REPLY_RULES[k]?.pack ?? "atm") === pack);
 
 export const REMOTE_RELEASE: Record<string, string> = { failed: "失敗", released: "成功" };
 

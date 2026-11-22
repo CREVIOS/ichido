@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, Fingerprint, Languages, Link2, MessageSquareQuote, ScrollText, SlidersHorizontal } from "lucide-react";
 import { AccessFragment, BotFragment, CatalogueFragment, EnterpriseHero, FIELD, RuleFragment, TargetsFragment } from "@/components/enterprise-preview";
 import { McpTabs } from "@/components/mcp-tabs";
+import { Beyond } from "@/components/beyond";
 import { Faq, Footer, Section, TopNav, dark, light } from "@/components/site";
 import { cn } from "@/lib/utils";
 import { CONTACT, ENTERPRISE } from "@/content/catalogue";
@@ -21,6 +22,7 @@ export default function Enterprise() {
       <Yours />
       <Specs />
       <Open />
+      <Beyond />
       <Rollout />
       <Cta />
       <Questions />

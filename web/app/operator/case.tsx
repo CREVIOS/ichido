@@ -6,13 +6,13 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACCESS_STAFF, ACTOR, BOT, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACCESS_STAFF, ACTOR, BOT, CALLER_FLAGS, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, PACKS, PACK_DESK, REMOTE_RELEASE, eventText, isFault, packOfFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { Pill } from "@/components/charts";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
-import { BankStatusCard, CallerFlags, FaultCard } from "./faults";
+import { BankStatusCard, CallerFlags, FaultCard, UrgentBanner } from "./faults";
 import { DeviceCodeCard, TextOnlyBadge, TextOnlyBanner } from "./access";
 import { FraudCard, PromiseCard, TakeoverPanel, abusive, opsTags, useAbuseKey, useCompany } from "./ops";
 import { hhmm, when, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
@@ -64,22 +64,24 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const lang: Lang = d.lang ?? "bn";
   const paired = isPaired(events);
   const company = useCompany(d.station);
+  const atm = packOfFault(d.fault) === "atm";
   useAbuseKey(d, mine && !closed, run);
 
   return (
     <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-8 p-5 lg:p-8">
         {d.text_only && !closed && <TextOnlyBanner />}
+        {!closed && <UrgentBanner flags={card?.flags ?? []} />}
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
-        <Timeline events={events} />
-        {d.operator_id && <HandoffPanel incident={d.id} />}
-        {d.operator_id && <BankStatusCard incident={d.id} card={card} run={run} />}
+        <Timeline events={events} fault={d.fault} />
+        {d.operator_id && <HandoffPanel incident={d.id} fault={d.fault} />}
+        {d.operator_id && atm && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
-            <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
+            <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null, fault: d.fault, flags: card?.flags })}</p>
             {bot.approval?.note && <p className="inset px-3 py-2 text-[13px] leading-5"><span className="label mr-2">{REVIEW.record.staffNote}</span>{bot.approval.note}</p>}
           </Panel>
         )}
@@ -120,8 +122,10 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
 }
 
 function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: boolean; run: Run }) {
+  const pack = packOfFault(d.fault);
+  const atm = pack === "atm";
   const menu = !closed && mine ? [
-    ...(!d.remote_release ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
+    ...(!d.remote_release && atm ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
     { label: DESK.resetCaller, onClick: () => run("reset_caller", { incident: d.id }) },
     { label: OPS.abusive.mark, onClick: () => abusive(d.id, run), disabled: Boolean(d.abusive_at) },
     { label: DESK.abandon, onClick: () => run("abandon", { incident: d.id }), danger: true },
@@ -136,8 +140,8 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
         <MoreMenu label={DESK.caseMenu} items={menu} />
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
-        <Fact label={DESK.facts.atm} value={<span className="mono">{d.station}</span>} />
-        <Fact label={DESK.facts.release} value={d.remote_release ? REMOTE_RELEASE[d.remote_release] : DESK.releaseNone} />
+        <Fact label={PACKS[pack].place} value={<span className="mono">{d.station}</span>} />
+        {atm ? <Fact label={DESK.facts.release} value={d.remote_release ? REMOTE_RELEASE[d.remote_release] : DESK.releaseNone} /> : <Fact label={PACK_DESK.pack} value={PACKS[pack].name.staff} />}
         <Fact label={DESK.facts.source} value={DESK.source[d.source] ?? ACCESS_STAFF.source[d.source] ?? d.source} />
         <Fact label={DESK.facts.at} value={<span className="num">{hhmm(d.created_at)}</span>} />
         {d.lang && <Fact label={DESK.pair.title} value={LANG_NAME[d.lang]} />}
@@ -162,8 +166,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </div>
           <div className="surface flex flex-col gap-2 p-4">
             <span className="flex justify-between"><span className="label">{DESK.confirmed}</span><span className="label num">{DESK.rev(d.confirmed_rev)}</span></span>
-            <span className="text-[15px] text-foreground">{FACT_STAFF.card_back[d.card_back]}</span>
-            <span className="text-[15px] text-foreground">{FACT_STAFF.cash_received[d.cash_received]}</span>
+            {packOfFault(d.fault) === "atm" ? <><span className="text-[15px] text-foreground">{FACT_STAFF.card_back[d.card_back]}</span>
+            <span className="text-[15px] text-foreground">{FACT_STAFF.cash_received[d.cash_received]}</span></>
+              : (card?.flags ?? []).map((f) => <span key={f} className="text-[15px] text-foreground">{CALLER_FLAGS[f]?.staff ?? f}</span>)}
           </div>
         </div>
       )}
@@ -194,7 +199,7 @@ function TeachBack({ card, lang, canJudge, onJudge }: { card: CallerCard; lang: 
   );
 }
 
-function Timeline({ events }: { events: CaseEvent[] }) {
+function Timeline({ events, fault }: { events: CaseEvent[]; fault: string }) {
   return (
     <Panel title={DESK.timeline}>
       <ol className="relative flex flex-col">
@@ -202,7 +207,7 @@ function Timeline({ events }: { events: CaseEvent[] }) {
           <li key={e.id} className="grid grid-cols-[44px_14px_minmax(0,1fr)] items-baseline gap-x-2 py-1.5">
             <span className="mono text-muted-foreground">{hhmm(e.at)}</span>
             <span className="relative top-[-1px] size-1.5 rounded-full bg-foreground/25" aria-hidden />
-            <span className="text-[14px] leading-6"><span className="text-muted-foreground">{e.actor_name ?? ACTOR[e.actor]}</span>　<span className="text-foreground">{eventText(e.kind, e.data)}</span></span>
+            <span className="text-[14px] leading-6"><span className="text-muted-foreground">{e.actor_name ?? ACTOR[e.actor]}</span>　<span className="text-foreground">{eventText(e.kind, e.data, fault)}</span></span>
           </li>
         ))}
       </ol>

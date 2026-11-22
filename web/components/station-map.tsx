@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import Map, { Marker, NavigationControl, Popup } from "react-map-gl/maplibre";
 import { Truck } from "lucide-react";
 import { Pill } from "@/components/charts";
-import { DISASTER_STAFF, STATIONS } from "@/content/catalogue";
+import { DISASTER_STAFF, STATIONS, type PackId } from "@/content/catalogue";
+import { PACK_ICON } from "@/components/pack-icon";
 import { cn } from "@/lib/utils";
 
 // disaster: inside a disaster area. mobile: a mobile branch (no Help Point device). selected: picked for a disaster area.
 export type MapStation = {
   id: string; label: string; lat: number; lng: number; state: "online" | "stale" | "never"; open: number;
-  disaster?: boolean; mobile?: boolean; selected?: boolean;
+  disaster?: boolean; mobile?: boolean; selected?: boolean; pack?: PackId;   // pack: the station type, drawn as its icon
 };
 
 // Free vector tiles from OpenFreeMap (OpenStreetMap data), rendered by MapLibre GL — both open source, no API key.
@@ -41,7 +42,7 @@ export function StationMap({ stations, onToggle }: { stations: MapStation[]; onT
               {s.open > 0 && <span className="absolute size-9 animate-ping rounded-full bg-[oklch(0.78_0.13_80/0.35)]" />}
               {s.selected && <span className="absolute size-10 rounded-full border-2 border-dashed border-foreground" />}
               <span className={cn("relative grid size-6 place-items-center rounded-full border-2 border-white shadow-md", s.disaster ? DISASTER_DOT : s.mobile ? MOBILE_DOT : DOT[s.state])}>
-                {s.mobile ? <Truck className="size-3.5 stroke-[2] text-white" /> : s.open > 0 && <span className="text-[10px] font-medium text-white">{s.open}</span>}
+                {s.mobile ? <Truck className="size-3.5 stroke-[2] text-white" /> : s.open > 0 ? <span className="text-[10px] font-medium text-white">{s.open}</span> : s.pack && s.pack !== "atm" && <PackGlyph pack={s.pack} />}
               </span>
             </button>
           </Marker>
@@ -65,4 +66,9 @@ export function StationMap({ stations, onToggle }: { stations: MapStation[]; onT
       </div>
     </div>
   );
+}
+
+function PackGlyph({ pack }: { pack: PackId }) {
+  const Icon = PACK_ICON[pack];
+  return <Icon className="size-3.5 stroke-[2] text-white" />;
 }

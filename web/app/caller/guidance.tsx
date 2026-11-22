@@ -6,7 +6,7 @@ import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { FIELD_STATE, LANG_LOCALE, RATING, RATINGS, STATUS, UI, errorText, etaText, replyOf, type Lang } from "@/content/catalogue";
+import { LANG_LOCALE, RATING, RATINGS, STATUS, UI, callerPack, errorText, replyOf, type Lang } from "@/content/catalogue";
 import type { CallerCase, Reply } from "./types";
 
 // Whether the device has a speech voice for this language (Bengali often has none).
@@ -42,8 +42,8 @@ export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: Ca
       {note && <Notice tone="warn">{note}</Notice>}
       {card.field_state !== "none" && (
         <section className="surface flex flex-col gap-1 p-4">
-          <span className="text-[17px] text-foreground">{FIELD_STATE[card.field_state][lang]}</span>
-          {card.field_state === "on_way" && <span className="text-[14px]">{etaText(card.eta, lang)}</span>}
+          <span className="text-[17px] text-foreground">{callerPack(card.fault).field(card.field_state, lang)}</span>
+          {card.field_state === "on_way" && <span className="text-[14px]">{callerPack(card.fault).eta(card.eta, lang)}</span>}
         </section>
       )}
       {r?.offersChoice && (

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, RATING, RATINGS, type Lang } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId } from "@/content/catalogue";
 
 export type Insights = {
   since: string;
@@ -20,6 +20,7 @@ export type Insights = {
     fraud: number; abusive: number; takeovers: number; mass_incidents: number; broadcasts: number; promises: number; promises_expired: number;
     captured: number; resolved_same_day: number; per_day: { day: string; captured: number; resolved: number }[];
   };
+  packs: Partial<Record<PackId, { received: number; guided: number }>>;   // insights_packs(): counts per station type
 };
 const dur = (s: number | null) => (s == null ? "—" : INSIGHTS.duration(s));
 
@@ -112,6 +113,19 @@ export const METRICS = {
           [INSIGHTS.bot.claim, dur(d.bot.claim_s)], [INSIGHTS.bot.reply, dur(d.bot.first_reply_s)],
           [INSIGHTS.bot.guard, dur(d.bot.guard_arrival_s)], [INSIGHTS.bot.records, INSIGHTS.count(d.bot.records)],
         ]} />
+      </div>
+    ),
+  },
+  packs: {
+    card: (d: Insights) => {
+      const beyond = PACK_IDS.filter((p) => p !== "atm").reduce((a, p) => a + (d.packs[p]?.received ?? 0), 0);
+      return centre(INSIGHTS.count(total(PACK_IDS.map((p) => d.packs[p]?.received ?? 0))), `${PACK_IDS.filter((p) => p !== "atm").map((p) => PACKS[p].name.staff).join("・")} ${INSIGHTS.count(beyond)}`);
+    },
+    detail: (d: Insights) => (
+      <div className="flex flex-col gap-6">
+        <Donut total={INSIGHTS.count(total(PACK_IDS.map((p) => d.packs[p]?.received ?? 0)))} totalLabel={INSIGHTS.received}
+          data={PACK_IDS.map((p) => ({ key: p, label: PACKS[p].name.staff, value: d.packs[p]?.received ?? 0 }))} />
+        <Pair items={PACK_IDS.map((p) => [PACKS[p].name.staff, `${PACK_DESK.insights.received} ${INSIGHTS.count(d.packs[p]?.received ?? 0)}・${PACK_DESK.insights.guided} ${pct(d.packs[p]?.guided ?? 0, d.packs[p]?.received ?? 0)}%`])} />
       </div>
     ),
   },
