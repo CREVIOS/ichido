@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
-import { Check, CircleCheck, Frown, Meh, Smile, Volume2 } from "lucide-react-native";
+import { Check, CircleCheck, Frown, Meh, OctagonAlert, Smile, Volume2 } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
@@ -10,13 +11,14 @@ import { hasVoice } from "@/lib/voice";
 import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { color, radius, shadow, space, tint } from "@/theme";
 import {
-  FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
+  FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
   type Lang, type Fact, type Status, type FieldState, type L10n,
 } from "@content/catalogue";
 
 type CallerCard = {
   id: string; station: string; fault: string; lang: Lang | null; confirmed_rev: number | null; status: Status;
   field_state: FieldState; eta: string | null; choice: string | null; teachback: string | null; teachback_result: string | null; needs_human: boolean; rating: number | null;
+  fraud?: boolean; notice?: string | null;
 };
 type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -52,6 +54,7 @@ export default function CallerScreen() {
   if (card === null) return <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
+  if (card.fraud) return <FraudScreen lang={lang} />;
   const latest = replies.at(-1);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
 
@@ -62,6 +65,9 @@ export default function CallerScreen() {
         <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
         <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
       </View>
+      {card.notice && OPS_CALLER.notice[card.notice] && (
+        <Card title={OPS_CALLER.noticeLabel[lang]}><T v="h2">{OPS_CALLER.notice[card.notice][lang]}</T></Card>
+      )}
       {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
       {confirmed && !latest && <Waiting lang={lang} />}
       {latest && <Guidance lang={lang} card={card} reply={latest} />}
@@ -229,6 +235,17 @@ function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onN
         })}
       </View>
     </View>
+  );
+}
+
+// Fraud-in-progress mode (the operator's decision; web/app/caller/ops.tsx): the approved warning, full screen.
+function FraudScreen({ lang }: { lang: Lang }) {
+  return (
+    <SafeAreaView accessibilityRole="alert" style={{ flex: 1, justifyContent: "center", gap: space.xl, padding: space.xxl, backgroundColor: color.alert }}>
+      <OctagonAlert size={56} strokeWidth={1.5} color={color.onPrimary} />
+      <T v="h1" tone="onPrimary" weight={500} style={{ fontSize: 44, lineHeight: 48 }}>{OPS_CALLER.fraud.title[lang]}</T>
+      <T v="h1" tone="onPrimary">{OPS_CALLER.fraud.body[lang]}</T>
+    </SafeAreaView>
   );
 }
 

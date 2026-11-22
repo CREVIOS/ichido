@@ -76,6 +76,7 @@ Import the repository and set **Root Directory** to `web`. Set these environment
 | `FIRMWARE_MANIFEST_JSON` | optional: signed Help Point firmware manifest from `scripts/sign-firmware.mjs` (section 4) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | optional: Gemini decision support, also precomputed by the Ichido Bot when the caller confirms |
 | `BOT_REMIND_AT` | optional: when the Ichido Bot reminds, as a share of each `ichido.sla_target` (default `0.75`, when the console's countdown turns amber) |
+| `PROMISE_MINUTE_S` | tests only: seconds in one promised minute for the promise timers (default `60`); leave unset in production |
 
 `VERCEL_GIT_COMMIT_SHA` is set by Vercel. It appears in `/api/health` and in every log line. After the first
 deploy, check `https://<app>/api/health` → `{"ok":true,"db":"ok","version":"<sha>"}`.

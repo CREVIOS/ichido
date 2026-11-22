@@ -6,10 +6,11 @@ import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
 import * as training from "@/lib/training";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
-import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
+import { actorFrom, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
+import { OPS_COMMANDS, fieldPromise } from "@/lib/ops";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -24,19 +25,9 @@ const CODE_LENGTH = 6;
 const CODE_TTL_MS = 5 * 60_000;
 const MAX_TEXT = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;   // only well-formed ids reach the logs
-const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400, rate_limited: 429 };
 
 const str = (b: Body, k: string) => (typeof b[k] === "string" && b[k] ? (b[k] as string) : fail(400, "bad_request"));
 const digest = (code: string) => createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
-
-async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await admin.rpc(fn, args);
-  if (error) {
-    if (Object.hasOwn(STATUS, error.message)) fail(STATUS[error.message], error.message);
-    throw error;
-  }
-  return data as T;
-}
 
 function staff(a: Actor, role: Staff["role"]): Staff {
   if (a.kind !== "staff" || a.role !== role) fail(403, "forbidden");
@@ -76,7 +67,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const s = await suggest(incident);
     if (!s) return { suggestion: null };
     if (d!.confirmed_rev != null) await saveSuggestion(incident, d!.confirmed_rev, s);   // the console's AI card shows the latest
-    await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, model: s.model });
+    await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, fraud: s.fraud, model: s.model });
     return { suggestion: s };
   },
 
@@ -269,8 +260,12 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const eta = typeof b.eta === "string" && b.eta && ETA_OPTIONS.includes(b.eta) ? b.eta : null;
     if (typeof b.generation !== "number") fail(400, "bad_request");
     await rpc("cmd_field", { p_uid: f.uid, p_name: f.name, p_incident: str(b, "incident"), p_generation: b.generation, p_state: str(b, "state"), p_eta: eta });
+    await fieldPromise(str(b, "incident"), b.generation as number, str(b, "state"), eta);
     return {};
   },
+
+  // Fraud mode, mass-incident broadcast, promises, harassment flag and takeover (lib/ops.ts).
+  ...OPS_COMMANDS,
 };
 
 export async function POST(req: Request): Promise<Response> {

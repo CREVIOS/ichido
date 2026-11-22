@@ -3,6 +3,7 @@
 // Bengali, Vietnamese, Indonesian, Nepali and Japanese below are drafts awaiting native review (see README).
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
+import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
 export const MANUAL_VERSION = "retained-card/v1";
 
@@ -35,6 +36,7 @@ export const FAULTS: Record<string, L10n> = {
     ja: "ATM を つかった あと、カードが でてこない", bn: "লেনদেনের পরে কার্ড বের হয়নি", en: "Card not returned after the transaction",
     vi: "Thẻ không được trả ra sau giao dịch", id: "Kartu tidak keluar setelah transaksi", ne: "कारोबारपछि कार्ड बाहिर आएन",
   },
+  ...OPS_FAULTS,
 };
 export const DEVICE_FAULT = "card_retained";
 export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
@@ -184,8 +186,6 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "remote_release": return `遠隔解除を試行 → ${REMOTE_RELEASE[d.result ?? ""] ?? d.result}`;
     case "confirmed": return `お客様が内容を確認（${FACT_STAFF.card_back[(d.card_back ?? "unknown") as Fact]}／${FACT_STAFF.cash_received[(d.cash_received ?? "unknown") as Fact]}）`;
     case "reply": return `承認済み返答を送信：${replyOf(d.intent)?.code ?? ""} ${replyOf(d.intent)?.title ?? d.intent}`;
-    case "dispatch": return `警備会社へ現地確認を依頼（${d.assignee ?? ""}）`;
-    case "redispatch": return `別の警備員へ再依頼（${d.assignee ?? ""}）`;
     case "caller_reset": return "お客様の接続をリセット（新しいコードが必要）";
     case "abandoned": return "案件を終了（お客様と連絡が取れず）";
     case "field": return `${STAFF_JA.field[(d.state ?? "none") as FieldState]}${d.state === "on_way" ? `（目安 ${d.eta ? d.eta.replace("-", "〜") + "分" : "未定"}）` : ""}`;
@@ -202,7 +202,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
-    default: return kind;
+    default: return opsEventText(kind, d) ?? kind;
   }
 }
 
@@ -356,6 +356,7 @@ export * from "./staff.ts";
 export * from "./numbers.ts";
 export * from "./home.ts";
 export * from "./mobile.ts";
+export * from "./ops.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {

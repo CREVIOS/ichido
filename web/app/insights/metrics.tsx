@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, RATING, RATINGS, type Lang } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, RATING, RATINGS, type Lang } from "@/content/catalogue";
 
 export type Insights = {
   since: string;
@@ -16,6 +16,10 @@ export type Insights = {
   ratings: Record<string, number>;
   targets: Partial<Record<string, number>>;
   bot: { records: number; claim_s: number | null; first_reply_s: number | null; guard_arrival_s: number | null; total_s: number | null };
+  ops: {
+    fraud: number; abusive: number; takeovers: number; mass_incidents: number; broadcasts: number; promises: number; promises_expired: number;
+    captured: number; resolved_same_day: number; per_day: { day: string; captured: number; resolved: number }[];
+  };
 };
 const dur = (s: number | null) => (s == null ? "—" : INSIGHTS.duration(s));
 
@@ -107,6 +111,22 @@ export const METRICS = {
         <Pair items={[
           [INSIGHTS.bot.claim, dur(d.bot.claim_s)], [INSIGHTS.bot.reply, dur(d.bot.first_reply_s)],
           [INSIGHTS.bot.guard, dur(d.bot.guard_arrival_s)], [INSIGHTS.bot.records, INSIGHTS.count(d.bot.records)],
+        ]} />
+      </div>
+    ),
+  },
+  ops: {
+    card: (d: Insights) => centre(INSIGHTS.count(d.ops.fraud), OPS.insights.fraud),
+    detail: (d: Insights) => (
+      <div className="flex flex-col gap-6">
+        <DailyArea labels={{ received: OPS.insights.captured, guided: OPS.insights.resolved }}
+          data={d.ops.per_day.map((x) => ({ day: dayLabel(x.day), received: x.captured, guided: x.resolved }))} />
+        <Pair items={[
+          [OPS.insights.captured, INSIGHTS.count(d.ops.captured)], [OPS.insights.resolved, INSIGHTS.count(d.ops.resolved_same_day)],
+          [OPS.insights.fraud, INSIGHTS.count(d.ops.fraud)], [OPS.insights.mass, INSIGHTS.count(d.ops.mass_incidents)],
+          [OPS.insights.broadcasts, INSIGHTS.count(d.ops.broadcasts)], [OPS.insights.abusive, INSIGHTS.count(d.ops.abusive)],
+          [OPS.insights.takeovers, INSIGHTS.count(d.ops.takeovers)], [OPS.insights.promises, INSIGHTS.count(d.ops.promises)],
+          [OPS.insights.expired, INSIGHTS.count(d.ops.promises_expired)],
         ]} />
       </div>
     ),

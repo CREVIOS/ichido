@@ -4,6 +4,7 @@ import { Dot } from "@/components/kit";
 import { cn } from "@/lib/utils";
 import { DESK, LANG_NAME, SLA, isFault, STAFF_JA } from "@/content/catalogue";
 import type { Peer } from "@/lib/presence";
+import { opsTags } from "./ops";
 import { when, type Desk, type OpenDesk, type Targets, type Run } from "./types";
 
 // A clock for countdowns and "n minutes ago", ticking every 15 seconds.
@@ -61,7 +62,7 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
         {open.map((c) => (
           <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
             title={label[c.station] ?? c.station} meta={ago(c.created_at)}
-            sub={<>{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}</>} />
+            sub={<>{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}{opsTags(c) && <span className="text-alert"> · {opsTags(c)}</span>}</>} />
         ))}
       </QueueGroup>
       {done.length > 0 && (

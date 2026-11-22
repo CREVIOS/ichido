@@ -7,9 +7,10 @@ import { usePresence } from "@/lib/presence";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Dot, MoreMenu, Notice } from "@/components/kit";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CASES, DESK, DEVICE_FAULT, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
+import { CASES, DESK, DEVICE_FAULT, FRAUD_FAULT, OPS, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
 import { CaseAlerts } from "./alerts";
 import { BotReminders } from "./bot";
+import { MassBanner, PromiseAlerts, incidentOrder } from "./ops";
 import { CaseView } from "./case";
 import { Peers, Queue, useClock, useQueueKeys } from "./queue";
 import type { Desk, OpenDesk, Run, Station, Targets } from "./types";
@@ -39,16 +40,17 @@ function useDesk(sel: string) {
   const load = useCallback(async (signal: AbortSignal) => {
     const db = sb();
     const [o, h, s, t] = await Promise.all([
-      db.from("desk").select("*, escalation(reason), reply(id), case_event(at)").is("finished_at", null)
+      db.from("desk").select("*, escalation(reason), reply(id, sent_at), case_event(at)").is("finished_at", null)
         .eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
-        .limit(1, { referencedTable: "case_event" }).limit(1, { referencedTable: "reply" }).order("created_at").abortSignal(signal),
+        .limit(1, { referencedTable: "case_event" }).order("sent_at", { referencedTable: "reply", ascending: false })
+        .limit(1, { referencedTable: "reply" }).order("created_at").abortSignal(signal),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY).abortSignal(signal),
       db.from("station").select("id, label").order("id").abortSignal(signal),
       db.schema("ichido").from("sla_target").select("reason, seconds").abortSignal(signal),
     ]);
     if (signal.aborted) return;
     if (o.error || h.error || s.error || t.error) { setFailed(true); return; }
-    const queue = o.data as OpenDesk[];
+    const queue = incidentOrder(o.data as OpenDesk[]);
     const recent = h.data as Desk[];
     let archived: Desk | null = null;
     if (sel && ![...queue, ...recent].some((row) => row.id === sel)) {
@@ -122,9 +124,14 @@ function Console({ me }: { me: Me }) {
         {watching.length > 0 && <span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:inline-flex"><Dot s="live" />{DESK.alsoViewing(watching.join("・"))}</span>}
         <CaseAlerts open={open} labels={label} />
         <BotReminders open={open} labels={label} me={me.uid} />
-        <MoreMenu label={DESK.manualFault} items={stations.map((s) => ({ label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) }))} />
+        <PromiseAlerts open={open} labels={label} me={me.uid} />
+        <MoreMenu label={DESK.manualFault} items={stations.flatMap((s) => [
+          { label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) },
+          { label: OPS.fraud.manual(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: FRAUD_FAULT }) },
+        ])} />
       </>}
     >
+      <MassBanner open={open} />
       {failed && <Notice tone="warn">{CASES.loadError}</Notice>}
       {current
         ? <CaseView key={current.id} d={current} me={me} run={run} />

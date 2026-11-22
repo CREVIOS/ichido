@@ -6,7 +6,8 @@
 //           and retries never open a second case.
 // RGB LED : shows the station state polled from the server:
 //           idle = off, received = amber, review = blue, field = amber blinking,
-//           guided = blue slow pulse, offline / no valid state yet = red blinking.
+//           guided = blue slow pulse, fraud = red steady (the operator suspects phone fraud: staff are coming),
+//           offline / no valid state yet = red blinking.
 //           Device states: setup hold = white fast blink, setup portal open = magenta slow blink,
 //           firmware download = white steady.
 //           There is deliberately no green "collect your card" signal.
@@ -61,7 +62,7 @@ const unsigned long SETUP_HOLD_MS = 8000;
 const unsigned long PORTAL_MS = 5UL * 60 * 1000;
 const unsigned long OTA_CHECK_MS = 6UL * 60 * 60 * 1000;
 const unsigned long OTA_PROBATION_MS = 10UL * 60 * 1000;
-const char *KNOWN_STATES[] = {"idle", "received", "review", "field", "guided"};
+const char *KNOWN_STATES[] = {"idle", "received", "review", "field", "guided", "fraud"};
 
 Preferences store;
 String appUrl, stationId, deviceSecret;    // from flash, falling back to secrets.h
@@ -377,6 +378,7 @@ void showState() {
   if (state == "review") return setRgb(false, false, true);
   if (state == "field") return setRgb(fast, fast, false);
   if (state == "guided") return setRgb(false, false, slow);
+  if (state == "fraud") return setRgb(true, false, false);
   setRgb(false, false, false);
 }
 

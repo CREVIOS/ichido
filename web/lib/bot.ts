@@ -19,7 +19,7 @@ export async function startBot(incident: string) {
 }
 
 // Commands after which the bot re-reads the case.
-export const BOT_SIGNALS = new Set(["claim", "confirm", "send", "assign", "field", "outcome", "abandon", "reset_caller"]);
+export const BOT_SIGNALS = new Set(["claim", "confirm", "send", "assign", "field", "outcome", "abandon", "reset_caller", "fraud", "promise"]);
 
 export async function signalBot(incident: string, cmd: string) {
   try {

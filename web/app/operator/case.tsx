@@ -6,11 +6,13 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, OPS, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { Pill } from "@/components/charts";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
+import { FraudCard, PromiseCard, TakeoverPanel, abusive, opsTags, useAbuseKey, useCompany } from "./ops";
 import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
 
 type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null };
@@ -57,6 +59,8 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const closed = Boolean(d.finished_at);
   const lang: Lang = d.lang ?? "bn";
   const paired = isPaired(events);
+  const company = useCompany(d.station);
+  useAbuseKey(d, mine && !closed, run);
 
   return (
     <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -73,14 +77,14 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         )}
       </div>
       <aside className="flex flex-col gap-8 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
-        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} run={run} />
+        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} company={company} run={run} />
       </aside>
     </div>
   );
 }
 
-function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, run }: {
-  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; run: Run;
+function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, company, run }: {
+  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
 }) {
   const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
   if (closed) return <Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>;
@@ -91,14 +95,17 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
       <Button size="lg" onClick={() => run("claim", { incident: d.id })}>{DESK.claim}</Button>
     </Panel>
   );
-  if (!mine) return <Panel title={DESK.otherOperator}><p className="text-[14px]">{DESK.otherOperatorBody}</p></Panel>;
+  if (!mine) return <TakeoverPanel d={d} run={run} title={DESK.otherOperator} body={DESK.otherOperatorBody} />;
   return (
     <>
+      <FraudCard d={d} job={job} guards={guards} />
       {!paired && <PairCard incident={d.id} />}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
       <Separator />
-      <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
+      <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />
+      <Separator />
+      <PromiseCard d={d} run={run} />
     </>
   );
 }
@@ -107,6 +114,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
   const menu = !closed && mine ? [
     ...(!d.remote_release ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
     { label: DESK.resetCaller, onClick: () => run("reset_caller", { incident: d.id }) },
+    { label: OPS.abusive.mark, onClick: () => abusive(d.id, run), disabled: Boolean(d.abusive_at) },
     { label: DESK.abandon, onClick: () => run("abandon", { incident: d.id }), danger: true },
   ] : [];
   return (
@@ -115,6 +123,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
         <div className="flex flex-col gap-2">
           <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{isFault(d.fault) ? STAFF_JA.fault[d.fault] : DESK.unknownFault}</span>
           {d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}
+          {opsTags(d) && <Pill tone="alert" className="self-start">{opsTags(d)}</Pill>}
         </div>
         <MoreMenu label={DESK.caseMenu} items={menu} />
       </div>

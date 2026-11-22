@@ -8,6 +8,7 @@ import { LangSelect, preferredLang } from "@/components/lang-select";
 import { FAULTS, STATION, UI, pick, type Lang } from "@/content/catalogue";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
+import { CallerNotice, FraudScreen } from "./ops";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
 const noop = () => () => {};
@@ -41,6 +42,7 @@ export default function CallerPage() {
   if (card === null) return <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
+  if (card.fraud) return <FraudScreen lang={lang} />;
   const latest = replies.at(-1);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
 
@@ -50,6 +52,7 @@ export default function CallerPage() {
         <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>
         <StatusLabel status={card.status} lang={lang} />
       </div>
+      {card.notice && <CallerNotice code={card.notice} lang={lang} />}
       {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
       {confirmed && !latest && <Waiting lang={lang} />}
       {latest && <Guidance lang={lang} card={card} reply={latest} />}

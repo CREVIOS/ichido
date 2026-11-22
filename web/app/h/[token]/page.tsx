@@ -3,7 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { admin } from "@/lib/server";
 import { openHandoff } from "@/lib/handoff";
 import { Mark } from "@/components/mark";
-import { ACTOR, DESK, FACT_STAFF, HANDOFF, LANG_NAME, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status, STAFF_JA } from "@/content/catalogue";
+import { ACTOR, DESK, FACT_STAFF, HANDOFF, LANG_NAME, OPS, RATING, REMOTE_RELEASE, STATUS, eventText, isFault, replyOf, summaryDraft, type Fact, type FieldState, type Lang, type L10n, type Status, STAFF_JA } from "@/content/catalogue";
 import { PrintButton } from "./print";
 
 export const metadata: Metadata = { title: HANDOFF.doc.title, robots: { index: false, follow: false } };
@@ -22,14 +22,14 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
   if (!h) return <main className="grid min-h-dvh place-items-center p-6"><p className="max-w-sm text-center text-[14px]">{D.gone}</p></main>;
   const id = h.incident;
   const [{ data: d }, { data: events }, { data: replies }, { data: job }, { data: card }] = await Promise.all([
-    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at").eq("id", id).single(),
+    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at, fraud_at").eq("id", id).single(),
     admin.from("case_event").select("id, at, actor, actor_name, kind, data").eq("incident", id).order("id"),
     admin.from("reply").select("intent, sent_at").eq("incident", id).order("sent_at"),
     admin.from("field_job").select("state, eta").eq("incident", id).maybeSingle(),
     admin.from("caller_card").select("choice, teachback_result, rating").eq("id", id).maybeSingle(),
   ]);
   if (!d) return null;
-  const { data: st } = await admin.from("station").select("label, branch").eq("id", d.station).maybeSingle();
+  const { data: st } = await admin.from("station").select("label, branch, security_company").eq("id", d.station).maybeSingle();
   const status = d.abandoned ? DESK.abandonedChip : d.finished_at ? STAFF_JA.status[d.status as Status] : `${D.open}・${STAFF_JA.status[d.status as Status]}`;
 
   return (
@@ -55,6 +55,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
         [D.opened, at(d.created_at)],
         [D.closed, at(d.finished_at)],
         [D.status, status],
+        ...(d.fraud_at ? [[OPS.fraud.handoff, at(d.fraud_at)] as [string, string]] : []),
         [D.lang, d.lang ? LANG_NAME[d.lang as Lang] : D.none],
       ]} />
 
@@ -71,7 +72,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
         <Grid rows={[
           [D.replies, replies?.length ? replies.map((r) => `${replyOf(r.intent)?.code ?? ""} ${replyOf(r.intent)?.title ?? r.intent}（${at(r.sent_at)}）`).join("\n") : D.none],
           [D.release, d.remote_release ? REMOTE_RELEASE[d.remote_release] : DESK.releaseNone],
-          [D.guard, job ? `${STAFF_JA.field[job.state as FieldState]}${job.eta ? `・${DESK.dispatch.eta(job.eta)}` : ""}` : D.none],
+          [D.guard, job ? `${OPS.dispatch.chain(st?.security_company ?? "").join(" → ")}・${STAFF_JA.field[job.state as FieldState]}${job.eta ? `・${DESK.dispatch.eta(job.eta)}` : ""}` : D.none],
           [D.choice, card?.choice ? DESK.choiceText[card.choice] : D.none],
           [D.outcome, card?.teachback_result === "understood" ? STATUS.guided.ja : card?.teachback_result ? DESK.teach.clarify : D.none],
           [D.rating, card?.rating ? RATING[card.rating].ja : D.none],

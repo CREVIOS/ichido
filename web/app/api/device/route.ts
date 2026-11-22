@@ -1,9 +1,10 @@
 import { admin, priv, reply, deviceStation } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
-import { DEVICE_FAULT } from "@/content/catalogue";
+import { DEVICE_FAULT, isFault } from "@/content/catalogue";
 import { startBot } from "@/lib/bot";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
+// X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; default DEVICE_FAULT.
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/device", req);
   const auth = deviceStation(req);
@@ -13,23 +14,28 @@ export async function POST(req: Request): Promise<Response> {
   }
   const station = auth.id;
   const key = (await req.text()).trim();
+  const fault = req.headers.get("x-fault") || DEVICE_FAULT;
+  if (!isFault(fault)) {
+    log.warn("device_fault", { station, status: 400, code: "bad_fault" });
+    return reply(400, { error: "unknown fault" });
+  }
   if (!/^[0-9a-f]{32}$/.test(key)) {
     log.warn("device_fault", { station, status: 400, code: "bad_event_id" });
     return reply(400, { error: "bad event id" });
   }
   // Only for the log: whether this is a retry of an event the server already recorded.
   const { data: seen } = await priv().from("device_event").select("incident").eq("station", station).eq("event_key", key).maybeSingle();
-  const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: DEVICE_FAULT });
+  const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: fault });
   if (error) {
-    log.error("device_fault", { station, fault: DEVICE_FAULT, status: 500, duration_ms: log.ms(), ...errorFields(error) });
+    log.error("device_fault", { station, fault, status: 500, duration_ms: log.ms(), ...errorFields(error) });
     return reply(500, { error: "not recorded" });
   }
   if (!seen) await startBot(incident as string);   // a second press on an open case finds its run already there
-  log.info("device_fault", { station, fault: DEVICE_FAULT, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
+  log.info("device_fault", { station, fault, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
   return new Response(null, { status: 204 });
 }
 
-// GET: the station light state as plain text (idle | received | review | field | guided).
+// GET: the station light state as plain text (idle | received | review | field | guided | fraud).
 // Polled every 2 s per device, so only failures are logged; liveness comes from the heartbeat.
 export async function GET(req: Request): Promise<Response> {
   const log = requestLog("/api/device", req);
