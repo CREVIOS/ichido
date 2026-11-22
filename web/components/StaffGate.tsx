@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, ChartNoAxesColumn, GraduationCap, LogOut, MapPin, RadioTower, Router, Rows3 } from "lucide-react";
+import { Bot, ChartNoAxesColumn, GraduationCap, LogOut, MapPin, RadioTower, Router, Rows3, ScanText } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
-import { Notice, type NavItem } from "@/components/kit";
+import { CountBadge, Notice, useSidebar, type NavItem } from "@/components/kit";
+import { useReviewQueue } from "@/lib/review";
 import { Mark } from "@/components/mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ART, STAFF, NAV } from "@/content/catalogue";
+import { ART, STAFF, NAV, REVIEW } from "@/content/catalogue";
 
 export type Role = "operator" | "field" | "manager";
 export type Me = { uid: string; role: Role; name: string };
@@ -14,15 +15,21 @@ export type Me = { uid: string; role: Role; name: string };
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   operator: [
     { href: "/operator", label: NAV.operator, icon: RadioTower },
+    { href: "/review", label: REVIEW.nav, icon: ScanText, Badge: ReviewBadge },
     { href: "/cases", label: NAV.cases, icon: Rows3 },
     { href: "/stations", label: NAV.stations, icon: Router },
     { href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn },
     { href: "/automation", label: NAV.automation, icon: Bot },
     { href: "/training", label: NAV.training, icon: GraduationCap },
   ],
-  manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }],
+  manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }, { href: "/stations", label: NAV.stations, icon: Router }],
   field: [{ href: "/field", label: NAV.field, icon: MapPin }],
 };
+// Unreviewed items for the signed-in operator, live on every operator page.
+function ReviewBadge() {
+  return <CountBadge n={useReviewQueue().items?.length} />;
+}
+
 export const navFor = (role: Role, counts: Partial<Record<string, number>> = {}) => NAV_BY_ROLE[role].map((n) => ({ ...n, count: counts[n.href] }));
 
 export async function signOut() {
@@ -32,14 +39,18 @@ export async function signOut() {
 
 // Who is signed in, at the bottom of the sidebar.
 export function MeFooter({ me }: { me: Me }) {
+  const { collapsed } = useSidebar();
+  const avatar = <span aria-hidden title={me.name} className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-[12px] text-foreground">{me.name.slice(0, 1)}</span>;
+  const out = <Button variant="ghost" size="icon-sm" onClick={signOut} aria-label={STAFF.signOut} title={STAFF.signOut} data-close><LogOut className="stroke-[1.5]" /></Button>;
+  if (collapsed) return <div className="flex flex-col items-center gap-2 border-t pt-3">{avatar}{out}</div>;
   return (
     <div className="flex items-center gap-2.5 border-t px-2 pt-3">
-      <span aria-hidden className="grid size-7 place-items-center rounded-full bg-secondary text-[12px] text-foreground">{me.name.slice(0, 1)}</span>
+      {avatar}
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate text-[13px] text-foreground">{me.name}</span>
         <span className="text-[12px] text-muted-foreground">{STAFF.roleName[me.role]}</span>
       </span>
-      <Button variant="ghost" size="icon-sm" onClick={signOut} aria-label={STAFF.signOut} data-close><LogOut className="stroke-[1.5]" /></Button>
+      {out}
     </div>
   );
 }

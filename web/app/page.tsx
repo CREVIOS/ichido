@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
-import { Logo } from "@/components/kit";
 import { HeroPreview } from "@/components/hero-preview";
 import { HowDiagram } from "@/components/how-diagram";
 import { People } from "@/components/people";
 import { MeasurePreview } from "@/components/measure-preview";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Footer, Section, TopNav, dark, light } from "@/components/site";
 import { HOME } from "@/content/catalogue";
-
-const dark = cn(buttonVariants({ size: "sm" }), "h-[30px] rounded-md px-2.5 text-[12px]");
-const light = cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-[30px] rounded-md px-2.5 text-[12px]");
 
 export default function Home() {
   return (
@@ -24,23 +19,6 @@ export default function Home() {
       <Rules />
       <Cta />
       <Footer />
-    </div>
-  );
-}
-
-function TopNav() {
-  return (
-    <div className="fixed inset-x-0 top-4 z-30 flex justify-center px-4">
-      <nav className="flex h-[38px] items-center gap-1 rounded-[10px] bg-[oklch(0.95_0_0/0.85)] py-1 pr-1 pl-3.5 backdrop-blur-md" aria-label="Main">
-        <Logo className="mr-3" />
-        <div className="hidden items-center sm:flex">
-          {HOME.nav.map((n) => <a key={n.href} href={n.href} className="rounded-md px-2 py-1 text-[13px] text-soft transition-colors hover:text-foreground">{n.label}</a>)}
-          <a href={HOME.repo.href} className="rounded-md px-2 py-1 text-[13px] text-soft transition-colors hover:text-foreground">{HOME.repo.label}</a>
-        </div>
-        <span className="mx-2 hidden h-4 w-px bg-border sm:block" />
-        <Link href="/operator" className="hidden px-2 text-[13px] text-soft hover:text-foreground md:block">{HOME.signIn}</Link>
-        <Link href={HOME.primary.href} className={dark}>{HOME.primary.label}</Link>
-      </nav>
     </div>
   );
 }
@@ -63,19 +41,6 @@ function Hero() {
         <span className="text-muted-foreground">{HOME.news.text}</span>
         <ChevronRight className="size-3.5 stroke-[1.5]" />
       </a>
-    </section>
-  );
-}
-
-function Section({ id, title, tag, children }: { id: string; title: string; tag?: { left: string; right: string }; children: React.ReactNode }) {
-  return (
-    <section id={id} className="mx-auto max-w-[1440px] scroll-mt-20 px-6 py-20 lg:px-12 lg:py-28">
-      <div className="mb-12 grid grid-cols-[1fr_auto] items-baseline gap-4 border-t pt-5 lg:grid-cols-[1fr_minmax(0,0.45fr)_auto]">
-        <h2 className="text-[28px] leading-[1.2] tracking-[-0.03em]">{title}</h2>
-        {tag && <span className="mono hidden text-[11px] tracking-[0.06em] text-muted-foreground uppercase lg:inline">{tag.left}</span>}
-        {tag && <span className="mono text-[11px] text-muted-foreground">{tag.right}</span>}
-      </div>
-      {children}
     </section>
   );
 }
@@ -166,15 +131,5 @@ function Cta() {
         ))}
       </div>
     </Section>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="mx-auto flex max-w-[1440px] flex-col gap-6 border-t px-6 py-10 sm:flex-row sm:items-center sm:justify-between lg:px-12">
-      <Logo />
-      <p className="max-w-xl text-[12px] leading-5 text-muted-foreground">{HOME.footer}</p>
-      <a href={HOME.repo.href} className="text-[13px] text-soft hover:text-foreground">{HOME.repo.label}</a>
-    </footer>
   );
 }

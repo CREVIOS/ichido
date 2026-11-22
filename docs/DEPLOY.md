@@ -54,6 +54,11 @@ insert into public.station (id, label, branch, counter_hours, security_company, 
 insert into public.light (station) values ('TABLE-A');
 ```
 
+A **mobile branch** (移動店舗) sent out after a disaster is a station row with `kind = 'mobile_branch'`, a location,
+and its opening hours in `counter_hours`. It has no Help Point device, so it needs no secret and no `light` row.
+Callers in a disaster area see it among the nearest working places while it is outside the area. Delete the row
+when it leaves.
+
 Then generate the station's device secret (`openssl rand -hex 32`) and add it to `DEVICE_SECRETS_JSON` (below)
 and to the device's `secrets.h`.
 
@@ -159,6 +164,7 @@ Encrypt). Check with `openssl s_client -connect <app>.vercel.app:443 -showcerts`
 
 ```sh
 arduino-cli lib install WiFiManager      # tzapu/WiFiManager (MIT): the setup portal
+arduino-cli lib install U8g2             # olikraus/U8g2 (BSD-2-Clause): the optional OLED display
 arduino-cli compile --fqbn esp32:esp32:esp32 firmware/help_point
 arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 ```
@@ -166,6 +172,29 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 Use the default partition scheme (two OTA app slots). The device posts a heartbeat every 60 s (uptime, free heap, RSSI, firmware version, last fault-ack and poll
 round trips) to `/api/device/heartbeat`. Operators and managers can read the latest heartbeat in
 `public.device_health` (with live updates).
+
+### Display (optional)
+
+A 0.96" SSD1306 128×64 I²C OLED lets a caller who cannot hear the handset pair: the operator presses
+端末に表示 on a 文字対応 case and the 6-character code appears on the screen for its 5 minutes (gone as soon
+as the caller pairs). Otherwise the screen shows the station state in words (ready, alert sent, operator
+checking, staff requested / on the way / arrived, guidance confirmed, offline).
+
+```
+ ESP32 dev board            SSD1306 OLED (I²C, 0x3C)
+ ┌──────────────┐           ┌──────────────┐
+ │         3V3  ├───────────┤ VCC          │
+ │         GND  ├───────────┤ GND          │
+ │ GPIO21 (SDA) ├───────────┤ SDA          │
+ │ GPIO22 (SCL) ├───────────┤ SCL          │
+ └──────────────┘           └──────────────┘
+```
+
+`#define HAS_DISPLAY` in `config.h` turns it on (default); delete the line to build without the library.
+Change `PIN_SDA` / `PIN_SCL` in `help_point.ino` for C3/S3 boards. A device with a display polls
+`/api/device` with `X-Display: 1` and receives extra `code=`, `ttl=` and `guard=` lines after the state; older
+firmware without the header gets the one-word state as before. The plain code is held server-side only while it
+is offered (`ichido.device_code`, service role only) and is never logged.
 
 ### Setup without reflashing
 
@@ -237,6 +266,7 @@ Useful events:
 | `device_auth_failed` | wrong or missing device secret: `code` = `bad_secret` / `no_secret` / `unknown_station` |
 | `device_heartbeat` | device telemetry |
 | `device_firmware` | firmware check: `fw`, `fw_target`, `code` (`offered`, `current`, `none`, `bad_manifest`) |
+| `disaster_entered`, `disaster_left` | a station entered or left disaster mode: `station`, `role`, `code` (the notice key) |
 | `voice_token` | LiveKit token issued or refused (`code`) |
 | `unhandled_error` | anything uncaught on the server (`instrumentation.ts`) |
 | `bot_start` | Ichido Bot run started for a case: `incident`, `run_id`, `code` (`started` / `start_failed`) |

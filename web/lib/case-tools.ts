@@ -1,19 +1,23 @@
 import "server-only";
-import { FRAUD_FAULT, REPLIES } from "@/content/catalogue";
+import { FRAUD_FAULT, REPLIES, replyBlock, type Fact } from "@/content/catalogue";
 import { admin, priv } from "@/lib/server";
 
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
 // never the caller's words or draft.
 
 export type Ctx = { incident: string };
-type DeskFacts = { confirmed_rev: number | null; card_back: string; remote_release: string | null };
+type DeskFacts = { confirmed_rev: number | null; card_back: string; remote_release: string | null; fault: string };
+const WHY_NOT: Record<string, string> = {
+  awaiting: "caller has not confirmed yet", held: "card is not confirmed as still inside",
+  fault: "not an approved reply for this fault type", flag: "the caller's own statements do not fit this reply",
+};
 
-// Which approved replies may be sent now — the same rule the SQL command enforces.
-export function eligibleReplies(d: DeskFacts) {
+// Which approved replies may be sent now — the same rules the SQL command and the reply trigger enforce.
+export function eligibleReplies(d: DeskFacts, flags: string[]) {
+  const ctx = { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back as Fact, remote_release: d.remote_release };
   return Object.entries(REPLIES).map(([intent, r]) => {
-    const why = d.confirmed_rev == null ? "caller has not confirmed yet"
-      : r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? "card is not confirmed as still inside" : null;
-    return { intent, code: r.code, title_ja: r.title, offers_wait_or_leave: Boolean(r.offersChoice), eligible: why == null, why_not: why };
+    const block = replyBlock(intent, r.needsHeld, ctx);
+    return { intent, code: r.code, title_ja: r.title, offers_wait_or_leave: Boolean(r.offersChoice), eligible: block == null, why_not: block && WHY_NOT[block] };
   });
 }
 
@@ -30,7 +34,7 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
   switch (name) {
     case "get_case": {
       const [{ data: c }, { data: j }] = await Promise.all([
-        admin.from("caller_card").select("choice, field_state, eta, needs_human").eq("id", ctx.incident).maybeSingle(),
+        admin.from("caller_card").select("choice, field_state, eta, needs_human, flags").eq("id", ctx.incident).maybeSingle(),
         admin.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
       ]);
       return {
@@ -38,8 +42,10 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
         suspected_phone_fraud_alert: d.fault === FRAUD_FAULT, fraud_mode_active: d.fraud_at != null,
       };
     }
-    case "list_replies":
-      return eligibleReplies(d);
+    case "list_replies": {
+      const { data: c } = await admin.from("caller_card").select("flags").eq("id", ctx.incident).maybeSingle();
+      return eligibleReplies(d, c?.flags ?? []);
+    }
     case "list_guards": {
       const [{ data: g }, { data: jobs }] = await Promise.all([
         priv().from("staff").select("uid, display_name").eq("role", "field"),

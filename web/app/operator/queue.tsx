@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Dot } from "@/components/kit";
+import { Dot, useSidebar } from "@/components/kit";
 import { cn } from "@/lib/utils";
 import { DESK, LANG_NAME, SLA, isFault, STAFF_JA } from "@/content/catalogue";
 import type { Peer } from "@/lib/presence";
+import { TextOnlyBadge } from "./access";
 import { opsTags } from "./ops";
 import { when, type Desk, type OpenDesk, type Targets, type Run } from "./types";
 
@@ -43,7 +44,9 @@ export function useQueueKeys(open: Desk[], current: Desk | null | undefined, sel
 }
 
 export function Peers({ peers }: { peers: Peer[] }) {
+  const { collapsed } = useSidebar();
   if (!peers.length) return null;
+  if (collapsed) return <span title={DESK.online(peers.length)} className="mx-auto mb-2 grid size-6 place-items-center rounded-full bg-secondary text-[10px] text-foreground">+{peers.length}</span>;
   return (
     <div className="flex items-center gap-2 px-2 pb-2 text-[12px] text-muted-foreground">
       <span className="flex -space-x-1.5">{peers.slice(0, 4).map((p) => <span key={p.uid} title={p.name} className="grid size-5 place-items-center rounded-full border-2 border-background bg-secondary text-[10px] text-foreground">{p.name.slice(0, 1)}</span>)}</span>
@@ -62,7 +65,7 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
         {open.map((c) => (
           <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
             title={label[c.station] ?? c.station} meta={ago(c.created_at)}
-            sub={<>{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}{opsTags(c) && <span className="text-alert"> · {opsTags(c)}</span>}</>} />
+            sub={<>{c.text_only && <><TextOnlyBadge />{" "}</>}{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}{opsTags(c) && <span className="text-alert"> · {opsTags(c)}</span>}</>} />
         ))}
       </QueueGroup>
       {done.length > 0 && (

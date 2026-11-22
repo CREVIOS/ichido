@@ -2,6 +2,7 @@ import { admin, priv, reply, deviceStation } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
 import { DEVICE_FAULT, isFault } from "@/content/catalogue";
 import { startBot } from "@/lib/bot";
+import { displayLines } from "@/lib/access";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
 // X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; default DEVICE_FAULT.
@@ -36,6 +37,7 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 // GET: the station light state as plain text (idle | received | review | field | guided | fraud).
+// A Help Point with a display sends X-Display: 1 and also gets key=value lines (lib/access.ts displayLines).
 // Polled every 2 s per device, so only failures are logged; liveness comes from the heartbeat.
 export async function GET(req: Request): Promise<Response> {
   const log = requestLog("/api/device", req);
@@ -50,5 +52,10 @@ export async function GET(req: Request): Promise<Response> {
     log.error("device_poll", { station: auth.id, status: 503, ...errorFields(error) });
     return reply(503, { error: "unavailable" });
   }
-  return new Response(data?.state ?? "idle", { headers: { "content-type": "text/plain", "cache-control": "no-store" } });
+  const extra = req.headers.get("x-display") === "1" ? await displayLines(auth.id) : "";
+  if (extra === null) {
+    log.error("device_poll", { station: auth.id, status: 503, code: "display" });
+    return reply(503, { error: "unavailable" });
+  }
+  return new Response((data?.state ?? "idle") + extra, { headers: { "content-type": "text/plain", "cache-control": "no-store" } });
 }

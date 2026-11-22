@@ -46,7 +46,7 @@ function Board({ me }: { me: Me }) {
             </button>
           ))}
         </div>
-        <div className="flex min-w-0 flex-col gap-6 p-5 lg:p-8">
+        <div className="flex min-w-0 flex-col gap-6 p-5 lg:sticky lg:top-0 lg:self-start lg:p-8">
           {error && <Notice tone="warn">{error}</Notice>}
           <span className="flex items-center gap-2 text-[13px] text-foreground"><ChartLine className="size-4 stroke-[1.5]" />{INSIGHTS.title} / {INSIGHTS.metrics[sel].title}</span>
           <h2 className="text-[26px] leading-tight tracking-[-0.03em]">{INSIGHTS.metrics[sel].title}</h2>

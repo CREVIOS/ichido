@@ -1,6 +1,7 @@
 import { OPS, OPS_FAULT_STAFF } from "./ops.ts";
 
 // Staff screens (Japanese): console, guard, insights, sign-in.
+import { FAULT_STAFF } from "./faults.ts";
 
 // Staff sign-in (staff screens are Japanese).
 export const STAFF = {
@@ -12,6 +13,7 @@ export const STAFF = {
   noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
   signInLead: "スタッフ用アカウントでサインインしてください。アカウントは管理者が発行します。",
   menu: "メニュー",
+  sidebar: { collapse: "サイドバーを閉じる（[）", expand: "サイドバーを開く（[）" },
   palette: { title: "コマンド", hint: "検索・移動・操作", placeholder: "ページ・案件・操作を検索…", empty: "見つかりません", pages: "ページ", cases: "対応中の案件", actions: "操作", shortcut: "⌘K" },
   keys: { next: "次の案件 (J)", prev: "前の案件 (K)", claim: "担当する (C)" },
   roleName: { operator: "オペレーター", field: "警備員", manager: "マネージャー" } as Record<string, string>,
@@ -320,7 +322,7 @@ export const STAFF_JA = {
     none: "未依頼", requested: "現地確認を依頼しました", on_way: "警備員が向かっています", arrived: "警備員が到着しました",
     done: "現地対応完了（カードの扱いは銀行所定の手続き）",
   } as Record<string, string>,
-  fault: { card_retained: "取引後にカードが排出されない", ...OPS_FAULT_STAFF } as Record<string, string>,
+  fault: { card_retained: "取引後にカードが排出されない", ...FAULT_STAFF, ...OPS_FAULT_STAFF } as Record<string, string>,
 };
 
 // Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.

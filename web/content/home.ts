@@ -7,9 +7,10 @@ export const META = {
 
 export const HOME = {
   nav: [
-    { href: "#how", label: "How it works" },
-    { href: "#screens", label: "Screens" },
-    { href: "#rules", label: "Rules" },
+    { href: "/#how", label: "How it works" },
+    { href: "/#screens", label: "Screens" },
+    { href: "/enterprise", label: "Enterprise" },
+    { href: "/pricing", label: "Pricing" },
   ],
   repo: { href: "https://github.com/CREVIOS/ichido", label: "GitHub" },
   signIn: "Staff sign in",

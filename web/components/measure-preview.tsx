@@ -1,5 +1,5 @@
 import { CalendarDays, ChartLine, Code, GripVertical } from "lucide-react";
-import { DailyArea } from "@/components/insight-charts";
+import { DailyArea } from "@/components/lazy-charts";
 import { HOME, INSIGHTS } from "@/content/catalogue";
 
 const M = HOME.measure;
