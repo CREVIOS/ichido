@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, ChartNoAxesColumn, GraduationCap, LogOut, MapPin, RadioTower, Router, Rows3 } from "lucide-react";
+import { Bot, ChartNoAxesColumn, GraduationCap, LogOut, MapPin, RadioTower, Router, Rows3, ScanText } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
-import { Notice, type NavItem } from "@/components/kit";
+import { CountBadge, Notice, type NavItem } from "@/components/kit";
+import { useReviewQueue } from "@/lib/review";
 import { Mark } from "@/components/mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ART, STAFF, NAV } from "@/content/catalogue";
+import { ART, STAFF, NAV, REVIEW } from "@/content/catalogue";
 
 export type Role = "operator" | "field" | "manager";
 export type Me = { uid: string; role: Role; name: string };
@@ -14,6 +15,7 @@ export type Me = { uid: string; role: Role; name: string };
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   operator: [
     { href: "/operator", label: NAV.operator, icon: RadioTower },
+    { href: "/review", label: REVIEW.nav, icon: ScanText, Badge: ReviewBadge },
     { href: "/cases", label: NAV.cases, icon: Rows3 },
     { href: "/stations", label: NAV.stations, icon: Router },
     { href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn },
@@ -23,6 +25,11 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }],
   field: [{ href: "/field", label: NAV.field, icon: MapPin }],
 };
+// Unreviewed items for the signed-in operator, live on every operator page.
+function ReviewBadge() {
+  return <CountBadge n={useReviewQueue().items?.length} />;
+}
+
 export const navFor = (role: Role, counts: Partial<Record<string, number>> = {}) => NAV_BY_ROLE[role].map((n) => ({ ...n, count: counts[n.href] }));
 
 export async function signOut() {

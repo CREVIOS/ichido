@@ -34,6 +34,9 @@
   --color-warn: var(--warn);
   --color-info: var(--info);
   --color-alert: var(--alert);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-pane: var(--pane);
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
@@ -67,6 +70,9 @@
   --warn: oklch(0.72 0.14 70);
   --info: oklch(0.6 0.13 250);
   --alert: oklch(0.6 0.19 27);
+  --brand: #80bfff;                         /* unread dot (review inbox) */
+  --brand-strong: #2b7fd6;                  /* the one primary action in a review pane; readable on white text */
+  --pane: #f9f9f9;                          /* list and sequence panes */
   --radius: 6px;
 }
 

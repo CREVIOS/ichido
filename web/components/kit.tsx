@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { Menu, MoreHorizontal, Search, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -12,7 +12,8 @@ import { Palette, usePalette, type PaletteItem } from "@/components/palette";
 export { Mark } from "@/components/mark";
 import { STATUS, STAFF, STAFF_JA, type Lang, type Status } from "@/content/catalogue";
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; count?: number };
+// Badge: a live count the item fetches itself (e.g. 要確認 on every operator page).
+export type NavItem = { href: string; label: string; icon: LucideIcon; count?: number; Badge?: ComponentType };
 
 export function Logo({ className }: { className?: string }) {
   return (
@@ -39,7 +40,7 @@ function SideNav({ nav, side, footer, onSearch }: { nav: NavItem[]; side?: React
             className="flex h-8 items-center gap-2.5 rounded-md px-2 text-[14px] text-soft transition-colors hover:bg-accent aria-[current=page]:bg-accent aria-[current=page]:text-foreground">
             <n.icon className="size-4 stroke-[1.5]" />
             <span className="flex-1">{n.label}</span>
-            {n.count != null && n.count > 0 && <span className="num grid h-4 min-w-4 place-items-center rounded bg-secondary px-1 text-[11px] text-muted-foreground">{n.count}</span>}
+            {n.Badge ? <n.Badge /> : <CountBadge n={n.count} />}
           </Link>
         ))}
       </nav>
@@ -49,9 +50,13 @@ function SideNav({ nav, side, footer, onSearch }: { nav: NavItem[]; side?: React
   );
 }
 
+export const CountBadge = ({ n }: { n?: number }) =>
+  n != null && n > 0 ? <span className="num grid h-4 min-w-4 place-items-center rounded bg-secondary px-1 text-[11px] text-muted-foreground">{n}</span> : null;
+
 // Staff app frame: a quiet sidebar on the canvas, the work on a white sheet beside it.
-export function AppShell({ nav, side, footer, title, crumb, actions, commands = [], children }: {
-  nav: NavItem[]; side?: ReactNode; footer?: ReactNode; title: ReactNode; crumb?: ReactNode; actions?: ReactNode; commands?: PaletteItem[]; children: ReactNode;
+// bare: the page draws its own title bars on wide screens (the header stays for the phone menu).
+export function AppShell({ nav, side, footer, title, crumb, actions, commands = [], bare, children }: {
+  nav: NavItem[]; side?: ReactNode; footer?: ReactNode; title: ReactNode; crumb?: ReactNode; actions?: ReactNode; commands?: PaletteItem[]; bare?: boolean; children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const palette = usePalette();
@@ -63,7 +68,7 @@ export function AppShell({ nav, side, footer, title, crumb, actions, commands = 
       </aside>
       <div className="flex min-w-0 flex-1 flex-col lg:py-2 lg:pr-2">
         <main className="flex min-h-0 flex-1 flex-col bg-card lg:rounded-xl lg:border" style={{ boxShadow: "0 1px 2px oklch(0 0 0 / 0.03)" }}>
-          <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-card/90 px-3 backdrop-blur lg:rounded-t-xl lg:px-5">
+          <header className={cn("sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-card/90 px-3 backdrop-blur lg:rounded-t-xl lg:px-5", bare && "lg:hidden")}>
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger render={<Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label={STAFF.menu} />}>
                 <Menu className="stroke-[1.5]" />

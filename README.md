@@ -16,7 +16,8 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 |---|---|---|
 | `/` | everyone | Overview and links |
 | `/operator` | monitoring-centre operator | Queue with response-time targets and new-case alerts, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
-| `/automation` | monitoring-centre operator | Every open case's Ichido Bot workflow and the step it is on |
+| `/review` | monitoring-centre operator | 要確認: what the AI and the bot drafted for the operator's own cases, grouped (AI suggestion, after-call record, machine translation, unopened hand-off link), with a live count in the menu. Accept sends the stored suggestion through the operator's own send/dispatch commands; dismiss, approve (with a staff-only note), confirm/flag a translation, reissue/revoke a link — each once, recorded in `review_state` and on the timeline. J/K or ↑/↓, Enter, E |
+| `/automation` | monitoring-centre operator | The Ichido Bot workflow as a sequence: performance over 30 days, what it may and may not do, its four steps and when each runs; running runs, history with durations, and test runs from manually registered faults |
 | `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
 | `/stations` | operator | Live map of stations (MapLibre + OpenFreeMap/OSM) with device-health pins, each Help Point's last heartbeat, signal, firmware and open cases, and a printable QR sticker per station |
 | `/h/[token]` | bank, police, security company | Read-only hand-off record (引継票) of one case: facts, decisions, timeline, after-call summary. Expires in 24 h, revocable, every view audited, never the caller's free text |

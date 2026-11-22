@@ -97,6 +97,36 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
+  // 要確認: the operator's decision on a draft for one of their own cases (cmd_review checks ownership and the item version).
+  async review(a, b) {
+    const op = staff(a, "operator");
+    const incident = str(b, "incident");
+    const kind = str(b, "kind");
+    const ref = str(b, "ref");
+    const decision = str(b, "decision");
+    if (!UUID.test(incident)) fail(400, "bad_request");
+    if (kind === "suggestion" && decision === "accepted") {
+      // What is sent is the stored suggestion, never the request body, through the operator's own send and assign.
+      const { data: s } = await admin.from("bot_suggestion").select("rev, suggestion").eq("incident", incident).maybeSingle();
+      if (!s || String(s.rev) !== ref) fail(409, "conflict");
+      const intent = s!.suggestion?.intent;
+      const r = replyOf(intent) ?? fail(409, "conflict");
+      await rpc("cmd_accept_suggestion", {
+        p_uid: op.uid, p_name: op.name, p_incident: incident, p_rev: s!.rev, p_intent: intent, p_manual: MANUAL_VERSION, p_needs_held: Boolean(r.needsHeld),
+      });
+      await signalBot(incident, "send");
+      if (s!.suggestion?.dispatch) await signalBot(incident, "assign");
+      return {};
+    }
+    if (b.note != null && (typeof b.note !== "string" || b.note.length > MAX_TEXT)) fail(400, "bad_request");
+    await rpc("cmd_review", { p_uid: op.uid, p_name: op.name, p_kind: kind, p_incident: incident, p_ref: ref, p_decision: decision, p_note: b.note ?? null });
+    if (kind !== "handoff" || decision === "dismissed") return {};
+    // The token is stored only as a hash, so "copy again" means a new link for the same recipient, the old one revoked.
+    const { data: h } = await priv().from("handoff").select("recipient").eq("id", ref).single();
+    await revokeHandoff(ref, op);
+    return decision === "reissued" ? createHandoff(incident, h!.recipient, op) : {};
+  },
+
   async staff_list(a) {
     staff(a, "operator");
     const { data, error } = await priv().from("staff").select("uid, display_name").eq("role", "field").order("display_name");
