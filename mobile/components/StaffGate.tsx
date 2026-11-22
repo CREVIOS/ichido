@@ -48,7 +48,7 @@ export function StaffGate({ allow, title, children }: { allow: Role[]; title: st
         <Button label={STAFF.signIn} onPress={signIn} busy={busy} disabled={!email || !password} block />
         {me && <Button kind="ghost" label={STAFF.otherAccount} onPress={out} />}
       </Card>
-      <View style={{ paddingHorizontal: 4 }}><T v="small">{STAFF.demo}</T></View>
+      <View style={{ paddingHorizontal: 4 }}><T v="small">{STAFF.signInLead}</T></View>
     </Screen>
   );
 }

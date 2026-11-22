@@ -7,8 +7,8 @@ import { Brand, Button, Card, Input, LangPicker, Notice, Row, Screen, Section, T
 import { HOME, MOBILE, STAFF, type Lang } from "@content/catalogue";
 
 const ICON: Record<string, LucideIcon> = { "/operator": MonitorDot, "/field": ShieldCheck, "/insights": ChartColumn };
-const STATION_ROLE = HOME.roles.find((r) => r.href.startsWith("/s/"));
-const STAFF_ROLES = HOME.roles.filter((r) => r !== STATION_ROLE);
+const STATION_ROLE = HOME.screens.items.find((r) => r.href.startsWith("/s/"));
+const STAFF_ROLES = HOME.screens.items.filter((r) => r !== STATION_ROLE);
 
 // Accepts a bare station id or any Help Point link (https://…/s/TABLE-A, ichido://s/TABLE-A).
 const stationFrom = (s: string) => {
@@ -32,7 +32,7 @@ export default function Entry() {
   const go = () => router.push({ pathname: "/s/[station]", params: { station: stationFrom(station), lang } });
 
   return (
-    <Screen eyebrow={<Brand />} title={HOME.title}>
+    <Screen eyebrow={<Brand />} title={HOME.title.join(" ")}>
       <T v="body">{HOME.lead}</T>
 
       <Section label={`${MOBILE.entry.caller.ja} · ${MOBILE.entry.caller.en}`}>
