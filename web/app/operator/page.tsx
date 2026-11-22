@@ -7,7 +7,7 @@ import { usePresence } from "@/lib/presence";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Dot, MoreMenu, Notice } from "@/components/kit";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CASES, DESK, DEVICE_FAULT, FRAUD_FAULT, OPS, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
+import { CASES, DESK, FRAUD_FAULT, OPS, packOfKind, STAFF, isFault, staffError, STAFF_JA } from "@/content/catalogue";
 import { CaseAlerts } from "./alerts";
 import { BotReminders } from "./bot";
 import { MassBanner, PromiseAlerts, incidentOrder } from "./ops";
@@ -45,7 +45,7 @@ function useDesk(sel: string) {
         .limit(1, { referencedTable: "case_event" }).order("sent_at", { referencedTable: "reply", ascending: false })
         .limit(1, { referencedTable: "reply" }).order("created_at").abortSignal(signal),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY).abortSignal(signal),
-      db.from("station").select("id, label").order("id").abortSignal(signal),
+      db.from("station").select("id, label, kind").order("id").abortSignal(signal),
       db.schema("ichido").from("sla_target").select("reason, seconds").abortSignal(signal),
     ]);
     if (signal.aborted) return;
@@ -99,7 +99,7 @@ function Console({ me }: { me: Me }) {
   const commands = [
     ...(open ?? []).map((c) => ({ group: STAFF.palette.cases, label: `${label[c.station] ?? c.station} · ${isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}`, onSelect: () => select(c.id) })),
     ...(current && !current.operator_id && !current.finished_at ? [{ group: STAFF.palette.actions, label: DESK.claim, hint: "C", onSelect: () => run("claim", { incident: current.id }) }] : []),
-    ...stations.map((s) => ({ group: STAFF.palette.actions, label: DESK.manualFaultAt(s.label.ja), onSelect: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) })),
+    ...stations.map((s) => ({ group: STAFF.palette.actions, label: DESK.manualFaultAt(s.label.ja), onSelect: () => run("simulate", { station: s.id }) })),
   ];
 
   return (
@@ -126,8 +126,8 @@ function Console({ me }: { me: Me }) {
         <BotReminders open={open} labels={label} me={me.uid} />
         <PromiseAlerts open={open} labels={label} me={me.uid} />
         <MoreMenu label={DESK.manualFault} items={stations.flatMap((s) => [
-          { label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: DEVICE_FAULT }) },
-          { label: OPS.fraud.manual(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: FRAUD_FAULT }) },
+          { label: DESK.manualFaultAt(s.label.ja), onClick: () => run("simulate", { station: s.id }) },
+          ...(packOfKind(s.kind) === "atm" ? [{ label: OPS.fraud.manual(s.label.ja), onClick: () => run("simulate", { station: s.id, fault: FRAUD_FAULT }) }] : []),
         ])} />
       </>}
     >

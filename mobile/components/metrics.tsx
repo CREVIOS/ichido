@@ -5,7 +5,7 @@ import { useLive } from "@/lib/live";
 import { Bars, Donut, Lines } from "@/components/charts";
 import { T } from "@/components/ui";
 import { chart, color, tier } from "@/theme";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, RATING, RATINGS, staffError, type Lang } from "@content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, staffError, type Lang, type PackId } from "@content/catalogue";
 
 // Mirrors web/app/insights/metrics.tsx: the same metrics, copy and RPCs, drawn with react-native-gifted-charts.
 export type Insights = {
@@ -20,6 +20,7 @@ export type Insights = {
   choices: Record<string, number>;
   ratings: Record<string, number>;
   targets: Partial<Record<string, number>>;
+  packs: Partial<Record<PackId, { received: number; guided: number }>>;   // insights_packs(): per station type
 };
 
 export const PERIODS = [7, 14, 30];
@@ -30,15 +31,16 @@ export function useInsights(days: number) {
   const [data, setData] = useState<Insights | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    const [main, ratings, t] = await Promise.all([
+    const [main, ratings, t, packs] = await Promise.all([
       sb().rpc("insights", { p_days: days }),
       sb().rpc("insights_ratings", { p_days: days }),
       sb().schema("ichido").from("sla_target").select("reason, seconds"), // operators only; managers see no target line
+      sb().rpc("insights_packs", { p_days: days }),
     ]);
-    const e = main.error ?? ratings.error;
+    const e = main.error ?? ratings.error ?? packs.error;
     const targets = Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds]));
     if (e) setError(staffError(e.message));
-    else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, targets }); }
+    else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, targets, packs: packs.data ?? {} }); }
   }, [days]);
   useLive(["desk"], load);
   return { data, error, load };
@@ -51,6 +53,8 @@ const minutes = (s: number | null) => (s == null ? null : Math.round((s / 60) * 
 const LANG_COLOR: Record<string, string> = { bn: chart.blue, en: chart.green, ja: color.violet };
 const RATING_COLOR: Record<number, string> = { 3: tier.high, 2: tier.mid, 1: tier.low };
 const CHOICE_COLOR: Record<string, string> = { wait: chart.blue, leave: chart.green };
+const PACK_COLOR = [chart.blue, chart.green, color.violet, tier.mid, color.faint];
+const packTotal = (d: Insights) => PACK_IDS.reduce((a, p) => a + (d.packs[p]?.received ?? 0), 0);
 
 function daily(d: Insights, compact = false) {
   return <Lines compact={compact} height={compact ? 72 : 220} labels={d.per_day.map((x) => dayLabel(x.day))}
@@ -153,6 +157,17 @@ export const METRICS = {
       return <Donut centre={t ? `${pct(d.ratings[3] ?? 0, t)}%` : "—"} centreSub={RATING[3].ja} shown={(v, all) => `${INSIGHTS.count(v)} · ${pct(v, all)}%`}
         slices={RATINGS.map((r) => ({ name: RATING[r].ja, color: RATING_COLOR[r], value: d.ratings[r] ?? 0 }))} />;
     },
+  },
+  // Cases per station type (scenario packs), as on the web.
+  packs: {
+    card: (d: Insights) => <Big sub={PACK_IDS.map((p) => PACKS[p].name.staff).join("・")}>{INSIGHTS.count(packTotal(d))}</Big>,
+    detail: (d: Insights) => (
+      <View style={{ gap: 12 }}>
+        <Donut centre={INSIGHTS.count(packTotal(d))} centreSub={INSIGHTS.received} shown={(v, t) => `${INSIGHTS.count(v)} · ${pct(v, t)}%`}
+          slices={PACK_IDS.map((p, i) => ({ name: PACKS[p].name.staff, color: PACK_COLOR[i], value: d.packs[p]?.received ?? 0 }))} />
+        {PACK_IDS.map((p) => <T key={p} v="small">{`${PACKS[p].name.staff}：${PACK_DESK.insights.received} ${INSIGHTS.count(d.packs[p]?.received ?? 0)}・${PACK_DESK.insights.guided} ${pct(d.packs[p]?.guided ?? 0, d.packs[p]?.received ?? 0)}%`}</T>)}
+      </View>
+    ),
   },
 } satisfies Record<string, { card: (d: Insights) => ReactNode; detail: (d: Insights) => ReactNode }>;
 

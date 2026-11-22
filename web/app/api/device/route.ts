@@ -1,12 +1,14 @@
 import { admin, priv, reply } from "@/lib/server";
 import { authenticateDevice, boundedText } from "@/lib/request-security";
 import { requestLog, errorFields } from "@/lib/log";
-import { DEVICE_FAULT, isFault } from "@/content/catalogue";
+import { isFault } from "@/content/catalogue";
+import { defaultFault } from "@/lib/faults";
 import { startBot } from "@/lib/bot";
 import { displayLines } from "@/lib/access";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
-// X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; default DEVICE_FAULT.
+// X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; by default the
+// station pack's situation for a press (an ATM: card retained). The database refuses a fault from another pack.
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/device");
   const station = await authenticateDevice(req, "/api/device");
@@ -14,7 +16,7 @@ export async function POST(req: Request): Promise<Response> {
   const body = await boundedText(req, 64);
   if (body instanceof Response) return body;
   const key = body.trim();
-  const fault = req.headers.get("x-fault") || DEVICE_FAULT;
+  const fault = req.headers.get("x-fault") || await defaultFault(station);
   if (!isFault(fault)) {
     log.warn("device_fault", { station, status: 400, code: "bad_fault" });
     return reply(400, { error: "unknown fault" });

@@ -1,5 +1,5 @@
 import "server-only";
-import { FRAUD_FAULT, REPLIES, replyBlock, type Fact } from "@/content/catalogue";
+import { FRAUD_FAULT, REPLIES, REPLY_RULES, packOfFault, replyBlock, type Fact } from "@/content/catalogue";
 import { admin, priv } from "@/lib/server";
 
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
@@ -15,7 +15,9 @@ const WHY_NOT: Record<string, string> = {
 // Which approved replies may be sent now — the same rules the SQL command and the reply trigger enforce.
 export function eligibleReplies(d: DeskFacts, flags: string[]) {
   const ctx = { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back as Fact, remote_release: d.remote_release };
-  return Object.entries(REPLIES).map(([intent, r]) => {
+  // Only the case's own pack: another pack's replies are never an option.
+  const pack = packOfFault(d.fault);
+  return Object.entries(REPLIES).filter(([intent]) => (REPLY_RULES[intent]?.pack ?? "atm") === pack).map(([intent, r]) => {
     const block = replyBlock(intent, r.needsHeld, ctx);
     return { intent, code: r.code, title_ja: r.title, offers_wait_or_leave: Boolean(r.offersChoice), eligible: block == null, why_not: block && WHY_NOT[block] };
   });
@@ -39,7 +41,7 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
         db.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
       ]);
       return {
-        ...d, caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
+        ...d, pack: packOfFault(d.fault), caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
         suspected_phone_fraud_alert: d.fault === FRAUD_FAULT, fraud_mode_active: d.fraud_at != null,
       };
     }

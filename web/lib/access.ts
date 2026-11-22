@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomInt } from "node:crypto";
-import { DEVICE_FAULT } from "@/content/catalogue";
+import { defaultFault } from "@/lib/faults";
 import { admin, fail, HttpError, type Actor } from "@/lib/server";
 
 // The path with no voice. A deaf or speech-impaired caller presses "I can't hear / I can't speak" on the sticker
@@ -46,7 +46,7 @@ export const accessCommands: Record<string, Command> = {
   async silent_alert(a, b) {
     if (a.kind !== "caller") return fail(403, "forbidden");
     if (a.incident) fail(409, "conflict");
-    await rpc("cmd_silent_alert", { p_uid: a.uid, p_station: str(b, "station"), p_fault: DEVICE_FAULT });
+    await rpc("cmd_silent_alert", { p_uid: a.uid, p_station: str(b, "station"), p_fault: await defaultFault(str(b, "station")) });
     return {};
   },
 

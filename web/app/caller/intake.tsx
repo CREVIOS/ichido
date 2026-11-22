@@ -7,15 +7,19 @@ import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ACCESS, ANSWER, FACTS, FACT_KEYS, STATUS, UI, errorText, type Fact, type Lang } from "@/content/catalogue";
-import type { Draft } from "./types";
+import { ACCESS, ANSWER, FACTS, FACT_KEYS, STATUS, UI, callerPack, errorText, type Fact, type Lang } from "@/content/catalogue";
+import { CallerFlags } from "./faults";
+import type { CallerCase, Draft } from "./types";
 
 // textOnly: the caller cannot hear or speak, so no voice and no "use the handset" hints.
-export function Intake({ lang, draft, needsHuman, textOnly }: { lang: Lang; draft: Draft; needsHuman: boolean; textOnly: boolean }) {
+// An ATM caller confirms the read-back of two facts; any other pack's caller confirms their own taps (content/packs).
+export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerCase }) {
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [say, setSay] = useState<SignedSpeech | null>(null);
+  const P = callerPack(card.fault);
+  const textOnly = card.text_only;
 
   async function send(body: Record<string, unknown>) {
     setBusy(true); setNote("");
@@ -28,14 +32,16 @@ export function Intake({ lang, draft, needsHuman, textOnly }: { lang: Lang; draf
     } finally { setBusy(false); }
   }
   const fail = (e: Error) => setNote(errorText(e.message, lang));
-  const known = FACT_KEYS.filter((k) => draft[k] !== "unknown");
+  const ready = P.atm ? FACT_KEYS.some((k) => draft[k] !== "unknown") : card.flags.length > 0;
 
   return (
     <>
       <div className="flex flex-col gap-3">
         <h1 className="text-[24px] leading-snug">{UI.aiNotice[lang]}</h1>
-        <Notice>{UI.neverAsk[lang]}</Notice>
+        <Notice>{P.neverAsk[lang]}</Notice>
+        {P.scope && <Notice>{P.scope[lang]}</Notice>}
       </div>
+      {!P.atm && <CallerFlags card={card} lang={lang} />}
       {!textOnly && <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} />}
       <form className="surface flex flex-col gap-2 p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) send({ text }); }}>
         <label className="px-1 text-[13px] text-muted-foreground" htmlFor="what">{UI.whatHappened[lang]}</label>
@@ -44,9 +50,10 @@ export function Intake({ lang, draft, needsHuman, textOnly }: { lang: Lang; draf
       </form>
       {note && <Notice tone="warn">{note}</Notice>}
       {draft.needs_clarification && <Notice tone="info">{UI.unsure[lang]}</Notice>}
-      <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
-      <Button size="lg" className="h-11" disabled={busy || !known.length} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
-      {needsHuman ? <Notice tone="info">{(textOnly ? ACCESS.humanAsked : UI.humanAsked)[lang]}</Notice>
+      {P.atm ? <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
+        : draft.words && <p className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
+      <Button size="lg" className="h-11" disabled={busy || !ready} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
+      {card.needs_human ? <Notice tone="info">{textOnly ? ACCESS.humanAsked[lang] : P.humanAsked(lang)}</Notice>
         : <Button variant="secondary" size="lg" onClick={() => cmd("human").catch(fail)}>{UI.human[lang]}</Button>}
     </>
   );
@@ -78,12 +85,12 @@ function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; b
   );
 }
 
-// No timers in the caller flow: the handset hint is there from the start, so nobody has to wait for it to appear.
-export function Waiting({ lang, textOnly }: { lang: Lang; textOnly: boolean }) {
+// No timers in the caller flow: the "find a person" hint is there from the start, so nobody has to wait for it.
+export function Waiting({ lang, textOnly, fault }: { lang: Lang; textOnly: boolean; fault: string }) {
   return (
     <section className="surface flex flex-col gap-2 p-5">
       <span className="flex items-center gap-2 text-[18px] text-foreground"><span className="size-2 animate-pulse rounded-full bg-info" aria-hidden />{STATUS.review[lang]}</span>
-      <p className="text-[14px] leading-6">{(textOnly ? ACCESS.waiting : UI.waiting)[lang]}</p>
+      <p className="text-[14px] leading-6">{textOnly ? ACCESS.waiting[lang] : callerPack(fault).waiting(lang)}</p>
     </section>
   );
 }

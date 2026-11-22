@@ -52,6 +52,25 @@ export const HOME = {
   cta: { title: "Start from the console", body: "Sign in with a staff account issued by your administrator.", button: "Open the console" },
   footer: "The bank, branch and security company shown are fictional. Nothing here connects to a real bank or ATM network.",
   howTag: { left: "HOW IT WORKS", right: "1.0" },
+  // Scenario packs (content/packs). Each card's name, responder and situations come from the pack itself.
+  beyond: {
+    title: "Beyond ATMs",
+    sub: ["The same desk, at any staffed service point.", "The ATM stays the flagship."],
+    tag: { left: "SCENARIO PACKS", right: "5" },
+    lead: "A station's type picks its pack: its own situations, the caller's taps, the approved replies with database rules, the responder and the hand-off recipients. The rules do not change.",
+    responder: "Responder",
+    situations: "Situations",
+    atm: "Card, passbook or cash held; a forgotten card; a residence-card limit; phone fraud at the machine.",
+    rules: [
+      "AI drafts, a person decides. Callers only ever see their pack's approved replies.",
+      "No diagnosis, no legal or immigration advice: the assistant captures taps and routes to a person.",
+      "A red-flag tap (chest pain, hard to breathe, a missing child) allows only “tell the staff now / call 119”.",
+      "Residence-card, insurance, My Number and bank numbers are never asked for, and withheld if typed.",
+    ],
+    try: "Open a Help Point",
+    // The seeded fictional station for each pack (supabase/seed.sql).
+    stations: { atm: "TABLE-A", hospital: "HOSP-A", city_office: "CITY-A", transit: "RAIL-A", shelter: "SHELTER-A" } as Record<string, string>,
+  },
   people: {
     title: "Built for everyone at the machine",
     tag: { left: "PEOPLE", right: "3" },

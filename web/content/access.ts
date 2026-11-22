@@ -2,6 +2,7 @@
 // Caller strings are drafts awaiting native review, like the rest of the catalogue; staff strings are formal Japanese.
 
 import type { L10n } from "./catalogue.ts";
+import { SHELTER_NOTICES } from "./packs/shelter.ts";
 
 // Text-only path (caller).
 
@@ -93,6 +94,8 @@ export const DISASTER_NOTICES: Record<string, { title: string; text: L10n }> = {
       ne: "बिजुली गएको वा प्रणालीमा समस्या भएकाले यस क्षेत्रका एटीएम बन्द छन्। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। तल दिइएका चालु Help Point वा घुम्ती शाखा प्रयोग गर्नुहोस्, वा बैंकको आधिकारिक सम्पर्क माध्यम प्रयोग गर्नुहोस्।",
     },
   },
+  // A shelter's updates use the same mode (content/packs/shelter.ts).
+  ...SHELTER_NOTICES,
 };
 export const isDisasterNotice = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(DISASTER_NOTICES, k);
 

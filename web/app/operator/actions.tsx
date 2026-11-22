@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DESK, DEVICE_FAULT, FAULT_DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
+import { DESK, DEVICE_FAULT, FAULT_DESK, LANG_NAME, MANUAL_VERSION, PACKS, PACK_DESK, REPLIES, callerPack, intentsOf, packOfFault, packStaffField, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
 import { DispatchChain } from "./ops";
 
@@ -44,13 +44,13 @@ export function PairCard({ incident }: { incident: string }) {
   );
 }
 
-const INTENTS = Object.keys(REPLIES);
-
 // practice: the training console, where the held-card rule is scored in the debrief instead of hinted here.
-// flags: the caller's own taps, which some replies need (content/faults.ts REPLY_RULES).
+// flags: the caller's own taps, which some replies need (content/faults.ts REPLY_RULES). Only the case's pack's
+// replies are listed (content/packs).
 export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [] }: {
   d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; flags?: string[];
 }) {
+  const INTENTS = intentsOf(packOfFault(d.fault ?? DEVICE_FAULT));
   const [intent, setIntent] = useState(INTENTS[0]);
   const r = replyOf(intent) ?? REPLIES[INTENTS[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
@@ -99,28 +99,32 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
 }
 
 // company: the station's security company, whose control centre (管制) the dispatch goes through.
-export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: Pick<Desk, "id">; job: Job | null; guards: Guard[]; card: Pick<CallerCard, "field_state"> | null; lang: Lang; run: Run; company?: string | null }) {
+// A non-ATM case (d.fault in another pack) dispatches the same field staff as that pack's responder, with its wording.
+export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: Pick<Desk, "id"> & { fault?: string }; job: Job | null; guards: Guard[]; card: Pick<CallerCard, "field_state"> | null; lang: Lang; run: Run; company?: string | null }) {
   const others = guards.filter((g) => g.uid !== job?.assignee);
+  const pack = packOfFault(d.fault);
+  const staffField = packStaffField(pack) ?? STAFF_JA.field;
+  const caller = callerPack(d.fault ?? DEVICE_FAULT);
   return (
     <Panel title={DESK.dispatch.title}>
-      {company && <DispatchChain company={company} />}
+      {company && pack === "atm" && <DispatchChain company={company} />}
       {job ? (
         <div className="surface flex flex-col gap-1 p-3.5">
           <span className="flex items-center justify-between text-[14px] text-foreground">
             {guards.find((g) => g.uid === job.assignee)?.display_name ?? DESK.dispatch.guard}
-            <Chip>{STAFF_JA.field[job.state]}</Chip>
+            <Chip>{staffField[job.state]}</Chip>
           </span>
           <span className="text-[13px]">{job.eta ? DESK.dispatch.eta(job.eta) : DESK.dispatch.etaUnknown}</span>
         </div>
       ) : (
-        <p className="text-[14px] leading-6">{DESK.dispatch.body}</p>
+        <p className="text-[14px] leading-6">{pack === "atm" ? DESK.dispatch.body : PACK_DESK.dispatchBody(PACKS[pack].responder.staff)}</p>
       )}
       {others.length ? (
         <div className="flex flex-wrap gap-2">
           {others.map((g) => <Button key={g.uid} variant="secondary" onClick={() => run("assign", { incident: d.id, assignee: g.uid })}>{DESK.dispatch.assign(g.display_name, Boolean(job))}</Button>)}
         </div>
       ) : !job && <Notice>{DESK.dispatch.noGuards}</Notice>}
-      {card && card.field_state !== "none" && <span className="text-[12px] text-muted-foreground">{DESK.dispatch.callerSees(pick(FIELD_STATE[card.field_state], lang))}</span>}
+      {card && card.field_state !== "none" && <span className="text-[12px] text-muted-foreground">{DESK.dispatch.callerSees(caller.field(card.field_state, lang))}</span>}
     </Panel>
   );
 }

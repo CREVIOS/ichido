@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { STATIONS, isDisasterNotice } from "@/content/catalogue";
+import { STATIONS, isDisasterNotice, packOfKind } from "@/content/catalogue";
 import { admin, fail } from "@/lib/server";
 import { entry, ship } from "@/lib/log";
 import { nearestWorking, type Place } from "@/lib/nearest";
@@ -45,7 +45,7 @@ export const disasterCommands: Record<string, Command> = {
     const all = (rows ?? []).map((r) => ({ ...r, last_seen: seen(r.device_health) }));
     const here = all.find((r) => r.id === d?.station);
     if (!here?.disaster) return { notice: null, nearby: [] };
-    const near = here.lat != null && here.lng != null ? nearestWorking({ lat: here.lat, lng: here.lng }, all as Place[], Date.now(), STATIONS.onlineWithinS) : [];
+    const near = here.lat != null && here.lng != null ? nearestWorking({ lat: here.lat, lng: here.lng }, (all as Place[]).filter((r) => packOfKind(r.kind) === packOfKind(here.kind)), Date.now(), STATIONS.onlineWithinS) : [];
     const byId = new Map(all.map((r) => [r.id, r]));
     return {
       notice: here.disaster,

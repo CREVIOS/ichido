@@ -16,6 +16,9 @@ const NUMBER_WORDS = new Set([
   // Nepali
   "शून्य", "सुन्ना", "एक", "दुई", "तीन", "चार", "पाँच", "छ", "सात", "आठ", "नौ",
 ]);
+// Words for an ID, insurance, residence-card, My Number, passport or account number in the caller languages: with three
+// or more digits anywhere in the text, the text is withheld even when the digits are split up.
+const ID_WORDS = /number|no\.|card|insurance|passport|account|my ?number|番号|記号|保険|在留|マイナンバー|パスポート|口座|ばんごう|নম্বর|কার্ড|বিমা|পাসপোর্ট|số|thẻ|bảo hiểm|hộ chiếu|tài khoản|nomor|kartu|asuransi|paspor|rekening|नम्बर|कार्ड|बीमा|राहदानी|खाता/i;
 export function looksLikeNumber(text: string): boolean {
   const normalised = text
     .replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)))
@@ -23,6 +26,8 @@ export function looksLikeNumber(text: string): boolean {
     .replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
     .replace(/[\s\-‐-―ー.・,]/g, "");
   if (/\d{4,}/.test(normalised)) return true;
+  // Card-style IDs split by letters (a residence card is AB12345678CD; 記号12-番号345 on an insurance card).
+  if (/[a-z]\d{2,}[a-z]+\d/i.test(normalised) || ((normalised.match(/\d/g) ?? []).length >= 3 && ID_WORDS.test(text))) return true;
   let run = 0;
   // NFC so Vietnamese typed with combining accents matches the precomposed words above.
   for (const w of text.normalize("NFC").toLowerCase().split(/[\s,、。.・\-।]+/).filter(Boolean)) {

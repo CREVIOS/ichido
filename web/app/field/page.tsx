@@ -8,7 +8,7 @@ import { AppShell, Chip, Dot, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BOT, DESK, ETA_OPTIONS, FIELD, OPS, isFault, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
+import { BOT, DESK, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
 type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
 type Site = { label: string; company: string };
@@ -55,8 +55,8 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
   return (
     <section className="surface flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
-        <span className="mono text-muted-foreground">{j.station}</span>
-        <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{STAFF_JA.field[j.state]}</span>
+        <span className="mono text-muted-foreground">{j.station} · {PACKS[packOfFault(j.fault)].name.staff}</span>
+        <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{(packStaffField(packOfFault(j.fault)) ?? STAFF_JA.field)[j.state]}</span>
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-[22px] leading-tight tracking-[-0.03em] text-foreground">{label}</span>
@@ -80,7 +80,7 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
       <div className="grid grid-cols-2 gap-2">
         {STEPS.filter((x) => x !== (NEXT[j.state] ?? "done")).map((x) => <Button key={x} variant="secondary" className="h-10" onClick={() => act(x)}>{LABEL[x]}</Button>)}
       </div>
-      <p className="text-[12px] leading-5 text-muted-foreground">{FIELD.note}</p>
+      <p className="text-[12px] leading-5 text-muted-foreground">{packOfFault(j.fault) === "atm" ? FIELD.note : PACK_DESK.fieldNote(PACKS[packOfFault(j.fault)].responder.staff)}</p>
     </section>
   );
 }

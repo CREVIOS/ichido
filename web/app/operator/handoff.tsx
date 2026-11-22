@@ -7,14 +7,14 @@ import { useLive } from "@/lib/live";
 import { Chip, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
-import { HANDOFF, staffError } from "@/content/catalogue";
+import { HANDOFF, PACKS, packOfFault, staffError } from "@/content/catalogue";
 
 type Link = { id: string; recipient: string; created_at: string; expires_at: string; revoked_at: string | null; views: number };
-const RECIPIENTS = Object.keys(HANDOFF.recipient);
 const at = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-// Read-only links to this case's record for the bank, the police or the security company.
-export function HandoffPanel({ incident }: { incident: string }) {
+// Read-only links to this case's record for its pack's recipients (an ATM: the bank, the police, the security company).
+export function HandoffPanel({ incident, fault }: { incident: string; fault: string }) {
+  const RECIPIENTS = Object.keys(PACKS[packOfFault(fault)].recipients);
   const [state, setState] = useState<{ links: Link[]; now: number }>({ links: [], now: 0 });
   const load = useCallback(() => cmd<{ links: Link[] }>("handoff_list", { incident })
     .then((r) => setState({ links: r.links, now: Date.now() })).catch(() => setState({ links: [], now: Date.now() })), [incident]);

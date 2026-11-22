@@ -3,7 +3,8 @@
 // Bengali, Vietnamese, Indonesian, Nepali and Japanese below are drafts awaiting native review (see README).
 
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
-import { FAULT_NAMES, FAULT_REPLIES, faultEventText } from "./faults.ts";
+import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
+import { EXCLUSIVE_GROUPS, PACKS, contentPack, isUrgentTap, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
@@ -43,6 +44,10 @@ export const FAULTS: Record<string, L10n> = {
 };
 export const DEVICE_FAULT = "card_retained";
 export const isFault = (k: unknown): k is string => typeof k === "string" && Object.hasOwn(FAULTS, k);
+// A pack's situations (fault codes), in catalogue order; the ATM's are every code no other pack owns.
+export const situationsOf = (pack: PackId) => Object.keys(FAULTS).filter((f) => packOfFault(f) === pack);
+// A pack's approved replies, in catalogue order (the rule names the pack; the ATM's default).
+export const intentsOf = (pack: PackId) => Object.keys(REPLIES).filter((k) => (REPLY_RULES[k]?.pack ?? "atm") === pack);
 
 export const REMOTE_RELEASE: Record<string, string> = { failed: "失敗", released: "成功" };
 
@@ -180,8 +185,16 @@ export const RATING: Record<number, L10n> = {
 };
 const RATING_JA: Record<number, string> = { 3: "よかった", 2: "ふつう", 1: "むずかしかった" };
 
-// Timeline sentences for staff, rendered from event codes and data.
-export function eventText(kind: string, d: Record<string, string | undefined>): string {
+// Timeline sentences for staff, rendered from event codes and data. fault: the case's situation, so a non-ATM case
+// names its own responder instead of the security company.
+export function eventText(kind: string, d: Record<string, string | undefined>, fault?: string): string {
+  const pack = packOfFault(fault);
+  if (pack !== "atm") {
+    const who = PACKS[pack].responder.staff;
+    if (kind === "dispatch" || kind === "redispatch") return `${who}へ${kind === "dispatch" ? "" : "再"}依頼（${d.assignee ?? ""}）`;
+    if (kind === "confirmed") return "お客様が申告（選択肢）を確認";
+    if (kind === "field") return `${packStaffField(pack)![(d.state ?? "none") as FieldState]}${d.state === "on_way" ? `（目安 ${d.eta ? d.eta.replace("-", "〜") + "分" : "未定"}）` : ""}`;
+  }
   switch (kind) {
     case "fault": return `障害通知：${isFault(d.fault) ? STAFF_JA.fault[d.fault] : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
@@ -210,8 +223,15 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
   }
 }
 
-// After-call record: one sentence per piece of evidence that actually exists.
-export function summaryDraft(x: { card_back: Fact; cash_received: Fact; remote_release: string | null; dispatched: boolean; choice: string | null }): string {
+// After-call record: one sentence per piece of evidence that actually exists. A non-ATM case (fault) lists the
+// caller's own taps and names the pack's responder.
+export function summaryDraft(x: { card_back: Fact; cash_received: Fact; remote_release: string | null; dispatched: boolean; choice: string | null; fault?: string; flags?: string[] }): string {
+  const pack = packOfFault(x.fault);
+  if (pack !== "atm") return [
+    x.flags?.length && `お客様の申告：${x.flags.map((f) => CALLER_FLAGS[f]?.staff ?? f).join("、")}。`,
+    x.dispatched && `${PACKS[pack].responder.staff}へ対応を依頼。`,
+    "お客様が次の行動を自分の言葉で説明した。",
+  ].filter(Boolean).join("");
   return [
     x.card_back !== "unknown" && `${FACT_STAFF.card_back[x.card_back]}。`,
     x.cash_received !== "unknown" && `${FACT_STAFF.cash_received[x.cash_received]}。`,
@@ -365,6 +385,7 @@ export * from "./mobile.ts";
 export * from "./access.ts";
 import { accessEventText } from "./access.ts";
 export * from "./faults.ts";
+export * from "./packs/index.ts";
 export * from "./ops.ts";
 
 // Pairing page behind the Help Point sticker.
@@ -440,6 +461,33 @@ export const ERRORS: Record<string, L10n> = {
   },
 };
 export const errorText = (code: string, lang: Lang) => (Object.hasOwn(ERRORS, code) ? ERRORS[code] : ERRORS.server)[lang];
+
+// The caller wording that depends on the case's pack (content/packs): what is never asked, the assistant's limits,
+// where to find a person, the responder's state and estimate, and the "field" status. The ATM keeps its own.
+export function callerPack(fault: string) {
+  const p = contentPack(fault);
+  if (!p) return {
+    atm: true, neverAsk: UI.neverAsk, scope: undefined as L10n | undefined,
+    waiting: (l: Lang) => UI.waiting[l], humanAsked: (l: Lang) => UI.humanAsked[l],
+    field: (s: FieldState, l: Lang) => FIELD_STATE[s][l], eta: etaText,
+    status: (s: Status, l: Lang) => STATUS[s][l],
+  };
+  const c = packCaller(p);
+  return { atm: false, ...c, status: (s: Status, l: Lang) => (s === "field" ? c.field("requested", l) : STATUS[s][l]) };
+}
+
+// The pack's urgent approved reply (the one a red-flag tap allows), shown to the caller at once while such a tap is on:
+// the same words the operator would send. Null for no red flag, or a pack without one.
+export function urgentText(fault: string, flags: readonly string[], lang: Lang): string | null {
+  if (!flags.some(isUrgentTap)) return null;
+  const intent = intentsOf(packOfFault(fault)).find((k) => REPLY_RULES[k]?.needsFlags?.some(isUrgentTap));
+  return intent ? REPLIES[intent].text({})[lang] : null;
+}
+// The taps to turn off when the caller turns `flag` on in a one-answer group (who, since when, how much it hurts…).
+export function exclusiveOff(flag: string, flags: readonly string[]): string[] {
+  const g = CALLER_FLAGS[flag]?.group;
+  return g && EXCLUSIVE_GROUPS.has(g) ? flags.filter((f) => f !== flag && CALLER_FLAGS[f]?.group === g) : [];
+}
 
 // The sentence the assistant reads back, built from the current draft facts.
 export function readBackText(lang: Lang, facts: Record<FactKey, Fact>): string | null {

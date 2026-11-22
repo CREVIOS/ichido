@@ -176,14 +176,14 @@ export async function record(incident: string) {
   const t0 = performance.now();
   const { admin, summaryDraft } = await lib();
   const [d, job, card] = await Promise.all([
-    admin.from("desk").select("card_back, cash_received, remote_release").eq("id", incident).single(),
+    admin.from("desk").select("fault, card_back, cash_received, remote_release").eq("id", incident).single(),
     admin.from("field_job").select("incident").eq("incident", incident).maybeSingle(),
-    admin.from("caller_card").select("choice").eq("id", incident).maybeSingle(),
+    admin.from("caller_card").select("choice, flags").eq("id", incident).maybeSingle(),
   ]);
   if (d.error) throw d.error;
   const summary = summaryDraft({
     card_back: d.data.card_back as Fact, cash_received: d.data.cash_received as Fact, remote_release: d.data.remote_release,
-    dispatched: Boolean(job.data), choice: card.data?.choice ?? null,
+    dispatched: Boolean(job.data), choice: card.data?.choice ?? null, fault: d.data.fault, flags: card.data?.flags ?? [],
   });
   const r = await rpc<{ total_s: number }>("bot_close", { p_incident: incident, p_summary: summary });
   await log("record", incident, t0, "recorded", { total_s: r.total_s });

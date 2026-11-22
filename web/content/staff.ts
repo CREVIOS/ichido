@@ -2,6 +2,7 @@ import { OPS, OPS_FAULT_STAFF } from "./ops.ts";
 
 // Staff screens (Japanese): console, guard, insights, sign-in.
 import { FAULT_STAFF } from "./faults.ts";
+import { PACK_DESK, PACK_RECIPIENTS } from "./packs/index.ts";
 
 // Staff sign-in (staff screens are Japanese).
 export const STAFF = {
@@ -266,6 +267,7 @@ export const INSIGHTS = {
     choices: { title: "お客様の選択", def: "「待つ／帰る」を選べる返答を受けたお客様が、どちらを選んだか。" },
     ratings: { title: "お客様の評価", def: "案内確認で終了したあと、お客様が3つの顔から1回だけ選んだ評価。自由記述は集めません。" },
     ops: OPS.insights.metric,
+    packs: { title: PACK_DESK.insights.title, def: PACK_DESK.insights.def },
     bot: { title: "対応時間", def: "Ichido Bot が案件の終了時に経過記録から算出した時間の中央値。障害通知から担当決定・初回返答・終了まで、警備員は出動依頼から到着まで。" },
   },
   bot: { records: "記録件数", claim: "担当まで", reply: "初回返答まで", guard: "警備員の到着まで", total: "終了まで", median: "中央値" },
@@ -275,7 +277,7 @@ export const INSIGHTS = {
 export const HANDOFF = {
   title: "引継票",
   lead: "銀行・警察・警備会社へ、この案件の記録を読み取り専用のリンクで渡します。ファイルをメールで送る必要はありません。24時間で失効し、閲覧は経過に記録されます。お客様の自由記述は含みません。",
-  recipient: { bank: "銀行", police: "警察", security: "警備会社" } as Record<string, string>,
+  recipient: PACK_RECIPIENTS,   // per pack: content/packs (bank, police, security for an ATM)
   create: (r: string) => `${r}宛`,
   copy: "リンクをコピー",
   copied: "リンクをコピーしました",

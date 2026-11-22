@@ -1,29 +1,44 @@
 "use client";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Check } from "lucide-react";
 import { cmd } from "@/lib/supabase";
 import { Phone } from "@/components/phone";
 import { Notice } from "@/components/kit";
 import { LangSelect } from "@/components/lang-select";
 import { cn } from "@/lib/utils";
-import { CALLER_FLAGS, FAULTS, FAULT_UI, UI, bankStatusText, errorText, flagsFor, pick, replyOf, type L10n, type Lang } from "@/content/catalogue";
+import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, replyOf, urgentText, type L10n, type Lang } from "@/content/catalogue";
 import { PrefsBar, type Prefs } from "./prefs";
 import type { CallerCase } from "./types";
 
 // The caller's own taps: what happened and who is with them. Each tap is their statement, shown to the operator as is.
+// A pack groups its taps under headings (who, where, since when, how much it hurts…); a one-answer group turns the
+// others off. A red-flag tap shows the pack's urgent approved text at once, the same words the operator would send.
 export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
   const [note, setNote] = useState("");
-  const tap = (flag: string, on: boolean) => cmd("flag", { flag, on }).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
+  const tap = async (flag: string, on: boolean) => {
+    try {
+      for (const f of on ? exclusiveOff(flag, card.flags) : []) await cmd("flag", { flag: f, on: false });
+      await cmd("flag", { flag, on });
+      setNote("");
+    } catch (e) { setNote(errorText((e as Error).message, lang)); }
+  };
+  const taps = flagsFor(card.fault, card.flags);
+  const urgent = urgentText(card.fault, card.flags, lang);
   return (
     <section className="flex flex-col gap-2.5">
-      <span className="text-[13px] text-muted-foreground">{FAULT_UI.flagsTitle[lang]}</span>
-      {flagsFor(card.fault).map((f) => {
+      {urgent && <p role="alert" className="rounded-xl border border-alert bg-[oklch(0.98_0.02_25)] p-4 text-[17px] leading-7 text-foreground">{urgent}</p>}
+      {taps.map((f, i) => {
         const on = card.flags.includes(f);
+        const g = CALLER_FLAGS[f].group;
+        const heading = i === 0 || g !== CALLER_FLAGS[taps[i - 1]].group ? (g && GROUP_TITLE[g]) ?? FAULT_UI.flagsTitle : null;
         return (
-          <button key={f} type="button" aria-pressed={on} onClick={() => tap(f, !on)}
-            className={cn("flex min-h-12 items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left text-[15px] leading-6 transition-colors", on ? "border-primary bg-primary text-primary-foreground" : "bg-card text-foreground hover:bg-accent")}>
-            <Check className={cn("size-4 shrink-0 stroke-[1.5]", on ? "opacity-100" : "opacity-0")} />{CALLER_FLAGS[f].label[lang]}
-          </button>
+          <Fragment key={f}>
+            {heading && <span className={cn("text-[13px] text-muted-foreground", i > 0 && "pt-2")}>{heading[lang]}</span>}
+            <button type="button" aria-pressed={on} onClick={() => tap(f, !on)}
+              className={cn("flex min-h-12 items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left text-[15px] leading-6 transition-colors", on ? "border-primary bg-primary text-primary-foreground" : CALLER_FLAGS[f].urgent ? "border-alert/50 bg-card text-foreground hover:bg-accent" : "bg-card text-foreground hover:bg-accent")}>
+              <Check className={cn("size-4 shrink-0 stroke-[1.5]", on ? "opacity-100" : "opacity-0")} />{CALLER_FLAGS[f].label[lang]}
+            </button>
+          </Fragment>
         );
       })}
       {note && <Notice tone="warn">{note}</Notice>}
@@ -59,7 +74,7 @@ export function FollowUp({ f, prefs, onPrefs }: { f: FollowUpCase; prefs: Prefs;
         <h1 className="text-[24px] leading-snug">{FAULT_UI.followTitle[lang]}</h1>
         <p className="text-[15px] leading-6">{FAULT_UI.followLead[lang]}</p>
       </div>
-      <BankStatus status={f.bank_status} due={f.bank_due} lang={lang} />
+      {packOfFault(f.fault) === "atm" && <BankStatus status={f.bank_status} due={f.bank_due} lang={lang} />}
       {told && (
         <section className="flex flex-col gap-1.5">
           <span className="text-[13px] text-muted-foreground">{FAULT_UI.lastReply[lang]}</span>

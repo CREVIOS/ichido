@@ -4,20 +4,32 @@ import { toast } from "sonner";
 import { Chip, Dot, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AMOUNT_MAX, BANK_STATUS, CALLER_FLAGS, FAULTS, FAULT_DESK, STAFF_JA, bankStatusStaff, suggestedFaults, takesAmount } from "@/content/catalogue";
+import { AMOUNT_MAX, BANK_STATUS, CALLER_FLAGS, FAULT_DESK, PACK_DESK, STAFF_JA, bankStatusStaff, isUrgentTap, packOfFault, situationsOf, suggestedFaults, takesAmount } from "@/content/catalogue";
 import type { CallerCard, Desk, Run } from "./types";
 
 const field = "h-9 rounded-lg border bg-card px-2.5 text-[14px] text-foreground";
-const FAULT_KEYS = Object.keys(FAULTS);
 
-// The fault type (correctable when the caller's story shows the machine alert was wrong) and, for cash faults,
-// the amount the caller stated on the handset.
+// A red-flag tap (chest pain, a missing child…): the caller already sees the urgent approved text; only that reply
+// can be sent until the tap is off (the database refuses every other reply).
+export function UrgentBanner({ flags }: { flags: string[] }) {
+  const urgent = flags.filter(isUrgentTap);
+  if (!urgent.length) return null;
+  return (
+    <div role="alert" className="flex flex-col gap-1 rounded-xl border border-alert bg-[oklch(0.98_0.02_25)] p-4">
+      <span className="flex items-center gap-2 text-[16px] text-foreground"><Dot s="alert" />{PACK_DESK.urgent}：{urgent.map((f) => CALLER_FLAGS[f].staff).join("・")}</span>
+      <span className="text-[13px] leading-5">{PACK_DESK.urgentBody}</span>
+    </div>
+  );
+}
+
+// The situation (fault type), correctable within the case's pack when the caller's story shows the alert was wrong,
+// and, for cash faults, the amount the caller stated on the handset.
 export function FaultCard({ d, flags, run }: { d: Desk; flags: string[]; run: Run }) {
   const suggested = suggestedFaults(d.fault, flags);
   return (
     <Panel title={FAULT_DESK.title}>
       <select aria-label={FAULT_DESK.change} className={field} value={d.fault} onChange={(e) => run("set_fault", { incident: d.id, fault: e.target.value })}>
-        {FAULT_KEYS.map((k) => <option key={k} value={k}>{STAFF_JA.fault[k]}</option>)}
+        {situationsOf(packOfFault(d.fault)).map((k) => <option key={k} value={k}>{STAFF_JA.fault[k]}</option>)}
       </select>
       {suggested.map((f) => (
         <button key={f} type="button" onClick={() => run("set_fault", { incident: d.id, fault: f })}

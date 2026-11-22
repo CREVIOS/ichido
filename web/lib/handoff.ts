@@ -1,15 +1,18 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { fail, priv } from "@/lib/server";
+import { PACKS, PACK_RECIPIENTS, packOfFault } from "@/content/catalogue";
+import { admin, fail, priv } from "@/lib/server";
 import { rpc } from "@/lib/access";
 
-// Hand-off links: a read-only record of one case for the bank, the police or the security company.
-export const RECIPIENTS = ["bank", "police", "security"] as const;
-export type Recipient = (typeof RECIPIENTS)[number];
+// Hand-off links: a read-only record of one case for the recipients of its pack (an ATM's bank, police or security
+// company; a hospital department or medical interpreter; a city section; the railway; a disaster HQ…).
+export type Recipient = keyof typeof PACK_RECIPIENTS;
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function createHandoff(incident: string, recipient: string, by: { uid: string }) {
-  if (!(RECIPIENTS as readonly string[]).includes(recipient)) fail(400, "bad_request");
+  const { data: d } = await admin.from("desk").select("fault").eq("id", incident).maybeSingle();
+  if (!d) fail(404, "not_found");
+  if (!Object.hasOwn(PACKS[packOfFault(d!.fault)].recipients, recipient)) fail(400, "bad_request");
   const token = randomBytes(24).toString("base64url");
   const [link] = await rpc<{ id: string; expires_at: string }[]>("create_handoff", {
     p_uid: by.uid, p_incident: incident, p_hash: hash(token), p_recipient: recipient,

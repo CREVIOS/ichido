@@ -1,5 +1,5 @@
 import "server-only";
-import { AMOUNT_FAULTS, AMOUNT_MAX, BANK_STATUS, isBankStatus, isCallerFlag, isFault } from "@/content/catalogue";
+import { AMOUNT_FAULTS, AMOUNT_MAX, BANK_STATUS, DEVICE_FAULT, PACK_TAPS, contentPack, defaultSituation, isBankStatus, isCallerFlag, isFault, packTaps } from "@/content/catalogue";
 import { admin, fail, priv } from "@/lib/server";
 
 // Commands for the real-world fault paths (content/faults.ts). Each one is a SQL function in
@@ -7,7 +7,7 @@ import { admin, fail, priv } from "@/lib/server";
 
 type Body = Record<string, unknown>;
 type Op = { uid: string; name: string };
-type Caller = { uid: string };
+type Caller = { uid: string; incident?: string | null };
 
 const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400 };
 const str = (b: Body, k: string) => (typeof b[k] === "string" && b[k] ? (b[k] as string) : fail(400, "bad_request"));
@@ -41,10 +41,21 @@ export function bankStatus(op: Op, b: Body) {
   return rpc("cmd_bank_status", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident"), p_status: status, p_due: due });
 }
 
-// Caller: one of their own taps, on or off.
-export function flag(c: Caller, b: Body) {
+// Caller: one of their own taps, on or off. A tap is turned on only if the case's pack offers it (any can be turned off).
+export async function flag(c: Caller, b: Body) {
   if (!isCallerFlag(b.flag) || typeof b.on !== "boolean") fail(400, "bad_request");
+  if (b.on && c.incident) {
+    const { data: d } = await admin.from("desk").select("fault").eq("id", c.incident).maybeSingle();
+    const p = contentPack(d?.fault);
+    if (p ? !packTaps(p).includes(b.flag as string) : Object.hasOwn(PACK_TAPS, b.flag as string)) fail(400, "bad_request");
+  }
   return rpc("cmd_flag", { p_uid: c.uid, p_flag: b.flag, p_on: b.on });
+}
+
+// The situation a press on this station's Help Point opens: its pack's default, or the ATM's card fault.
+export async function defaultFault(station: string): Promise<string> {
+  const { data } = await admin.from("station").select("kind").eq("id", station).maybeSingle();
+  return defaultSituation(data?.kind) ?? DEVICE_FAULT;
 }
 
 // Caller: the case this phone may still follow after it closed (30 days), with the bank's status.

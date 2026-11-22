@@ -10,7 +10,7 @@ import { AppShell, Notice } from "@/components/kit";
 import { PaneButton, PaneLabel, TitleBar } from "@/components/pane";
 import { Pill, SegBar } from "@/components/charts";
 import { cn } from "@/lib/utils";
-import { BOT, CASES, DESK, DEVICE_FAULT, REVIEW, SEQUENCE, SLA, STAFF_JA, isFault, staffError, type L10n } from "@/content/catalogue";
+import { BOT, CASES, DESK, REVIEW, SEQUENCE, SLA, STAFF_JA, isFault, staffError, type L10n } from "@/content/catalogue";
 import { hhmm, when, type BotStep } from "../operator/types";
 
 type Run = { id: string; station: string; fault: string; source: string; created_at: string; bot_step: BotStep[] };
@@ -239,7 +239,7 @@ function History({ done, labels }: { done: Done[]; labels: Record<string, string
 // Runs started from a manually registered fault: the console's own "simulate" command, so a test is a real case.
 function Test({ data }: { data: Data }) {
   const X = SEQUENCE.test;
-  const start = (station: string) => cmd("simulate", { station, fault: DEVICE_FAULT })
+  const start = (station: string) => cmd("simulate", { station })
     .then(() => toast.success(X.started)).catch((e: Error) => toast.error(staffError(e.message)));
   const open = data.runs.filter((r) => r.source === "simulator");
   const closed = data.done.filter((r) => r.desk.source === "simulator");

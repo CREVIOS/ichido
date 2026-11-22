@@ -7,7 +7,7 @@ import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
 import { type Desk, type OpenDesk, type Targets, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
-import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n, STAFF_JA } from "@content/catalogue";
+import { LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n, STAFF_JA } from "@content/catalogue";
 
 const O = MOBILE.operator;
 const HISTORY = 8;
@@ -43,7 +43,7 @@ function Queue({ me }: { me: Me }) {
   useLive(["desk", "reply"], load);
 
   const label = useMemo(() => Object.fromEntries(stations.map((s) => [s.id, s.label.ja])), [stations]);
-  const simulate = (station: string) => cmd("simulate", { station, fault: DEVICE_FAULT }).then(() => setError("")).catch((e: Error) => setError(errorJa(e.message)));
+  const simulate = (station: string) => cmd("simulate", { station }).then(() => setError("")).catch((e: Error) => setError(errorJa(e.message)));
   const openCase = (id: string) => router.push({ pathname: "/operator/[id]", params: { id } });
 
   return (

@@ -172,8 +172,9 @@ export function MoreMenu({ label, items }: { label: string; items: { label: stri
 
 export const Dot = ({ s, className }: { s: string; className?: string }) => <span className={cn("dot", className)} data-s={s} aria-hidden />;
 
-export function StatusLabel({ status, lang, className }: { status: Status; lang?: Lang; className?: string }) {
-  return <span className={cn("inline-flex items-center gap-1.5 text-[13px] text-soft", className)}><Dot s={status} />{lang ? STATUS[status][lang] : STAFF_JA.status[status]}</span>;
+// text: the caller's wording when the pack words a status its own way (content/packs).
+export function StatusLabel({ status, lang, className, text }: { status: Status; lang?: Lang; className?: string; text?: string }) {
+  return <span className={cn("inline-flex items-center gap-1.5 text-[13px] text-soft", className)}><Dot s={status} />{text ?? (lang ? STATUS[status][lang] : STAFF_JA.status[status])}</span>;
 }
 
 // Small grey token, as used for counts and metadata.
