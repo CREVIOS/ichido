@@ -21,23 +21,29 @@ Production starts empty: no demo accounts, no synthetic cases. `supabase/seed.sq
 3. In the dashboard, set the following:
    - **Data API → Exposed schemas**: add `ichido` (next to `public`). The server and `create-staff.mjs` use it.
    - **Authentication → Sign In / Providers**: enable **Anonymous sign-ins** (callers). Under Email, turn off
-     **Allow new users to sign up**, so staff accounts come only from the script below.
+     **Allow new users to sign up**: Supabase Auth is for anonymous callers only; staff use Better Auth (below).
    - **Authentication → URL Configuration**: Site URL = your Vercel URL.
 4. Note **Project URL**, the **publishable key** and a **secret key** (Settings → API Keys).
 
 ### Staff accounts
 
-Write a JSON file outside git (format: `scripts/staff.example.json`; `scripts/*.json` is git-ignored), then:
+Staff sign in with Better Auth (tables in schema `auth_ba`, created by the migrations). Set in Vercel:
+`DATABASE_URL` (Supabase → Connect → direct or session pooler connection string), `BETTER_AUTH_SECRET`
+(`openssl rand -base64 32`), `BETTER_AUTH_URL` (the public origin), `PASSKEY_RP_ID` (the registrable domain),
+`SUPABASE_JWT_SECRET` (Project Settings → JWT), `BREVO_API_KEY` and `MAIL_FROM` (a sender verified in Brevo).
+
+The first admin comes from a JSON file outside git (format: `scripts/staff.example.json`; `scripts/*.json` is
+git-ignored):
 
 ```sh
-SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SECRET_KEY=sb_secret_… node scripts/create-staff.mjs scripts/staff.json
+DATABASE_URL=postgresql://… BETTER_AUTH_URL=https://<app> node scripts/create-staff.mjs scripts/staff.json
 ```
 
-New accounts get a generated 24-character password. The CLI prints the path to a private, mode-0600 JSONL
-file in a mode-0700 temporary directory. Deliver credentials to their owners and remove the handoff file.
-If the command fails midway, verify provisioning status before distributing its passwords. Re-running updates role and name, and keeps
-existing passwords. `--reset` rotates the password of every account in the file. To remove someone, delete the
-user under Authentication → Users (their staff row goes with it).
+Each new account gets a one-time set-password link (72 hours) in a private, mode-0600 JSONL file in a mode-0700
+temporary directory: deliver it to its owner and remove the file. Opening it verifies the address; the owner sets
+a password and registers a second factor (authenticator app or passkey) at first sign-in. Re-running updates role
+and name; `--reset` issues new links. After that, admins invite, change roles, disable, reset second factors and
+sign people out from `/admin`; every action is in the append-only audit log there. Nobody can sign up on their own.
 
 ### Stations
 
@@ -311,8 +317,9 @@ incident.
 
 ## Local stack and demo data
 
-`supabase start` / `supabase db reset` apply the migrations and `seed.sql`: station `TABLE-A` and the local
-demo accounts (`*@ichido.demo`, password `ichido-demo`), which the tests use. For a populated insights page,
+`supabase start` / `supabase db reset` apply the migrations and `seed.sql` (station `TABLE-A` and the pack
+stations); `npm run seed:staff` (in `web/`) then creates the local demo staff accounts (`*@ichido.demo`, password
+`ichido-demo-local`, authenticator secret `local-totp-<email>`), which the tests use. For a populated insights page,
 load the synthetic history as well. It will not run without the local demo accounts:
 
 ```sh
