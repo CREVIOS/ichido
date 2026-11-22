@@ -147,6 +147,9 @@ export function eventText(kind: string, d: Record<string, string | undefined>): 
     case "human": return "お客様が担当者との会話を希望";
     case "clarify": return "理解が不十分 → 再案内";
     case "suggested": return `AI提案（${d.model ?? "Gemini"}）：${replyOf(d.intent)?.code ?? "—"}${String(d.dispatch) === "true" ? `・${d.guard ?? "警備員"}へ依頼` : ""}（判断は担当者）`;
+    case "handoff": return `引継票を発行（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
+    case "handoff_viewed": return `引継票が閲覧されました（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
+    case "handoff_revoked": return `引継票を失効（${HANDOFF.recipient[d.recipient ?? ""] ?? d.recipient}宛）`;
     case "rated": return `お客様の評価：${RATING_JA[Number(d.rating)] ?? d.rating}`;
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     default: return kind;
@@ -235,6 +238,7 @@ export const UI = {
 } satisfies Record<string, L10n>;
 
 export * from "./staff";
+import { HANDOFF } from "./staff";
 export * from "./numbers";
 export * from "./home";
 export * from "./mobile";

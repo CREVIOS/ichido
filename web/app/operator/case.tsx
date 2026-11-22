@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ACTOR, DESK, FACTS, FAULTS, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang } from "@/content/catalogue";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
+import { HandoffPanel } from "./handoff";
 import { hhmm, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Reply, type Run } from "./types";
 
 // True while a caller is connected: paired, and not reset since.
@@ -53,6 +54,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <Timeline events={events} />
+        {d.operator_id && <HandoffPanel incident={d.id} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
