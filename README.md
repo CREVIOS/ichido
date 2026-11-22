@@ -15,11 +15,12 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 | Route | Who | What |
 |---|---|---|
 | `/` | everyone | Overview and links |
-| `/operator` | monitoring-centre operator | Queue, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch |
+| `/operator` | monitoring-centre operator | Queue with response-time targets, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch; who else is online and viewing the same case; ⌘K palette, J/K/C keys |
+| `/stations` | operator | Each Help Point's live health (last heartbeat, signal, firmware, open cases) and a printable QR sticker per station |
 | `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code |
-| `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back |
+| `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back, one-tap rating after close |
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
-| `/insights` | operator, manager | Case funnel, cases per day, busiest hours, languages, median time to first reply — counts only |
+| `/insights` | operator, manager | Metric cards with definitions: daily cases vs guided, funnel, time to first reply, languages, busiest hours, wait/leave, ratings — counts only |
 
 ## How it works
 
@@ -37,7 +38,8 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 - **LiveKit Agents** (`agent/`): speech in, text out. The agent transcribes and speaks only the read-back the caller's own client asks for. It never decides anything and never asks for numbers.
 - **ESP32 firmware** (`firmware/help_point/`): debounced button, idempotent event ids, polled status light, offline indication, and a heartbeat every 60 s (`public.device_health`).
 - **Observability**: structured JSON logs from the web routes and the agent (codes, ids and timings only, never caller words), shipped to Better Stack when its token is set; `/api/health` for uptime monitoring. See [docs/DEPLOY.md](docs/DEPLOY.md).
-- **Content** (`web/content/catalogue.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
+- **Design**: Tailwind v4 and shadcn/ui (Base UI) on a quiet monochrome system — off-white canvas, white sheets with hairlines, near-black actions, colour only for state. The mark is a speech bubble holding one brush stroke, 一: say it once.
+- **Content** (`web/content/catalogue.ts`, `staff.ts`, `home.ts`): every user-visible string, fault type, reply and timeline sentence, in Japanese, Bengali and English. The database holds codes and data only.
 
 ## Rules the product keeps
 
@@ -48,6 +50,7 @@ LiveKit room ◀── agent/app.py (Google STT, Azure TTS; no conversational LL
 - **A caller reaches a case only with the operator's single-use, five-minute code.** Scanning the sticker alone reveals nothing; guesses are rate-limited. If a caller loses their phone, the operator resets the connection and issues a new code, or closes the case.
 - **The operator never sees the caller's draft**, only what the caller confirmed. A teach-back in another language is shown with a labelled machine translation, or flagged for a bilingual colleague.
 - **Each role sees only what it needs**, enforced by RLS: callers their own case, guards their own assignments, managers counts.
+- **The timeline is an audit trail.** `case_event` is append-only: no role, not even the service role, can edit or delete an event.
 
 ## Run it locally
 

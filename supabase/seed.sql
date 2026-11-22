@@ -5,7 +5,7 @@
 insert into public.station (id, label, branch, counter_hours, security_company) values (
   'TABLE-A',
   '{"ja": "長崎駅前 店舗外ATM（架空）", "bn": "নাগাসাকি স্টেশনের সামনের এটিএম (কাল্পনিক)", "en": "Nagasaki Station front ATM (fictional)"}',
-  '{"ja": "長崎駅前支店", "bn": "নাগাসাকি একিমায়ে শাখা", "en": "Nagasaki Ekimae branch"}',
+  '{"ja": "出島銀行 駅前支店（架空）", "bn": "দেজিমা ব্যাংক স্টেশন শাখা (কাল্পনিক)", "en": "Dejima Bank Station branch (fictional)"}',
   '{"ja": "平日 9:00〜15:00", "bn": "সোম–শুক্র, ৯:০০–১৫:০০", "en": "weekdays 9:00–15:00"}',
   '架空警備株式会社'
 );
