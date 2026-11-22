@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import type { Lang } from "@/content/catalogue";
 
 // Service-role client: bypasses RLS, so only use it after checking who the actor is.
 export const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, {
@@ -10,7 +11,7 @@ export const priv = () => admin.schema("ichido");
 
 export type Actor =
   | { kind: "staff"; uid: string; role: "operator" | "field" | "manager"; name: string }
-  | { kind: "caller"; uid: string; incident: string | null; lang: "bn" | "en" | "ja" | null; expires: string | null }
+  | { kind: "caller"; uid: string; incident: string | null; lang: Lang | null; expires: string | null }
   | { kind: "none" };
 
 // Derive the actor from the bearer token only; never trust role or incident fields in the body.

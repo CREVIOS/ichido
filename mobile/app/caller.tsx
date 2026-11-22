@@ -10,7 +10,7 @@ import { hasVoice } from "@/lib/voice";
 import { Brand, Button, Card, Icon, Input, Notice, Screen, T, Tag, Toggle } from "@/components/ui";
 import { color, radius, space } from "@/theme";
 import {
-  FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, FIELD_STATE, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, etaText, pick, replyOf, errorText,
+  FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
   type Lang, type Fact, type Status, type FieldState, type L10n,
 } from "@content/catalogue";
 
@@ -51,9 +51,8 @@ export default function CallerScreen() {
   if (card === undefined) return null;
   if (card === null) return (
     <Screen back eyebrow={<Brand />}>
-      <T v="h1">{staffSession ? STATION.staffSession.bn : UI.notConnected.bn}</T>
-      <T v="body">{staffSession ? STATION.staffSession.en : UI.notConnected.en}</T>
-      <T v="body">{staffSession ? STATION.staffSession.ja : UI.notConnected.ja}</T>
+      {/* The phone has no case yet, so no language: say it in every caller language. */}
+      {LANGS.map((l, i) => <T key={l} v={i === 0 ? "h1" : "body"}>{(staffSession ? STATION.staffSession : UI.notConnected)[l]}</T>)}
       <Button kind="secondary" label={`${MOBILE.back.bn} · ${MOBILE.back.en}`} onPress={() => router.replace("/")} />
     </Screen>
   );
@@ -104,7 +103,7 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
     <>
       <T v="h1">{UI.aiNotice[lang]}</T>
       <Notice>{UI.neverAsk[lang]}</Notice>
-      {hasVoice ? <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} /> : <T v="small">{VOICE.unavailable[lang]}</T>}
+      {hasVoice && VOICE_LANGS.includes(lang) ? <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} /> : <T v="small">{VOICE.unavailable[lang]}</T>}
       <Card>
         <Input label={UI.whatHappened[lang]} value={text} onChangeText={setText} multiline maxLength={MAX_TEXT} />
         <View style={{ alignItems: "flex-end" }}>

@@ -7,7 +7,8 @@ relayed by the caller's client on `ichido.say`; anything else is ignored.
 It never runs a conversational LLM, never decides anything, and never asks for numbers.
 
 Audio: LiveKit background voice cancellation (BVC, LiveKit Cloud only) cleans the caller's microphone, and
-the multilingual turn detector ends Japanese and English turns; Bengali uses Silero VAD endpointing. Both
+the multilingual turn detector ends Japanese, English and Indonesian turns; Bengali and Vietnamese use Silero VAD
+endpointing. Nepali has no voice path: Soniox cannot transcribe it, so the web app never asks for an agent in Nepali. Both
 are optional: without the plugin or its downloaded model files the agent runs on VAD endpointing alone.
 
 Logs: structured events on the "ichido-agent" logger (job start/end, STT and TTS timings, spoken and
@@ -47,17 +48,20 @@ except ImportError as e:
     log.warning("turn_detector_unavailable", extra={"event": "turn_detector_unavailable", "error": type(e).__name__})
     MultilingualModel = None
 
-# The multilingual end-of-turn model covers Japanese and English; Bengali keeps Silero VAD endpointing.
-TURN_MODEL_LOCALES = {"ja-JP", "en-US"}
+# The multilingual end-of-turn model covers Japanese, English and Indonesian; Bengali and Vietnamese keep Silero VAD endpointing.
+TURN_MODEL_LOCALES = {"ja-JP", "en-US", "id-ID"}
 
 # Caller locale (sent by the web app) -> language code for Soniox hints and ElevenLabs pronunciation.
-LANGS = {"bn-BD": "bn", "en-US": "en", "ja-JP": "ja"}
+# No ne-NP: Soniox has no Nepali model (ElevenLabs v4 Turbo would speak it). Keep in step with VOICE_LANGS in the catalogue.
+LANGS = {"bn-BD": "bn", "vi-VN": "vi", "id-ID": "id", "en-US": "en", "ja-JP": "ja"}
 # ElevenLabs voices per language come from the environment so a reviewer can swap them without a code change.
-# The default is ElevenLabs' stock voice that the LiveKit plugin ships with; eleven_v4_turbo speaks it in all
-# three languages. A native-speaker voice from the Voice Library sounds better; set its id here.
+# The default is ElevenLabs' stock voice that the LiveKit plugin ships with; eleven_v4_turbo speaks it in every
+# language here. A native-speaker voice from the Voice Library sounds better; set its id here.
 DEFAULT_VOICE = "hpp4J3VqNfWAUOO0d1Us"
 VOICES = {
     "bn-BD": os.getenv("ELEVEN_VOICE_BN") or DEFAULT_VOICE,
+    "vi-VN": os.getenv("ELEVEN_VOICE_VI") or DEFAULT_VOICE,
+    "id-ID": os.getenv("ELEVEN_VOICE_ID") or DEFAULT_VOICE,
     "en-US": os.getenv("ELEVEN_VOICE_EN") or DEFAULT_VOICE,
     "ja-JP": os.getenv("ELEVEN_VOICE_JA") or DEFAULT_VOICE,
 }

@@ -1,4 +1,4 @@
-// Mobile app (mobile/). Caller-facing strings in all three languages; staff strings in Japanese, as in STAFF.
+// Mobile app (mobile/). Caller-facing strings in every caller language (vi/id/ne drafts await native review); staff strings in Japanese, as in STAFF.
 export const MOBILE = {
   // Role entry is shown to everyone, so each label carries Japanese and English.
   entry: {
@@ -7,14 +7,14 @@ export const MOBILE = {
     signedIn: (name: string) => `${name} としてサインイン中`,
   },
   station: {
-    label: { bn: "Help Point-এর নাম বা লিংক", en: "Help Point name or link", ja: "Help Point の 名前 か リンク" },
-    hint: { bn: "স্টিকারে লেখা আছে, যেমন TABLE-A", en: "It is printed on the sticker, for example TABLE-A", ja: "ステッカーに 書いて あります（れい：TABLE-A）" },
-    open: { bn: "খুলুন", en: "Open", ja: "ひらく" },
+    label: { bn: "Help Point-এর নাম বা লিংক", en: "Help Point name or link", ja: "Help Point の 名前 か リンク", vi: "Tên hoặc đường link của Help Point", id: "Nama atau tautan Help Point", ne: "Help Point को नाम वा लिङ्क" },
+    hint: { bn: "স্টিকারে লেখা আছে, যেমন TABLE-A", en: "It is printed on the sticker, for example TABLE-A", ja: "ステッカーに 書いて あります（れい：TABLE-A）", vi: "Được in trên nhãn dán, ví dụ TABLE-A", id: "Tertulis di stiker, misalnya TABLE-A", ne: "स्टिकरमा लेखिएको छ, जस्तै TABLE-A" },
+    open: { bn: "খুলুন", en: "Open", ja: "ひらく", vi: "Mở", id: "Buka", ne: "खोल्नुहोस्" },
   },
-  back: { bn: "ফিরে যান", en: "Back", ja: "もどる" },
+  back: { bn: "ফিরে যান", en: "Back", ja: "もどる", vi: "Quay lại", id: "Kembali", ne: "पछाडि जानुहोस्" },
   // Voice buttons without the symbols the web strings carry; the app draws an icon instead.
-  speak: { bn: "কথা বলুন", en: "Speak", ja: "はなす" },
-  stopSpeaking: { bn: "থামুন", en: "Stop", ja: "とめる" },
+  speak: { bn: "কথা বলুন", en: "Speak", ja: "はなす", vi: "Nói", id: "Bicara", ne: "बोल्नुहोस्" },
+  stopSpeaking: { bn: "থামুন", en: "Stop", ja: "とめる", vi: "Dừng", id: "Berhenti", ne: "रोक्नुहोस्" },
   // Seeded local demo accounts (supabase/seed.sql), prefilled on the sign-in form.
   demoAccount: { operator: "operator@ichido.demo", field: "guard1@ichido.demo", manager: "manager@ichido.demo" } as Record<string, string>,
 

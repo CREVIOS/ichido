@@ -54,8 +54,8 @@ function StationForm() {
 
   return (
     <Phone lang={lang} center right={<Chip>Help Point · <span className="mono">{station}</span></Chip>}>
-      <ToggleGroup value={[lang]} onValueChange={(v: string[]) => v[0] && setLang(v[0] as Lang)} className="w-full rounded-lg bg-secondary p-0.5">
-        {LANGS.map((l) => <ToggleGroupItem key={l} value={l} lang={l} className="h-9 flex-1 rounded-md text-[14px] data-[pressed]:bg-card data-[pressed]:text-foreground data-[pressed]:shadow-xs">{LANG_NAME[l]}</ToggleGroupItem>)}
+      <ToggleGroup value={[lang]} onValueChange={(v: string[]) => v[0] && setLang(v[0] as Lang)} className="grid w-full grid-cols-3 gap-0.5 rounded-lg bg-secondary p-0.5">
+        {LANGS.map((l) => <ToggleGroupItem key={l} value={l} lang={l} className="h-9 min-w-0 rounded-md px-1 text-[14px] data-[pressed]:bg-card data-[pressed]:text-foreground data-[pressed]:shadow-xs">{LANG_NAME[l]}</ToggleGroupItem>)}
       </ToggleGroup>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (

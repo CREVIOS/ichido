@@ -9,8 +9,14 @@ import app  # noqa: E402
 
 
 class TurnDetectionTest(unittest.TestCase):
-    def test_bengali_always_uses_vad_endpointing(self):
+    def test_bengali_and_vietnamese_always_use_vad_endpointing(self):
         self.assertFalse(app.use_turn_model("bn-BD", True))
+        self.assertFalse(app.use_turn_model("vi-VN", True))
+
+    def test_indonesian_uses_the_model_when_its_files_are_on_disk(self):
+        self.assertFalse(app.use_turn_model("id-ID", False))
+        if app.MultilingualModel is not None:
+            self.assertTrue(app.use_turn_model("id-ID", True))
 
     def test_japanese_and_english_use_the_model_only_when_its_files_are_on_disk(self):
         self.assertFalse(app.use_turn_model("ja-JP", False))
@@ -47,7 +53,7 @@ class ProvidersTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def test_stt_is_held_to_the_callers_language(self):
-        for locale, lang in (("bn-BD", "bn"), ("en-US", "en"), ("ja-JP", "ja")):
+        for locale, lang in (("bn-BD", "bn"), ("vi-VN", "vi"), ("id-ID", "id"), ("en-US", "en"), ("ja-JP", "ja")):
             params = app.make_stt(locale)._params
             self.assertEqual(params.language_hints, [lang])
             self.assertTrue(params.language_hints_strict)
@@ -58,6 +64,17 @@ class ProvidersTest(unittest.TestCase):
         self.assertEqual(tts._opts.model, app.ELEVEN_MODEL)
         self.assertEqual(tts._opts.language.language, "bn")
         self.assertNotEqual(app.ELEVEN_MODEL, "eleven_flash_v2_5")
+
+    def test_tts_language_and_voice_per_new_language(self):
+        for locale, lang in (("vi-VN", "vi"), ("id-ID", "id")):
+            tts = app.make_tts(locale)
+            self.assertEqual(tts._opts.language.language, lang)
+            self.assertEqual(tts._opts.voice_id, app.VOICES[locale])
+
+    def test_nepali_has_no_voice_path(self):
+        # Soniox cannot transcribe Nepali; the web app keeps Nepali callers on the typed path.
+        self.assertNotIn("ne-NP", app.LANGS)
+        self.assertNotIn("ne-NP", app.VOICES)
 
 
 class NeverRepliesTest(unittest.TestCase):

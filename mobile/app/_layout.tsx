@@ -7,6 +7,8 @@ import { DMMono_400Regular } from "@expo-google-fonts/dm-mono/400Regular";
 import { DMMono_500Medium } from "@expo-google-fonts/dm-mono/500Medium";
 import { HindSiliguri_400Regular } from "@expo-google-fonts/hind-siliguri/400Regular";
 import { HindSiliguri_500Medium } from "@expo-google-fonts/hind-siliguri/500Medium";
+import { NotoSansDevanagari_400Regular } from "@expo-google-fonts/noto-sans-devanagari/400Regular";
+import { NotoSansDevanagari_500Medium } from "@expo-google-fonts/noto-sans-devanagari/500Medium";
 import { NotoSansJP_400Regular } from "@expo-google-fonts/noto-sans-jp/400Regular";
 import { NotoSansJP_500Medium } from "@expo-google-fonts/noto-sans-jp/500Medium";
 import { color } from "@/theme";
@@ -18,7 +20,8 @@ setupVoice();
 export default function RootLayout() {
   const [loaded] = useFonts({
     Inter_400Regular, Inter_500Medium, DMMono_400Regular, DMMono_500Medium,
-    HindSiliguri_400Regular, HindSiliguri_500Medium, NotoSansJP_400Regular, NotoSansJP_500Medium,
+    HindSiliguri_400Regular, HindSiliguri_500Medium, NotoSansDevanagari_400Regular, NotoSansDevanagari_500Medium,
+    NotoSansJP_400Regular, NotoSansJP_500Medium,
   });
   if (!loaded) return null;
   return (

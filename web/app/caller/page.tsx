@@ -4,7 +4,7 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Phone } from "@/components/phone";
 import { Chip, StatusLabel } from "@/components/kit";
-import { FAULTS, LANG_NAME, STATION, UI, pick, type Lang } from "@/content/catalogue";
+import { FAULTS, LANGS, LANG_NAME, STATION, UI, pick, type Lang } from "@/content/catalogue";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
 import type { CallerCase, Draft, Reply, Station } from "./types";
@@ -37,8 +37,11 @@ export default function CallerPage() {
   if (card === undefined) return null;
   if (card === null) return (
     <Phone center>
-      <h1 lang="bn" className="text-[24px] leading-snug">{staffSession ? STATION.staffSession.bn : UI.notConnected.bn}</h1>
-      <p className="text-[15px]">{staffSession ? STATION.staffSession.en : UI.notConnected.en}</p>
+      {/* The phone has no case yet, so no language: say it in every caller language. */}
+      {LANGS.map((l, i) => {
+        const text = (staffSession ? STATION.staffSession : UI.notConnected)[l];
+        return i === 0 ? <h1 key={l} lang={l} className="text-[24px] leading-snug">{text}</h1> : <p key={l} lang={l} className="text-[15px]">{text}</p>;
+      })}
     </Phone>
   );
 

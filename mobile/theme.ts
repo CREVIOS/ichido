@@ -22,6 +22,7 @@ export const font = {
   inter: { 400: "Inter_400Regular", 500: "Inter_500Medium" },
   ja: { 400: "NotoSansJP_400Regular", 500: "NotoSansJP_500Medium" },
   bn: { 400: "HindSiliguri_400Regular", 500: "HindSiliguri_500Medium" },
+  ne: { 400: "NotoSansDevanagari_400Regular", 500: "NotoSansDevanagari_500Medium" },
   mono: { 400: "DMMono_400Regular", 500: "DMMono_500Medium" },
 } as const;
 

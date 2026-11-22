@@ -6,7 +6,7 @@
    Colour is reserved for state (a small dot or a word), never for decoration. */
 
 @theme inline {
-  --font-sans: var(--font-sans), var(--font-jp), var(--font-bn), system-ui, sans-serif;
+  --font-sans: var(--font-sans), var(--font-jp), var(--font-bn), var(--font-ne), system-ui, sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: var(--font-mono), ui-monospace, monospace;
   --color-background: var(--background);
@@ -79,6 +79,7 @@
   }
   h1, h2, h3 { @apply text-foreground font-normal; letter-spacing: -0.03em; }
   :lang(bn) { font-family: var(--font-bn), var(--font-sans), sans-serif; letter-spacing: 0; }
+  :lang(ne) { font-family: var(--font-ne), var(--font-sans), sans-serif; letter-spacing: 0; }
   :lang(ja) { font-family: var(--font-sans), var(--font-jp), sans-serif; }
   ::selection { background: oklch(0 0 0 / 0.1); }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
