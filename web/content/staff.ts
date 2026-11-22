@@ -16,6 +16,7 @@ export const STAFF = {
 // Staff navigation, per role.
 export const NAV = {
   operator: "監視センター",
+  cases: "案件一覧",
   insights: "インサイト",
   field: "割当",
 };
@@ -34,6 +35,11 @@ export const staffError = (code: string) => (Object.hasOwn(STAFF_ERRORS, code) ?
 // Operator console.
 export const DESK = {
   title: "監視センター",
+  alerts: "新着案件の通知",
+  newCase: (station: string) => `新しい案件：${station}`,
+  alertsStorage: "通知設定を保存できません。このタブにのみ適用します。",
+  alertsSound: "通知音を再生できません。",
+  alertsBrowser: "ブラウザー通知を表示できません。",
   queue: "対応中",
   recent: "最近の案件",
   empty: "対応中の案件はありません。Help Point のボタンが押されるか、受話器での申告を手動で登録すると、ここに表示されます。",
@@ -116,6 +122,28 @@ export const DESK = {
     lastSeen: (m: number) => `最終通信 ${m < 1 ? "1分以内" : `${m}分前`}`,
     signal: (rssi: number) => `電波 ${rssi} dBm`,
   },
+};
+
+export const CASES = {
+  all: "すべて",
+  filter: "フィルター",
+  search: "ATM名・IDで検索",
+  status: "状態",
+  statuses: { open: "対応中", done: "完了", abandoned: "連絡なし終了" },
+  language: "言語",
+  languages: { bn: "ベンガル語", en: "英語", ja: "やさしい日本語" },
+  days: { today: "今日", week: "7日", month: "30日" },
+  firstReply: "初回返答",
+  operator: "担当",
+  missing: "—",
+  more: "さらに表示",
+  loading: "読み込み中…",
+  empty: "該当する案件はありません。",
+  loadError: "案件を読み込めませんでした。",
+  export: "CSVを書き出す",
+  exportError: "CSVを書き出せませんでした。もう一度お試しください。",
+  filename: "案件一覧.csv",
+  csvColumns: ["id", "station", "station_label", "fault", "status", "lang", "created_at", "first_reply_seconds", "finished_at", "abandoned"],
 };
 
 // Security guard's assignments.

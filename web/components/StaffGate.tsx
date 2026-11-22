@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { ChartNoAxesColumn, LogOut, MapPin, RadioTower } from "lucide-react";
+import { ChartNoAxesColumn, LogOut, MapPin, RadioTower, Rows3 } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { Logo, Notice, type NavItem } from "@/components/kit";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,11 @@ export type Role = "operator" | "field" | "manager";
 export type Me = { uid: string; role: Role; name: string };
 
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
-  operator: [{ href: "/operator", label: NAV.operator, icon: RadioTower }, { href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }],
+  operator: [
+    { href: "/operator", label: NAV.operator, icon: RadioTower },
+    { href: "/cases", label: NAV.cases, icon: Rows3 },
+    { href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn },
+  ],
   manager: [{ href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn }],
   field: [{ href: "/field", label: NAV.field, icon: MapPin }],
 };

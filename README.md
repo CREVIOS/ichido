@@ -16,6 +16,7 @@ Built for the TSUNAGU hackathon (theme: *update the way we connect*). The bank, 
 |---|---|---|
 | `/` | everyone | Overview and links |
 | `/operator` | monitoring-centre operator | Queue, machine state, caller's original words beside the facts they confirmed, timeline, approved replies, pairing code, dispatch |
+| `/cases` | monitoring-centre operator | Searchable case history, time to first reply, and filtered CSV export of case metadata |
 | `/s/[station]` | caller | Neutral page behind the Help Point sticker: language choice and the operator's single-use code |
 | `/caller` | caller | AI notice, voice or typed intake, read-back and correction, the operator's reply, wait/leave, teach-back |
 | `/field` | security guard | Only their own assignments; on the way (with their own estimate), arrived, done |
