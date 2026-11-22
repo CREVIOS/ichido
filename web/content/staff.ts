@@ -1,3 +1,5 @@
+import { OPS, OPS_FAULT_STAFF } from "./ops.ts";
+
 // Staff screens (Japanese): console, guard, insights, sign-in.
 import { FAULT_STAFF } from "./faults.ts";
 import { PACK_RECIPIENTS } from "./packs/index.ts";
@@ -12,6 +14,7 @@ export const STAFF = {
   noAccess: (role: string) => `このページを見る権限がありません（${role}）。`,
   signInLead: "スタッフ用アカウントでサインインしてください。アカウントは管理者が発行します。",
   menu: "メニュー",
+  sidebar: { collapse: "サイドバーを閉じる（[）", expand: "サイドバーを開く（[）" },
   palette: { title: "コマンド", hint: "検索・移動・操作", placeholder: "ページ・案件・操作を検索…", empty: "見つかりません", pages: "ページ", cases: "対応中の案件", actions: "操作", shortcut: "⌘K" },
   keys: { next: "次の案件 (J)", prev: "前の案件 (K)", claim: "担当する (C)" },
   roleName: { operator: "オペレーター", field: "警備員", manager: "マネージャー" } as Record<string, string>,
@@ -262,6 +265,7 @@ export const INSIGHTS = {
     hours: { title: "時間帯", def: "障害通知の時刻（日本時間）を2時間ごとに集計。もっとも多い時間帯を強調します。" },
     choices: { title: "お客様の選択", def: "「待つ／帰る」を選べる返答を受けたお客様が、どちらを選んだか。" },
     ratings: { title: "お客様の評価", def: "案内確認で終了したあと、お客様が3つの顔から1回だけ選んだ評価。自由記述は集めません。" },
+    ops: OPS.insights.metric,
     bot: { title: "対応時間", def: "Ichido Bot が案件の終了時に経過記録から算出した時間の中央値。障害通知から担当決定・初回返答・終了まで、警備員は出動依頼から到着まで。" },
   },
   bot: { records: "記録件数", claim: "担当まで", reply: "初回返答まで", guard: "警備員の到着まで", total: "終了まで", median: "中央値" },
@@ -319,7 +323,7 @@ export const STAFF_JA = {
     none: "未依頼", requested: "現地確認を依頼しました", on_way: "警備員が向かっています", arrived: "警備員が到着しました",
     done: "現地対応完了（カードの扱いは銀行所定の手続き）",
   } as Record<string, string>,
-  fault: { card_retained: "取引後にカードが排出されない", ...FAULT_STAFF } as Record<string, string>,
+  fault: { card_retained: "取引後にカードが排出されない", ...FAULT_STAFF, ...OPS_FAULT_STAFF } as Record<string, string>,
 };
 
 // Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DESK, DEVICE_FAULT, FAULT_DESK, FIELD_STATE, LANG_NAME, MANUAL_VERSION, REPLIES, pick, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
+import { DispatchChain } from "./ops";
 
 // Seconds left on a single-use code, ticking once a second.
 export function useCountdown(until: number | null) {
@@ -97,10 +98,12 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
   );
 }
 
-export function DispatchCard({ d, job, guards, card, lang, run }: { d: Pick<Desk, "id">; job: Job | null; guards: Guard[]; card: Pick<CallerCard, "field_state"> | null; lang: Lang; run: Run }) {
+// company: the station's security company, whose control centre (管制) the dispatch goes through.
+export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: Pick<Desk, "id">; job: Job | null; guards: Guard[]; card: Pick<CallerCard, "field_state"> | null; lang: Lang; run: Run; company?: string | null }) {
   const others = guards.filter((g) => g.uid !== job?.assignee);
   return (
     <Panel title={DESK.dispatch.title}>
+      {company && <DispatchChain company={company} />}
       {job ? (
         <div className="surface flex flex-col gap-1 p-3.5">
           <span className="flex items-center justify-between text-[14px] text-foreground">

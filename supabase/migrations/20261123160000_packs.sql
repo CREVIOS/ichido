@@ -24,7 +24,7 @@ grant select on ichido.situation to service_role;
 insert into ichido.situation values
   ('card_retained', 'atm'), ('card_forgotten', 'atm'), ('card_kept', 'atm'), ('card_unreadable', 'atm'),
   ('passbook_stuck', 'atm'), ('cash_jam', 'atm'), ('cash_left', 'atm'), ('debited_no_cash', 'atm'),
-  ('limit_refused', 'atm'), ('hosp_first_visit', 'hospital'), ('hosp_department', 'hospital'), ('hosp_symptoms', 'hospital'),
+  ('limit_refused', 'atm'), ('phone_fraud', 'atm'), ('hosp_first_visit', 'hospital'), ('hosp_department', 'hospital'), ('hosp_symptoms', 'hospital'),
   ('hosp_payment', 'hospital'), ('city_residence', 'city_office'), ('city_moving', 'city_office'), ('city_mynumber', 'city_office'),
   ('city_letter', 'city_office'), ('transit_way', 'transit'), ('transit_last_train', 'transit'), ('transit_lost_item', 'transit'),
   ('transit_access', 'transit'), ('shelter_checkin', 'shelter'), ('shelter_needs', 'shelter'), ('shelter_family', 'shelter'),

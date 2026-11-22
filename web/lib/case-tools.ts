@@ -1,5 +1,5 @@
 import "server-only";
-import { REPLIES, replyBlock, type Fact } from "@/content/catalogue";
+import { FRAUD_FAULT, REPLIES, replyBlock, type Fact } from "@/content/catalogue";
 import { admin, priv } from "@/lib/server";
 
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
@@ -22,14 +22,14 @@ export function eligibleReplies(d: DeskFacts, flags: string[]) {
 }
 
 export const TOOL_DECLARATIONS = [
-  { name: "get_case", description: "The case: fault, status, what the caller confirmed (card_back, cash_received), remote release result, caller language, choice, guard job state, minutes open." },
+  { name: "get_case", description: "The case: fault, status, what the caller confirmed (card_back, cash_received), remote release result, caller language, choice, guard job state, minutes open, whether a suspected phone-fraud alert was raised and whether fraud mode is already active." },
   { name: "list_replies", description: "The bank's approved replies with their code, Japanese title, and whether each is eligible for this case right now (and why not)." },
   { name: "list_guards", description: "Security guards who can be dispatched, with how many open jobs each has." },
   { name: "station_status", description: "The ATM's Help Point device health and how many cases this station had in the last 7 days." },
 ];
 
 export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
-  const { data: d } = await admin.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at").eq("id", ctx.incident).single();
+  const { data: d } = await admin.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at, fraud_at").eq("id", ctx.incident).single();
   if (!d) return { error: "not_found" };
   switch (name) {
     case "get_case": {
@@ -37,7 +37,10 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
         admin.from("caller_card").select("choice, field_state, eta, needs_human, flags").eq("id", ctx.incident).maybeSingle(),
         admin.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
       ]);
-      return { ...d, caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j };
+      return {
+        ...d, caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
+        suspected_phone_fraud_alert: d.fault === FRAUD_FAULT, fraud_mode_active: d.fraud_at != null,
+      };
     }
     case "list_replies": {
       const { data: c } = await admin.from("caller_card").select("flags").eq("id", ctx.incident).maybeSingle();

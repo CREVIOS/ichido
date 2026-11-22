@@ -1,10 +1,13 @@
 import { admin, priv, reply, deviceStation } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
+import { isFault } from "@/content/catalogue";
 import { defaultFault } from "@/lib/faults";
 import { startBot } from "@/lib/bot";
 import { displayLines } from "@/lib/access";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
+// X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; by default the
+// station pack's situation for a press (an ATM: card retained). The database refuses a fault from another pack.
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/device", req);
   const auth = deviceStation(req);
@@ -14,13 +17,17 @@ export async function POST(req: Request): Promise<Response> {
   }
   const station = auth.id;
   const key = (await req.text()).trim();
+  const fault = req.headers.get("x-fault") || await defaultFault(station);
+  if (!isFault(fault)) {
+    log.warn("device_fault", { station, status: 400, code: "bad_fault" });
+    return reply(400, { error: "unknown fault" });
+  }
   if (!/^[0-9a-f]{32}$/.test(key)) {
     log.warn("device_fault", { station, status: 400, code: "bad_event_id" });
     return reply(400, { error: "bad event id" });
   }
   // Only for the log: whether this is a retry of an event the server already recorded.
   const { data: seen } = await priv().from("device_event").select("incident").eq("station", station).eq("event_key", key).maybeSingle();
-  const fault = await defaultFault(station);   // the station pack's situation for a press (the ATM: card retained)
   const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: fault });
   if (error) {
     log.error("device_fault", { station, fault, status: 500, duration_ms: log.ms(), ...errorFields(error) });
@@ -31,7 +38,7 @@ export async function POST(req: Request): Promise<Response> {
   return new Response(null, { status: 204 });
 }
 
-// GET: the station light state as plain text (idle | received | review | field | guided).
+// GET: the station light state as plain text (idle | received | review | field | guided | fraud).
 // A Help Point with a display sends X-Display: 1 and also gets key=value lines (lib/access.ts displayLines).
 // Polled every 2 s per device, so only failures are logged; liveness comes from the heartbeat.
 export async function GET(req: Request): Promise<Response> {

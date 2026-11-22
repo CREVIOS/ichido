@@ -6,17 +6,20 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACCESS_STAFF, ACTOR, BOT, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { ACCESS_STAFF, ACTOR, BOT, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, REMOTE_RELEASE, eventText, isFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { Pill } from "@/components/charts";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
 import { BotPanel } from "./bot";
 import { BankStatusCard, CallerFlags, FaultCard } from "./faults";
 import { DeviceCodeCard, TextOnlyBadge, TextOnlyBanner } from "./access";
-import { hhmm, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
+import { FraudCard, PromiseCard, TakeoverPanel, abusive, opsTags, useAbuseKey, useCompany } from "./ops";
+import { hhmm, when, type BotStep, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Prepared, type Reply, type Run } from "./types";
 
-type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null };
-const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null };
+type Approval = { reviewer: string; reviewed_at: string; note: string | null };
+type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null; approval: Approval | null };
+const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null, approval: null };
 
 // True while a caller is connected: paired, and not reset since.
 const isPaired = (events: CaseEvent[]) => {
@@ -33,7 +36,7 @@ function useCase(id: string) {
   // Staff never read the caller's draft; only what the caller confirmed reaches the desk.
   const load = useCallback(async () => {
     const db = sb();
-    const [c, e, r, j, b, x, p, rec] = await Promise.all([
+    const [c, e, r, j, b, x, p, rec, ok] = await Promise.all([
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
@@ -42,11 +45,12 @@ function useCase(id: string) {
       db.from("escalation").select("reason").eq("incident", id),
       db.from("bot_suggestion").select("rev, suggestion").eq("incident", id).maybeSingle(),
       db.from("case_record").select("summary").eq("incident", id).maybeSingle(),
+      db.from("review_state").select("reviewer, reviewed_at, note").eq("incident", id).eq("kind", "record").eq("decision", "approved").maybeSingle(),
     ]);
     setCard(c.data as CallerCard); setEvents((e.data ?? []) as CaseEvent[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
-    setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null });
+    setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null, approval: ok.data as Approval | null });
   }, [id]);
-  useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation"], load);
+  useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation", "review_state"], load);
   return { card, events, replies, job, bot };
 }
 
@@ -59,6 +63,8 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const closed = Boolean(d.finished_at);
   const lang: Lang = d.lang ?? "bn";
   const paired = isPaired(events);
+  const company = useCompany(d.station);
+  useAbuseKey(d, mine && !closed, run);
 
   return (
     <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -72,20 +78,21 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         {d.operator_id && <HandoffPanel incident={d.id} />}
         {d.operator_id && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
-          <Panel title={DESK.record} action={<Chip>{bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
+          <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{bot.summary ?? summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
+            {bot.approval?.note && <p className="inset px-3 py-2 text-[13px] leading-5"><span className="label mr-2">{REVIEW.record.staffNote}</span>{bot.approval.note}</p>}
           </Panel>
         )}
       </div>
       <aside className="flex flex-col gap-8 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
-        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} run={run} />
+        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} company={company} run={run} />
       </aside>
     </div>
   );
 }
 
-function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, run }: {
-  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; run: Run;
+function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, company, run }: {
+  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
 }) {
   const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
   if (closed) return <Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>;
@@ -96,15 +103,18 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
       <Button size="lg" onClick={() => run("claim", { incident: d.id })}>{DESK.claim}</Button>
     </Panel>
   );
-  if (!mine) return <Panel title={DESK.otherOperator}><p className="text-[14px]">{DESK.otherOperatorBody}</p></Panel>;
+  if (!mine) return <TakeoverPanel d={d} run={run} title={DESK.otherOperator} body={DESK.otherOperatorBody} />;
   return (
     <>
+      <FraudCard d={d} job={job} guards={guards} />
       {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <FaultCard d={d} flags={card?.flags ?? []} run={run} />
       <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} flags={card?.flags ?? []} />
       <Separator />
-      <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
+      <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />
+      <Separator />
+      <PromiseCard d={d} run={run} />
     </>
   );
 }
@@ -113,6 +123,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
   const menu = !closed && mine ? [
     ...(!d.remote_release ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
     { label: DESK.resetCaller, onClick: () => run("reset_caller", { incident: d.id }) },
+    { label: OPS.abusive.mark, onClick: () => abusive(d.id, run), disabled: Boolean(d.abusive_at) },
     { label: DESK.abandon, onClick: () => run("abandon", { incident: d.id }), danger: true },
   ] : [];
   return (
@@ -120,7 +131,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <span className="text-[24px] leading-tight tracking-[-0.03em] text-foreground">{isFault(d.fault) ? STAFF_JA.fault[d.fault] : DESK.unknownFault}</span>
-          <span className="flex flex-wrap items-center gap-2">{d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}{d.text_only && <TextOnlyBadge />}</span>
+          <span className="flex flex-wrap items-center gap-2">{d.abandoned ? <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="alert" />{DESK.abandonedChip}</span> : <StatusLabel status={d.status} />}{d.text_only && <TextOnlyBadge />}{opsTags(d) && <Pill tone="alert">{opsTags(d)}</Pill>}</span>
         </div>
         <MoreMenu label={DESK.caseMenu} items={menu} />
       </div>

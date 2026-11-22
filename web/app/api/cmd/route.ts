@@ -7,12 +7,13 @@ import * as training from "@/lib/training";
 import * as faults from "@/lib/faults";
 import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
-import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } from "@/lib/server";
+import { actorFrom, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
 import { requestLog, errorFields } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
 import { accessCommands } from "@/lib/access";
 import { disasterCommands } from "@/lib/disaster";
+import { OPS_COMMANDS, fieldPromise } from "@/lib/ops";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -27,19 +28,9 @@ const CODE_LENGTH = 6;
 const CODE_TTL_MS = 5 * 60_000;
 const MAX_TEXT = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;   // only well-formed ids reach the logs
-const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400, rate_limited: 429 };
 
 const str = (b: Body, k: string) => (typeof b[k] === "string" && b[k] ? (b[k] as string) : fail(400, "bad_request"));
 const digest = (code: string) => createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
-
-async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await admin.rpc(fn, args);
-  if (error) {
-    if (Object.hasOwn(STATUS, error.message)) fail(STATUS[error.message], error.message);
-    throw error;
-  }
-  return data as T;
-}
 
 function staff(a: Actor, role: Staff["role"]): Staff {
   if (a.kind !== "staff" || a.role !== role) fail(403, "forbidden");
@@ -83,7 +74,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const s = await suggest(incident);
     if (!s) return { suggestion: null };
     if (d!.confirmed_rev != null) await saveSuggestion(incident, d!.confirmed_rev, s);   // the console's AI card shows the latest
-    await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, model: s.model });
+    await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, fraud: s.fraud, model: s.model });
     return { suggestion: s };
   },
 
@@ -102,6 +93,36 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const op = staff(a, "operator");
     await revokeHandoff(str(b, "id"), op);
     return {};
+  },
+
+  // 要確認: the operator's decision on a draft for one of their own cases (cmd_review checks ownership and the item version).
+  async review(a, b) {
+    const op = staff(a, "operator");
+    const incident = str(b, "incident");
+    const kind = str(b, "kind");
+    const ref = str(b, "ref");
+    const decision = str(b, "decision");
+    if (!UUID.test(incident)) fail(400, "bad_request");
+    if (kind === "suggestion" && decision === "accepted") {
+      // What is sent is the stored suggestion, never the request body, through the operator's own send and assign.
+      const { data: s } = await admin.from("bot_suggestion").select("rev, suggestion").eq("incident", incident).maybeSingle();
+      if (!s || String(s.rev) !== ref) fail(409, "conflict");
+      const intent = s!.suggestion?.intent;
+      const r = replyOf(intent) ?? fail(409, "conflict");
+      await rpc("cmd_accept_suggestion", {
+        p_uid: op.uid, p_name: op.name, p_incident: incident, p_rev: s!.rev, p_intent: intent, p_manual: MANUAL_VERSION, p_needs_held: Boolean(r.needsHeld),
+      });
+      await signalBot(incident, "send");
+      if (s!.suggestion?.dispatch) await signalBot(incident, "assign");
+      return {};
+    }
+    if (b.note != null && (typeof b.note !== "string" || b.note.length > MAX_TEXT)) fail(400, "bad_request");
+    await rpc("cmd_review", { p_uid: op.uid, p_name: op.name, p_kind: kind, p_incident: incident, p_ref: ref, p_decision: decision, p_note: b.note ?? null });
+    if (kind !== "handoff" || decision === "dismissed") return {};
+    // The token is stored only as a hash, so "copy again" means a new link for the same recipient, the old one revoked.
+    const { data: h } = await priv().from("handoff").select("recipient").eq("id", ref).single();
+    await revokeHandoff(ref, op);
+    return decision === "reissued" ? createHandoff(incident, h!.recipient, op) : {};
   },
 
   async staff_list(a) {
@@ -290,12 +311,15 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const eta = typeof b.eta === "string" && b.eta && ETA_OPTIONS.includes(b.eta) ? b.eta : null;
     if (typeof b.generation !== "number") fail(400, "bad_request");
     await rpc("cmd_field", { p_uid: f.uid, p_name: f.name, p_incident: str(b, "incident"), p_generation: b.generation, p_state: str(b, "state"), p_eta: eta });
+    await fieldPromise(str(b, "incident"), b.generation as number, str(b, "state"), eta);
     return {};
   },
 
   // Text-only path and disaster mode (lib/access.ts, lib/disaster.ts).
   ...accessCommands,
   ...disasterCommands,
+  // Fraud mode, mass-incident broadcast, promises, harassment flag and takeover (lib/ops.ts).
+  ...OPS_COMMANDS,
 };
 
 export async function POST(req: Request): Promise<Response> {

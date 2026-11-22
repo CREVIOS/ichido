@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DESK, replyOf, staffError } from "@/content/catalogue";
+import { DESK, OPS, replyOf, staffError } from "@/content/catalogue";
 import type { BotStep, Desk, Prepared, Run, Suggestion } from "./types";
 
 type Step = Suggestion["steps"][number];
@@ -63,6 +63,7 @@ function Body({ s, onAdopt }: { s: Suggestion; onAdopt: () => void }) {
         <span className="flex items-start gap-3 text-[14px] text-foreground"><span className="mono mt-0.5 text-muted-foreground">{r.code}</span>{r.title}</span>
       ) : <span className="text-[14px]">{DESK.ai.noIntent}</span>}
       {s.dispatch && s.guard && <span className="text-[13px] text-foreground">{DESK.ai.dispatch(s.guard.name)}</span>}
+      {s.fraud && <Notice tone="warn">{OPS.fraud.ai}</Notice>}
       <List title={DESK.ai.reasons} items={s.reasons} />
       <List title={DESK.ai.risks} items={s.risks} />
       <Trace steps={s.steps} ms={s.ms} />
