@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FAULTS, MOBILE, SLA, isFault, type Fact, type Lang, type Status } from "@content/catalogue";
+import { FAULTS, MOBILE, SLA, isFault, type Fact, type Lang, type Status, STAFF_JA } from "@content/catalogue";
 
 // Row shapes and formatting shared by the operator screens (same columns the web console reads).
 export type Desk = {
@@ -14,7 +14,7 @@ export const when = (t: string) =>
     ? hhmm(t)
     : new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 export const minutesAgo = (t: string, now = Date.now()) => Math.max(0, Math.round((now - Date.parse(t)) / 60000));
-export const faultJa = (f: string) => (isFault(f) ? FAULTS[f].ja : MOBILE.operator.unknownFault);
+export const faultJa = (f: string) => (isFault(f) ? STAFF_JA.fault[f] : MOBILE.operator.unknownFault);
 export const errorJa = (code: string) => MOBILE.staff.errors[code] ?? MOBILE.staff.errors.server;
 
 // A clock for countdowns and "n minutes ago", ticking every 15 seconds.

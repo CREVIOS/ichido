@@ -7,7 +7,7 @@ import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
 import { type Desk, type OpenDesk, type Targets, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
-import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n } from "@content/catalogue";
+import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n, STAFF_JA } from "@content/catalogue";
 
 const O = MOBILE.operator;
 const HISTORY = 8;
@@ -89,7 +89,7 @@ function Queue({ me }: { me: Me }) {
           <Card style={{ padding: 4, gap: 0 }}>
             {done.map((c) => (
               <Row key={c.id} status={c.abandoned ? "alert" : "guided"} label={label[c.station] ?? c.station} meta={when(c.created_at)} chevron onPress={() => openCase(c.id)}
-                sub={c.abandoned ? O.abandonedChip : STATUS[c.status].ja} />
+                sub={c.abandoned ? O.abandonedChip : STAFF_JA.status[c.status]} />
             ))}
           </Card>
         </Section>

@@ -10,7 +10,7 @@ import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
   FACT_STAFF, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
   eventText, summaryDraft, pick, replyOf,
-  type Lang, type FieldState, type L10n,
+  type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
 
 const O = MOBILE.operator;
@@ -87,7 +87,7 @@ function CaseView({ me }: { me: Me }) {
       ) : undefined}
     >
       <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-        <Pill tone={d.abandoned ? "alert" : d.status}>{d.abandoned ? O.abandonedChip : STATUS[d.status].ja}</Pill>
+        <Pill tone={d.abandoned ? "alert" : d.status}>{d.abandoned ? O.abandonedChip : STAFF_JA.status[d.status]}</Pill>
         {d.lang && <Pill>{LANG_NAME[d.lang]}</Pill>}
       </View>
       {error ? <Notice tone="alert">{error}</Notice> : null}
@@ -253,7 +253,7 @@ function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job |
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T v="body" tone="ink">{guards.find((g) => g.uid === job.assignee)?.display_name ?? O.guard}</T>
-            <Pill tone="field">{FIELD_STATE[job.state].ja}</Pill>
+            <Pill tone="field">{STAFF_JA.field[job.state]}</Pill>
           </View>
           <T v="label">{job.eta ? O.eta(job.eta) : O.etaUnknown}</T>
         </View>

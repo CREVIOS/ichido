@@ -6,7 +6,7 @@ import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Button, Card, Hairline, IconButton, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { faultJa } from "@/lib/staff";
-import { FIELD_STATE, ETA_OPTIONS, MOBILE, STAFF, type FieldState, type L10n } from "@content/catalogue";
+import { FIELD_STATE, ETA_OPTIONS, MOBILE, STAFF, type FieldState, type L10n, STAFF_JA } from "@content/catalogue";
 
 const F = MOBILE.field;
 type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
@@ -51,7 +51,7 @@ function Jobs({ me }: { me: Me }) {
         <Card key={j.incident}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T v="small" mono>{j.station}</T>
-            <Pill tone={TONE[j.state]}>{FIELD_STATE[j.state].ja}</Pill>
+            <Pill tone={TONE[j.state]}>{STAFF_JA.field[j.state]}</Pill>
           </View>
           <View style={{ gap: 2 }}>
             <T v="h1" style={{ fontSize: 22, lineHeight: 28, letterSpacing: -0.66 }}>{labels[j.station] ?? j.station}</T>
