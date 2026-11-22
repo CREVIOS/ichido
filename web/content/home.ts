@@ -101,3 +101,9 @@ export const HOME = {
     },
   },
 };
+
+// The artwork used on the splash and sign-in screens (public domain).
+export const ART = {
+  credit: "長谷川等伯「松林図屏風」16世紀・東京国立博物館",
+  creditEn: "Hasegawa Tōhaku, Pine Trees, 16th century — Tokyo National Museum (public domain)",
+};

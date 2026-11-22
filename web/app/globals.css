@@ -104,3 +104,20 @@
   /* Hairline hatch used by the funnel and step charts. */
   .hatch { background-image: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 5px); }
 }
+
+/* First-visit splash: white → pines emerge from the mist → mark → dissolve into the page. */
+@layer components {
+  .splash { animation: splash-out 0.7s ease 2.3s forwards; }
+  .splash-art { opacity: 0; transform: scale(1.06); filter: blur(6px); animation: splash-art 1.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s forwards; }
+  .splash-mark { opacity: 0; transform: translateY(6px); animation: splash-mark 0.9s ease 0.7s forwards; }
+  .splash-mark::before { content: ""; position: absolute; inset: -48px -72px; z-index: -1; background: radial-gradient(closest-side, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0)); }
+  .splash-credit { opacity: 0; animation: splash-mark 0.9s ease 1s forwards; }
+  [data-splash="off"] .splash { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .splash { animation-duration: 0.2s; animation-delay: 0.9s; }
+    .splash-art, .splash-mark, .splash-credit { animation: none; opacity: 1; transform: none; filter: none; }
+  }
+}
+@keyframes splash-art { to { opacity: 1; transform: scale(1); filter: blur(0); } }
+@keyframes splash-mark { to { opacity: 1; transform: none; } }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }

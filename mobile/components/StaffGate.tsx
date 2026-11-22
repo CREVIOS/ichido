@@ -1,7 +1,9 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { router } from "expo-router";
 import { sb, cmd, signOut } from "@/lib/supabase";
-import { Brand, Button, Card, Input, Notice, Screen, T } from "@/components/ui";
+import { Image, View } from "react-native";
+import { Button, Input, Mark, Notice, Screen, T } from "@/components/ui";
 import { STAFF } from "@content/catalogue";
 
 export type Role = "operator" | "field" | "manager";
@@ -39,16 +41,24 @@ export function StaffGate({ allow, title, children }: { allow: Role[]; title: st
   }
 
   return (
-    <Screen back eyebrow={<Brand />} title={title}>
-      <T v="row" tone="body">{STAFF.signInLead}</T>
+    <Screen back>
+      {/* Tōhaku's pines in ink, fading into the page; then the mark, the title and two fields. */}
+      <View style={{ height: 240, marginHorizontal: -16, marginTop: -8, overflow: "hidden" }}>
+        <Image source={require("@/assets/images/signin-art.webp")} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
+        <LinearGradient colors={["rgba(255,255,255,0)", "#F5F5F5"]} locations={[0.45, 1]} style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} />
+      </View>
+      <View style={{ gap: 14 }}>
+        <Mark size={30} />
+        <T v="h1">{title}</T>
+      </View>
       {me && <Notice tone="alert">{STAFF.noAccess(me.role)}</Notice>}
-      <Card>
-        <Input label={STAFF.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="username" />
-        <Input label={STAFF.password} value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" onSubmitEditing={signIn} />
+      <View style={{ gap: 10 }}>
+        <Input placeholder={STAFF.email} accessibilityLabel={STAFF.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} autoComplete="email" keyboardType="email-address" textContentType="username" />
+        <Input placeholder={STAFF.password} accessibilityLabel={STAFF.password} value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="current-password" textContentType="password" onSubmitEditing={signIn} />
         {error ? <Notice tone="alert">{error}</Notice> : null}
         <Button label={STAFF.signIn} onPress={signIn} busy={busy} disabled={!email || !password} block />
         {me && <Button kind="ghost" label={STAFF.otherAccount} onPress={out} />}
-      </Card>
+      </View>
     </Screen>
   );
 }
