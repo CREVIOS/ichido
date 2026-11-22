@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
@@ -11,7 +11,8 @@ import { actorFrom, admin, priv, fail, reply, event, HttpError, type Actor } fro
 import { requestLog, errorFields } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
-import { accessCommands } from "@/lib/access";
+import { accessCommands, str, rpc, digest } from "@/lib/access";
+import { boundedJson, limitKey, limitSource } from "@/lib/request-security";
 import { disasterCommands } from "@/lib/disaster";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
@@ -22,25 +23,8 @@ type Body = Record<string, unknown>;
 type Staff = Extract<Actor, { kind: "staff" }>;
 type Caller = Extract<Actor, { kind: "caller" }>;
 
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 6;
-const CODE_TTL_MS = 5 * 60_000;
 const MAX_TEXT = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;   // only well-formed ids reach the logs
-const STATUS: Record<string, number> = { forbidden: 403, not_found: 404, conflict: 409, bad_request: 400, rate_limited: 429 };
-
-const str = (b: Body, k: string) => (typeof b[k] === "string" && b[k] ? (b[k] as string) : fail(400, "bad_request"));
-const digest = (code: string) => createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
-
-async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await admin.rpc(fn, args);
-  if (error) {
-    if (Object.hasOwn(STATUS, error.message)) fail(STATUS[error.message], error.message);
-    throw error;
-  }
-  return data as T;
-}
-
 function staff(a: Actor, role: Staff["role"]): Staff {
   if (a.kind !== "staff" || a.role !== role) fail(403, "forbidden");
   return a as Staff;
@@ -49,6 +33,17 @@ function staff(a: Actor, role: Staff["role"]): Staff {
 function caller(a: Actor): Caller {
   if (a.kind !== "caller") fail(403, "forbidden");
   return a as Caller;
+}
+
+async function finishVoice(cmd: "outcome" | "reset_caller" | "abandon", a: Actor, b: Body) {
+  const op = staff(a, "operator");
+  const incident = str(b, "incident");
+  const room = await rpc<string | null>("finish_voice_command", {
+    p_cmd: cmd, p_uid: op.uid, p_name: op.name, p_incident: incident,
+    ...(cmd === "outcome" && { p_reply: str(b, "reply"), p_result: str(b, "result") }),
+  });
+  if (room) await closeVoice(incident, room);
+  return {};
 }
 
 const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
@@ -107,19 +102,6 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return { field: data };
   },
 
-  async issue_code(a, b) {
-    const op = staff(a, "operator");
-    const incident = str(b, "incident");
-    const { data: d } = await admin.from("desk").select("id").eq("id", incident).eq("operator_id", op.uid).is("finished_at", null).maybeSingle();
-    if (!d) fail(403, "forbidden");
-    const { data: bound } = await priv().from("binding").select("expires").eq("incident", incident).maybeSingle();
-    if (bound && Date.parse(bound.expires) > Date.now()) fail(409, "conflict");
-    const code = Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
-    const { error } = await priv().from("pair_code").upsert({ incident, digest: digest(code), expires: new Date(Date.now() + CODE_TTL_MS).toISOString() });
-    if (error) throw error;
-    return { code, expires_in: CODE_TTL_MS / 1000 };
-  },
-
   async claim(a, b) {
     const op = staff(a, "operator");
     await rpc("cmd_claim", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident") });
@@ -148,29 +130,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
-  async outcome(a, b) {
-    const op = staff(a, "operator");
-    const incident = str(b, "incident");
-    await rpc("cmd_outcome", { p_uid: op.uid, p_name: op.name, p_incident: incident, p_reply: str(b, "reply"), p_result: str(b, "result") });
-    if (b.result === "understood") await closeVoice(incident);
-    return {};
-  },
-
-  async reset_caller(a, b) {
-    const op = staff(a, "operator");
-    const incident = str(b, "incident");
-    await rpc("cmd_reset_caller", { p_uid: op.uid, p_name: op.name, p_incident: incident });
-    await closeVoice(incident);
-    return {};
-  },
-
-  async abandon(a, b) {
-    const op = staff(a, "operator");
-    const incident = str(b, "incident");
-    await rpc("cmd_abandon", { p_uid: op.uid, p_name: op.name, p_incident: incident });
-    await closeVoice(incident);
-    return {};
-  },
+  outcome: (a, b) => finishVoice("outcome", a, b),
+  reset_caller: (a, b) => finishVoice("reset_caller", a, b),
+  abandon: (a, b) => finishVoice("abandon", a, b),
 
   // Caller (anonymous user)
   async pair(a, b) {
@@ -206,7 +168,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
       p_uid: c.uid, p_rev: cur!.rev, p_card: card, p_cash: cash, p_words: text || null, p_clarify: Boolean(patch?.clarify) && !tapped,
     });
     const said = readBackText(lang, { card_back: card ?? cur!.card_back, cash_received: cash ?? cur!.cash_received });
-    return { rev, say: said ? signSpeech(incident, said) : null };
+    return { rev, say: said && c.voiceRoom ? signSpeech(c.voiceRoom, c.uid, said) : null };
   },
 
   async confirm(a, b) {
@@ -217,7 +179,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const { data: d } = await admin.from("desk").select("id, lang, caller_words").eq("id", c.incident!).single();
     if (d?.caller_words && d.lang !== "ja") {
       const ja = await toJapanese(d.caller_words);
-      if (ja) await admin.from("desk").update({ caller_words_ja: ja }).eq("id", d.id);
+      if (ja) await admin.from("desk").update({ caller_words_ja: ja }).eq("id", d.id).eq("confirmed_rev", b.rev);
     }
     return {};
   },
@@ -238,6 +200,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
 
   async teachback(a, b) {
     const c = caller(a);
+    if (!c.incident) return fail(403, "forbidden");
+    const { data: card } = await admin.from("caller_card").select("reply_id, teachback_result").eq("id", c.incident).maybeSingle();
+    if (!card?.reply_id || card.teachback_result === "understood") fail(409, "conflict");
     const text = str(b, "text").trim().slice(0, MAX_TEXT);
     if (looksLikeNumber(text)) return { withheld: true };
     const ja = c.lang === "ja" ? text : await toJapanese(text);
@@ -287,20 +252,31 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   ...disasterCommands,
 };
 
+const callerLimits: Record<string, number> = { rate: 5, set_lang: 10, teachback: 12, draft: 30 };
+
 export async function POST(req: Request): Promise<Response> {
-  const log = requestLog("/api/cmd", req);
+  const log = requestLog("/api/cmd");
   let cmd = "unknown";
   let role = "none";
   let incident: string | undefined;
   let session: string | undefined;
   try {
-    const body = (await req.json().catch(() => ({}))) as Body;
+    const body = await boundedJson(req, 32768);
+    if (body instanceof Response) return body;
     const name = typeof body.cmd === "string" && Object.hasOwn(commands, body.cmd) ? body.cmd : fail(404, "not_found");
     cmd = name;
+    if (req.headers.has("authorization")) {
+      const limited = await limitSource(req.headers, "cmd_auth", 900, 60);
+      if (limited) return limited;
+    }
     const actor = await actorFrom(req);
     role = actor.kind === "staff" ? actor.role : actor.kind;
     incident = actor.kind === "caller" ? actor.incident ?? undefined : typeof body.incident === "string" && UUID.test(body.incident) ? body.incident : undefined;
     session = typeof body.session === "string" && UUID.test(body.session) ? body.session : undefined;
+    if (actor.kind === "caller" && Object.hasOwn(callerLimits, name)) {
+      const limited = await limitKey(name, actor.uid, callerLimits[name], 60);
+      if (limited) return limited;
+    }
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });

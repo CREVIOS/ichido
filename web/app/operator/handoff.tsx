@@ -25,8 +25,12 @@ export function HandoffPanel({ incident }: { incident: string }) {
   const create = (recipient: string) => cmd<{ path: string }>("handoff_create", { incident, recipient })
     .then(async (r) => {
       const url = `${location.origin}${r.path}`;
-      await navigator.clipboard.writeText(url).catch(() => undefined);
-      toast.success(HANDOFF.copied, { description: url });
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(HANDOFF.copied);
+      } catch {
+        window.prompt(HANDOFF.copy, url);
+      }
       load();
     }).catch(fail);
   const revoke = (id: string) => cmd("handoff_revoke", { id }).then(load).catch(fail);

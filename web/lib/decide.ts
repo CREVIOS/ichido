@@ -38,7 +38,7 @@ type Content = { role: "user" | "model"; parts: Part[] };
 
 async function generate(key: string, contents: Content[]): Promise<Part[]> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL())}:generateContent`, {
-    method: "POST",
+    method: "POST", redirect: "error", signal: AbortSignal.timeout(20_000),
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -55,10 +55,10 @@ async function generate(key: string, contents: Content[]): Promise<Part[]> {
 type Raw = { intent: string; dispatch: boolean; guard_uid?: string | null; reasons: string[]; risks: string[] };
 
 // Run the tool loop; returns null when Gemini is not configured.
-export async function suggest(incident: string): Promise<Suggestion | null> {
+export async function suggest(incident: string, db?: Ctx["db"]): Promise<Suggestion | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const ctx = { incident };
+  const ctx = { incident, db };
   const started = performance.now();
   const steps: Step[] = [];
   const contents: Content[] = [{ role: "user", parts: [{ text: "Recommend the next step for this case." }] }];
@@ -67,6 +67,7 @@ export async function suggest(incident: string): Promise<Suggestion | null> {
     const parts = await generate(key, contents);
     steps.push({ tool: "model", ms: Math.round(performance.now() - t0) });
     const calls = parts.filter((p) => p.functionCall);
+    if (calls.length > TOOL_DECLARATIONS.length) throw new Error("tool_call_limit");
     if (!calls.length) {
       const text = parts.map((p) => p.text ?? "").join("");
       const s = await validate(JSON.parse(text) as Raw, ctx);

@@ -33,7 +33,9 @@ Write a JSON file outside git (format: `scripts/staff.example.json`; `scripts/*.
 SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SECRET_KEY=sb_secret_… node scripts/create-staff.mjs scripts/staff.json
 ```
 
-New accounts get a generated 24-character password, printed once. Re-running updates role and name, and keeps
+New accounts get a generated 24-character password. The CLI prints the path to a private, mode-0600 JSONL
+file in a mode-0700 temporary directory. Deliver credentials to their owners and remove the handoff file.
+If the command fails midway, verify provisioning status before distributing its passwords. Re-running updates role and name, and keeps
 existing passwords. `--reset` rotates the password of every account in the file. To remove someone, delete the
 user under Authentication → Users (their staff row goes with it).
 
@@ -107,7 +109,8 @@ dashboard (Project → Observability → Workflows). Two settings matter:
   every run fails on the read-only filesystem.
 - **Fluid compute** (the default for new projects) keeps step functions cheap while they wait on Supabase.
 
-If the app has a `proxy.ts` later, exclude `/.well-known/workflow/` from its matcher. Locally the Local World
+The Next.js proxy rejects the unused public webhook. The SDK authenticates queue deliveries to its flow route.
+Keep queue authentication enabled. Locally the Local World
 keeps runs in `web/.workflow-data/` (git-ignored); inspect them with `npx workflow web` or
 `npx workflow inspect runs`. Cases opened before the bot existed have no run and simply show no bot panel.
 
@@ -121,6 +124,12 @@ lk agent create --secrets-file .env     # builds agent/Dockerfile and deploys; f
 lk agent deploy                         # later releases
 lk agent logs                           # follow the running agent
 ```
+
+Deploy the web signer and agent verifier together. The read-back envelope binds the per-binding voice room, LiveKit caller
+identity, text, issuance time and a random nonce. The agent accepts it for 30 seconds and consumes the nonce
+once per room session. Keep host clocks synchronized. Mixed protocol versions suppress audio read-back while
+typed intake continues. The voice worker forwards only application events to stdout and Better Stack. SDK
+recording is disabled for audio, transcripts, logs and traces, with PII redaction enabled.
 
 The secrets are stored by LiveKit Cloud and injected at runtime. They are not baked into the image
 (`.dockerignore` excludes `.env`). To build the image locally: `docker build -t ichido-agent agent`.
@@ -157,9 +166,9 @@ Neither extra produces text. The session has no LLM: the agent only transcribes 
 cp firmware/help_point/secrets.example.h firmware/help_point/secrets.h   # git-ignored
 ```
 
-Set the Wi-Fi details, `APP_URL` (the Vercel URL), `STATION_ID`, `DEVICE_SECRET` (the value from
-`DEVICE_SECRETS_JSON`) and `ROOT_CA`. For `*.vercel.app` the issuing root is currently ISRG Root X1 (Let's
-Encrypt). Check with `openssl s_client -connect <app>.vercel.app:443 -showcerts`. Then:
+Set `APP_URL` to the HTTPS app origin and `STATION_ID` to the station identifier. Pin the issuing root
+certificate in `ROOT_CA` using a PEM obtained from the CA through a trusted channel. Use the setup portal
+to enter the station's Wi-Fi credentials and its unique `DEVICE_SECRET` from `DEVICE_SECRETS_JSON`.
 
 ```sh
 arduino-cli lib install WiFiManager      # tzapu/WiFiManager (MIT): the setup portal
@@ -171,6 +180,14 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p <port> firmware/help_point
 Use the default partition scheme (two OTA app slots). The device posts a heartbeat every 60 s (uptime, free heap, RSSI, firmware version, last fault-ack and poll
 round trips) to `/api/device/heartbeat`. Operators and managers can read the latest heartbeat in
 `public.device_health` (with live updates).
+
+The stock Arduino ESP32 core stores Preferences and Wi-Fi credentials in plaintext NVS. For a field unit,
+build the Arduino core with ESP-IDF NVS encryption, protected NVS keys and a matching partition table.
+On classic ESP32 the key partition requires flash encryption. Pass `-DICHIDO_REQUIRE_ENCRYPTED_NVS` in the
+sketch build flags to fail the build if the SDK lacks NVS encryption. The core initializes encrypted NVS
+before the sketch starts. Verify encryption, eFuse state and recovery on a test unit before provisioning
+production credentials. The stock core verifies the CA and hostname. For certificate expiry checks, enable
+`CONFIG_MBEDTLS_HAVE_TIME_DATE` in the core and allow outbound NTP for the device clock.
 
 ### Display (optional)
 
@@ -200,17 +217,19 @@ is offered (`ichido.device_code`, service role only) and is never logged.
 The `secrets.h` values are only first-boot defaults. To move a Help Point to another network, app or station:
 
 1. Hold the button and power the device on. Keep holding for 8 s (the LED blinks white quickly).
-2. The LED blinks magenta: a Wi-Fi network `Ichido-<station>` is open for 5 minutes. Its password is
-   `PORTAL_PASSWORD` from `secrets.h`, or else the first 12 hex characters of
-   `SHA-256("ichido-portal\n" + device secret)`, which is also printed on the serial console:
-   `printf 'ichido-portal\n%s' "$DEVICE_SECRET" | shasum -a 256 | cut -c1-12`.
-3. Join it. The captive portal asks for the Wi-Fi network and password, the app URL, the station ID and the
-   device secret (leave the secret empty to keep the current one).
-4. Save. The device stores the values in flash and restarts. If nobody saves within 5 minutes, it restarts
-   with its old settings.
+2. The LED blinks magenta and `Ichido-<station>` opens for five minutes. The OLED shows a fresh
+   16-character password. A USB build with a unique `PORTAL_PASSWORD` (12–63 characters) uses that
+   password instead. A headless device with a provisioned station secret and no explicit portal password
+   uses the first 16 hex digits of SHA-256 over `ichido-portal`, a newline, and the secret.
+3. Join the network. Enter the Wi-Fi settings, HTTPS app origin and station. Leaving the device secret
+   empty retains it for the current destination. A changed origin or station requires a different secret.
+4. Save. The device validates the settings and restarts. Invalid settings leave the previous station
+   configuration in effect. The Wi-Fi library may have saved the submitted network to its own NVS partition.
 
-Invalid values (a URL without `http(s)://`, a station ID with other characters than letters, digits, `-`, `_`,
-a secret shorter than 16 characters) are not saved. A new secret must also be in `DEVICE_SECRETS_JSON`.
+For a headless first boot, provision a unique secret or installer password in a private USB build. Leave
+`WIFI_SSID`, `WIFI_PASS`, `DEVICE_SECRET` and `PORTAL_PASSWORD` empty in every shared OTA image.
+The portal writes case-sensitive station IDs up to 32 characters and device secrets of 16–128 printable
+non-space ASCII characters. Generate station secrets with `openssl rand -hex 32`.
 
 ### Firmware updates
 
@@ -226,26 +245,31 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out ota-private.pe
 openssl pkey -in ota-private.pem -pubout          # paste into firmware/help_point/config.h (OTA_PUBLIC_KEY)
 ```
 
-Flash this build over USB once. A build with the placeholder key never installs an update.
+Flash the public key over USB for first provisioning. Devices running 1.3 with a real signing key can
+upgrade remotely. On devices still using compiled-in credentials, first use the 1.3 setup portal to save
+the Wi-Fi details, HTTPS app origin, station ID and current device secret explicitly into NVS. The shared
+1.4 image reads those settings and has empty credential defaults. Publish **1.4.0** first, signed by the
+same private key. This single bootstrap release
+includes both signature formats. Check station heartbeats for 1.4.0 before publishing 1.4.1 or later.
+From 1.4 onward devices accept only the signature binding the URL. A device with a placeholder key needs
+USB provisioning. Use an OTA partition scheme and a bootloader with rollback enabled.
 
 For each release:
 
-1. Raise `FW_VERSION` in `help_point.ino` (dotted numbers, e.g. `1.3.0`).
+1. Raise `FW_VERSION` in `help_point.ino` (three decimal components in 0–999, e.g. `1.4.1`).
 2. Build the image: `arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir build firmware/help_point`.
-3. Upload `build/help_point.ino.bin` to any HTTPS host that sends a `Content-Length` (for example Vercel
-   Blob or a GitHub release asset). If that host's root certificate differs from `APP_URL`'s, set
+3. Upload `build/help_point.ino.bin` to a direct HTTPS URL that sends a `Content-Length` without redirects. If that host's root certificate differs from `APP_URL`'s, set
    `OTA_ROOT_CA` in `secrets.h` (see `secrets.example.h`) in the build the devices are running.
 4. Sign it and publish the manifest:
 
    ```sh
-   node scripts/sign-firmware.mjs ota-private.pem build/help_point.ino.bin 1.3.0 https://<host>/help_point-1.3.0.bin
+   node scripts/sign-firmware.mjs ota-private.pem build/help_point.ino.bin 1.4.1 https://<host>/help_point-1.4.1.bin
    ```
 
    Put the printed JSON in `FIRMWARE_MANIFEST_JSON` on Vercel and redeploy. Devices pick it up within 6 hours,
    or at their next boot.
 
-The signature covers the version and the image's SHA-256 together, so neither can be swapped, and a device
-never installs an older version. Remove `FIRMWARE_MANIFEST_JSON` to stop offering updates
+The RSA signature covers the version, exact HTTPS URL and SHA-256 digest. Devices install only newer versions. Remove `FIRMWARE_MANIFEST_JSON` to stop offering updates
 (`/api/device/firmware` then answers 204). The route logs `device_firmware` with `fw` (the device's version),
 `fw_target` and `code` = `offered` / `current` / `none` / `bad_manifest`.
 
@@ -262,7 +286,7 @@ Useful events:
 |---|---|
 | `cmd` | every `/api/cmd` call: `cmd`, `role`, `status`, `code` (error or `withheld`), `duration_ms` |
 | `device_fault` | Help Point alert: `station`, `incident`, `repeat` (a retry of an event already recorded) |
-| `device_auth_failed` | wrong or missing device secret: `code` = `bad_secret` / `no_secret` / `unknown_station` |
+| `device_auth_failed` | Invalid device credentials produce the single code `bad_credentials` before the source reaches its failure quota. |
 | `device_heartbeat` | device telemetry |
 | `device_firmware` | firmware check: `fw`, `fw_target`, `code` (`offered`, `current`, `none`, `bad_manifest`) |
 | `disaster_entered`, `disaster_left` | a station entered or left disaster mode: `station`, `role`, `code` (the notice key) |

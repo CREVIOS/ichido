@@ -83,6 +83,7 @@ jobs:
       ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS: https://espressif.github.io/arduino-esp32/package_esp32_index.json
       ESP32_VERSION: 3.3.9
       WIFIMANAGER_VERSION: 2.0.17
+      U8G2_VERSION: 2.36.19
     steps:
       - uses: actions/checkout@v6
       - uses: arduino/setup-arduino-cli@v2
@@ -94,12 +95,12 @@ jobs:
           path: |
             ~/.arduino15/packages
             ~/Arduino/libraries
-          key: arduino-${{ runner.os }}-${{ runner.arch }}-esp32-${{ env.ESP32_VERSION }}-wifi-${{ env.WIFIMANAGER_VERSION }}
+          key: arduino-${{ runner.os }}-${{ runner.arch }}-esp32-${{ env.ESP32_VERSION }}-wifi-${{ env.WIFIMANAGER_VERSION }}-oled-${{ env.U8G2_VERSION }}
       - run: arduino-cli core update-index
       - if: steps.cores.outputs.cache-hit != 'true'
         run: |
           arduino-cli core install "esp32:esp32@$ESP32_VERSION"
-          arduino-cli lib install "WiFiManager@$WIFIMANAGER_VERSION"
+          arduino-cli lib install "WiFiManager@$WIFIMANAGER_VERSION" "U8g2@$U8G2_VERSION"
       - run: |
           cp firmware/help_point/secrets.example.h firmware/help_point/secrets.h
           arduino-cli compile --fqbn esp32:esp32:esp32 firmware/help_point

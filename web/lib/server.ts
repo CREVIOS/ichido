@@ -11,37 +11,38 @@ export const priv = () => admin.schema("ichido");
 
 export type Actor =
   | { kind: "staff"; uid: string; role: "operator" | "field" | "manager"; name: string }
-  | { kind: "caller"; uid: string; incident: string | null; lang: Lang | null; expires: string | null }
+  | { kind: "caller"; uid: string; incident: string | null; lang: Lang | null; expires: string | null; voiceRoom: string | null }
   | { kind: "none" };
 
 // Derive the actor from the bearer token only; never trust role or incident fields in the body.
 export async function actorFrom(req: Request): Promise<Actor> {
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = bearer(req);
   if (!token) return { kind: "none" };
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) return { kind: "none" };
   const uid = data.user.id;
-  const { data: staff } = await priv().from("staff").select("role, display_name").eq("uid", uid).maybeSingle();
+  const { data: staff, error: staffError } = await priv().from("staff").select("role, display_name").eq("uid", uid).maybeSingle();
+  if (staffError) throw staffError;
   if (staff) return { kind: "staff", uid, role: staff.role, name: staff.display_name };
   if (!data.user.is_anonymous) return { kind: "none" };
-  const { data: b } = await priv()
-    .from("binding").select("incident, lang, expires").eq("uid", uid).gt("expires", new Date().toISOString()).maybeSingle();
-  return { kind: "caller", uid, incident: b?.incident ?? null, lang: b?.lang ?? null, expires: b?.expires ?? null };
+  const { data: b, error: bindingError } = await priv()
+    .from("binding").select("incident, lang, expires, voice_room").eq("uid", uid).gt("expires", new Date().toISOString()).maybeSingle();
+  if (bindingError) throw bindingError;
+  return { kind: "caller", uid, incident: b?.incident ?? null, lang: b?.lang ?? null, expires: b?.expires ?? null, voiceRoom: b?.voice_room ?? null };
 }
 
-// An ESP32 Help Point authenticates with a per-station secret: Authorization: Bearer <secret>, X-Station: <id>.
-// Returns the station id, or null with the reason for logs; `station` is set only for configured ids,
-// so an arbitrary X-Station header never reaches the logs.
-type DeviceAuth = { id: string } | { id: null; reason: "no_secret" | "unknown_station" | "bad_secret"; station?: string };
-export function deviceStation(req: Request): DeviceAuth {
+function bearer(req: Request) {
+  return /^Bearer ([^\s]+)$/i.exec(req.headers.get("authorization") ?? "")?.[1] ?? "";
+}
+
+export function deviceStation(req: Request): string | null {
   const id = req.headers.get("x-station") ?? "";
-  const given = (req.headers.get("authorization") ?? "").replace(/^Bearer(\s+|$)/i, "");
-  const secrets = JSON.parse(process.env.DEVICE_SECRETS_JSON ?? "{}") as Record<string, string>;
-  const expected = Object.hasOwn(secrets, id) ? secrets[id] : undefined;
-  if (!expected) return { id: null, reason: "unknown_station" };
-  if (!given) return { id: null, reason: "no_secret", station: id };
-  const h = (s: string) => createHash("sha256").update(s).digest();
-  return timingSafeEqual(h(given), h(expected)) ? { id } : { id: null, reason: "bad_secret", station: id };
+  const given = bearer(req);
+  const secrets: Record<string, unknown> = JSON.parse(process.env.DEVICE_SECRETS_JSON ?? "{}");
+  const expected = Object.hasOwn(secrets, id) ? secrets[id] : null;
+  const hash = (value: string) => createHash("sha256").update(value).digest();
+  const match = timingSafeEqual(hash(given), hash(typeof expected === "string" ? expected : ""));
+  return match && given && typeof expected === "string" ? id : null;
 }
 
 export class HttpError extends Error {

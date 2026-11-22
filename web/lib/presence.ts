@@ -5,14 +5,12 @@ import { sb } from "@/lib/supabase";
 
 export type Peer = { uid: string; name: string; viewing: string | null };
 
-// Who else is on the console, and which case each is looking at (Supabase Realtime presence).
-// ponytail: a public presence channel among signed-in staff; move to a private channel with RLS if staff from other centres share the project.
 export function usePresence(me: { uid: string; name: string }, viewing: string | null) {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [joined, setJoined] = useState(false);
   const channel = useRef<RealtimeChannel | null>(null);
   useEffect(() => {
-    const ch = sb().channel("ichido:operators", { config: { presence: { key: me.uid } } });
+    const ch = sb().channel("ichido:operator-presence", { config: { private: true, presence: { key: me.uid } } });
     ch.on("presence", { event: "sync" }, () => {
       const state = ch.presenceState<Peer>();
       setPeers(Object.values(state).map((list) => list[list.length - 1]).filter((p) => p && p.uid !== me.uid));

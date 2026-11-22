@@ -6,6 +6,7 @@ import { Truck } from "lucide-react";
 import { Pill } from "@/components/charts";
 import { DISASTER_STAFF, STATIONS } from "@/content/catalogue";
 import { cn } from "@/lib/utils";
+import { MAP_STYLE } from "@/lib/map-style";
 
 // disaster: inside a disaster area. mobile: a mobile branch (no Help Point device). selected: picked for a disaster area.
 export type MapStation = {
@@ -14,7 +15,6 @@ export type MapStation = {
 };
 
 // Free vector tiles from OpenFreeMap (OpenStreetMap data), rendered by MapLibre GL — both open source, no API key.
-const STYLE = process.env.NEXT_PUBLIC_MAP_STYLE ?? "https://tiles.openfreemap.org/styles/positron";
 const TONE = { online: "guided", stale: "alert", never: "neutral" } as const;
 // Offline and never-connected (retired) Help Points are greyed; colour is kept for working and disaster states.
 const DOT = { online: "bg-[oklch(0.62_0.13_155)]", stale: "bg-[oklch(0.78_0_0)] opacity-70", never: "bg-[oklch(0.78_0_0)] opacity-70" } as const;
@@ -33,7 +33,7 @@ export function StationMap({ stations, onToggle }: { stations: MapStation[]; onT
   const picked = stations.find((s) => s.id === sel);
   return (
     <div className="relative h-[340px] w-full overflow-hidden border-b">
-      <Map initialViewState={view} mapStyle={STYLE} attributionControl={{ compact: true }} style={{ width: "100%", height: "100%" }}>
+      <Map initialViewState={view} mapStyle={MAP_STYLE} attributionControl={{ compact: true }} style={{ width: "100%", height: "100%" }}>
         <NavigationControl position="top-right" showCompass={false} />
         {stations.map((s) => (
           <Marker key={s.id} latitude={s.lat} longitude={s.lng} anchor="center" onClick={(e) => { e.originalEvent.stopPropagation(); setSel(s.id); onToggle?.(s.id); }}>

@@ -19,10 +19,15 @@ test("a hand-off link shows the record without the caller's words, logs views, a
   assert.equal((await cmd(op, "handoff_create", { incident, recipient: "press" })).status, 400);
   const { id, path } = await ok(cmd(op, "handoff_create", { incident, recipient: "bank" }));
 
-  const page = await (await fetch(`${APP}${path}`)).text();
+  const report = await fetch(`${APP}${path}`);
+  assert.match(report.headers.get("cache-control"), /no-store/);
+  assert.match(report.headers.get("x-robots-tag"), /noindex/);
+  assert.equal(report.headers.get("referrer-policy"), "no-referrer");
+  const page = await report.text();
   assert.ok(page.includes("引継票") && page.includes("銀行 御中"), "renders the record");
   assert.ok(page.includes("カードは戻ってきていないとのこと"), "includes the confirmed facts");
   assert.ok(!page.includes("PRIVATE-WORDS"), "never the caller's own words");
+  assert.ok(!page.includes((await ok(cmd(op, "me"))).name), "recipients see staff roles only");
   const { links } = await ok(cmd(op, "handoff_list", { incident }));
   assert.equal(links[0].views, 1);
   assert.ok((await op.c.from("case_event").select("kind").eq("incident", incident)).data.some((e) => e.kind === "handoff_viewed"));

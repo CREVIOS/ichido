@@ -1,0 +1,70 @@
+# Ichido security review
+
+Reviewed baseline `83ac5a7` and the hardening on `codex/security`. Deploy migration `20261123150000` before the matching web release. The shared development database still needs this migration. Missing quota and authorization functions cause requests to fail closed.
+
+## Threat model
+
+Anyone can reach the web routes, Supabase Auth, Realtime, MCP and workflow endpoints. A phone can obtain anonymous identities, change request fields and supply arbitrary text. A lost phone can retain a session and an unexpired media token. Staff members have distinct roles. Each Help Point holds a station-specific credential and allows physical provisioning. A hand-off recipient can copy a link.
+
+The assets are private drafts, confirmed statements, staff identities and assignments, pairing codes, hand-off links, device and provider credentials, firmware signing keys, audit history, service availability and model spend. Deployment administrators, the offline firmware signer and configured identity/media providers are trusted. Revocation protects future reads. A recipient can retain an earlier copy.
+
+## Security architecture
+
+| Boundary | Enforcement |
+|---|---|
+| Web commands | Supabase Auth verifies the bearer. The server looks up the staff role or unexpired caller binding. For staff commands, a supplied case ID selects a record and the command checks permission. Callers operate on their bound case. Guard commands check the current assignee and assignment generation. Requests from browsers cannot authenticate commands with ambient cookies. |
+| PostgREST | RLS protects drafts, desk, cards, replies, jobs, device health, training and bot records. Command functions run transactions with fixed search paths and explicit grants. Schema-qualified ownership predicates protect caller data. Managers may read aggregate insights, station data and overdue-case reasons. All operators may manage hand-offs. |
+| Audit and subscriptions | Case events reject direct update/delete, with a specific exception for deletion cascading from the whole case. Disaster history has its own append-only trigger. The application publication carries inserts and updates. Postgres Changes applies table policies. Operator presence uses a private topic with separate read and publish policies on realtime.messages. Presence is advisory. [Supabase channel isolation](https://supabase.com/docs/guides/realtime/concepts) |
+| Devices | Bearer secrets are station-specific. The server hashes both candidates to a fixed width and compares in constant time. A station lock, unique event ID and one-open-case index make retries idempotent. The physical display checks digest and expiry against the current pairing code. |
+| Public hand-off | A 192-bit random bearer selects one case. Only its SHA-256 digest is stored. Successful access consumes a view and appends its audit event in the same transaction. The recipient projection omits caller words, teach-back text and staff names. Links expire after 24 hours and support immediate revocation. |
+| Providers and workflow | OpenAI receives bounded input as data and has no command tools. Gemini's read tools are confined to one case. Suggestions are checked against current eligible replies and the guard roster. The operator makes the decision and SQL checks reply rules. Training uses separate tables. The workflow rereads case state on each wake and records recommendations, reminders and metrics. The local SDK authenticates queue callbacks before reading the envelope. The unused public webhook returns 404. Escalation cron runs inside Postgres. |
+| Voice | Only a caller paired to an open, voice-enabled case receives a microphone-scoped join grant. Its lifetime is capped at ten minutes and at binding expiry. Signed read-backs include the room, sender, timestamp, nonce and exact text. The agent validates the envelope, bounds input and disables session recording. |
+
+## Findings
+
+Severity describes the baseline. Dependency ratings are the registry's. The evidence column distinguishes executed checks from integration tests that require the migration.
+
+| Severity | Finding and fix | Evidence |
+|---|---|---|
+| Critical dependency | MapLibre's installed sanitizer carried a critical advisory. Upgraded the renderer to 6.19.0. The station map consumes an external style. | Post-fix npm audit, TypeScript and production build passed. An application-level XSS path was not demonstrated. [Advisory](https://github.com/advisories/GHSA-jrc7-96c5-q579) |
+| High | The physical setup portal also registered unsigned upload and erase handlers. Remove those handlers before servicing requests, fail closed on removal failure, require HTTPS with a configured CA and remove setup credentials from serial logs. | WiFiManager source review and OLED/headless firmware builds. Physical portal behavior requires a board. |
+| High | A shared OTA binary could carry station credentials, and its signature omitted the download location. Separate USB provisioning from credential-free releases. The signer checks a release marker and binds exact HTTPS URL, version and SHA-256 digest. | Signer regressions, release-marker inspection and Arduino builds. The documented 1.4.0 bootstrap supports existing keyed devices. |
+| High | Public presence exposed operator identity and the case being viewed. Switch the console and bot to an operator-only private topic. | Role/subscribe/track expectations in authorization.test.mjs and updated bot.test.mjs. Live Realtime qualification pending. |
+| High | A previous phone's unexpired grant targeted the same room as its replacement. Assign each new binding a random room UUID and capture the former room under the desk lock for teardown. Existing bindings retain their active room during rollout. | Replacement-binding integration test pending. Signing and cross-runtime voice-envelope checks passed. |
+| High | Error messages and request paths could carry private text or hand-off tokens into logs. Use route templates, generated request IDs and fixed error fields. Drop sensitive provider/SDK job output. | Web telemetry regression and agent logging unittest. Verify redaction in hosting/CDN log drains separately. |
+| High dependency | Two Vercel dependencies pinned Zod 4.1.11. Resolve both to the application's patched Zod 4 release. | npm dependency-tree readback and production audit. [Advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) |
+| Medium | Pair and silent-alert counters could race. Code eligibility, issuance and display were separate writes. Serialize limits per UID/station, issue under the desk lock and retire expired bindings before replacement. | access.test.mjs, races.test.mjs and authorization.test.mjs. Database run pending. |
+| Medium | Several public entry points lacked shared quotas. Add atomic counters, pre-auth lockout for device/MCP failures, and per-user budgets for caller operations. Check binding and guidance before invoking teach-back translation. | Concurrent admission, exhausted-budget and independent command-quota integration tests. Actual quotas below. |
+| Medium | Concurrent hand-off reads could lose view counts, race revocation and expose staff names. Use one transaction for each operation, restrict event projections, disable caching and indexing, and suppress referrers. | handoff.test.mjs and authorization.test.mjs cover concurrent reads, expiry, quota, revocation and privacy. Database run pending. |
+| Medium | Completed guard jobs could retain station access after abandonment. Some predicates relied on historical assignment without rechecking current role. Serialize job completion with closure, backfill completed jobs, recheck caller/guard identity and reinforce private-table ACLs and RLS. | Guard completion and private-directory integration regressions. Database run pending. |
+| Medium | The MCP suggestion tool switched to the service role. Use the requesting staff member's bearer for ownership checks and every model-tool query. A role-checked database routine supplies the field roster. | Five read-only tools reviewed; mcp.test.mjs, suggest.test.mjs and directory/ACL tests await the database. |
+| Medium | An authentic earlier read-back could be replayed. Enforce a 30-second validity window, bounded clock skew, constant-time HMAC verification and a bounded, per-session cache of consumed 128-bit nonces. | Agent tests, JavaScript signing test and Node-to-Python acceptance/replay check passed. |
+| Medium | API parsers buffered unbounded bodies. Pages lacked script, framing and microphone restrictions. Add streamed byte limits, unique document nonces, caller-only microphone permission, production HSTS and anti-framing headers. Replace raw QR SVG insertion with a PNG image. | Dev and production security.test.mjs, Chrome splash execution, Next build. Sticker rendering was source-reviewed. |
+| Medium | Native refresh tokens lived in ordinary app storage. Migrate credentials to OS-protected storage, handle interrupted migration and prevent Keychain reuse after reinstall. Expo web continues using browser storage. | Migration self-test, Expo configuration and mobile typecheck. Device Keychain/Keystore qualification pending. |
+| Medium | Staff provisioning printed passwords and upstream responses. The token helper could echo an interactive password. Use a private mode-0600 handoff file, validate service origins, reject redirects, mask password entry and report status codes. | CLI origin regression and script syntax checks. No staff account provisioning was required. |
+| Low | Physical storage confidentiality depends on board provisioning. The stock SDK used for compilation lacks encrypted NVS. | Production builds can require encryption at compile time. The negative build check passed. Flash protection and rollback require physical qualification. |
+
+## Rate and size limits
+
+| Operation | Budget |
+|---|---|
+| Pair | 5 per user and 30 per station per 5 minutes |
+| Silent alert | 3 per user and 10 per station per 10 minutes |
+| Language / rating / draft / teach-back / voice grant | 10 / 5 / 30 / 12 / 10 per user per minute |
+| Device authentication failures across device routes | 20 per source per minute |
+| Command authentication / configured voice endpoint / health probe | 900 / 60 / 120 per source per minute |
+| MCP requests / authentication failures | 180 / 12 per source per minute |
+| Hand-off views | 30 per source and 30 per valid link per minute |
+| Command / MCP / heartbeat / device event / voice-token request bodies | 32 KiB / 16 KiB / 1 KiB / 64 bytes / empty |
+
+Vercel supplies the trusted source address. Self-hosting uses a shared source bucket. Users behind one NAT can share a quota. Edge and Auth signup limits still matter for distributed traffic. Outbound model requests target fixed providers. Heartbeats use a configured Better Stack HTTPS origin. Device downloads are signed and use pinned roots. Credential-bearing CLI requests reject redirects. [Vercel request headers](https://vercel.com/docs/headers/request-headers)
+
+## Release and verification
+
+Apply the database migration before the web release. Rebuild native binaries, reload older presence clients, synchronize web and agent clocks, and replace firmware template trust material before deployment. The replay cache lasts for the running room job. Redact raw hand-off paths at the reverse proxy and CDN. Physically verify NVS encryption, signed OTA and rollback. See [deployment procedures](DEPLOY.md).
+
+- Both production npm audits report zero critical and zero high advisories after hardening. Web and mobile still include moderate minimatch dependency chains. The affected consumers pin major version 10. The patched major removes APIs. Source review found no caller-supplied glob flowing into those packages. [Maintainer advisory](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249) and [breaking changes](https://github.com/isaacs/minimatch/blob/main/changelog.md)
+- The installed uv has no audit subcommand. An OSV query for all 95 locked public PyPI package/version pairs returned zero matches, including optional platform and audio packages.
+- Reachable Git patches were searched for provider credentials, JWTs, private keys, assignments and sensitive filenames. Three credential-assignment matches were local test fixtures. Tracked environment files were examples. No production credential was identified or tested. Pattern matching cannot rule out arbitrary secrets.
+- Web typecheck, lint, Japanese copy checks, production build, loopback HTTP tests, native TypeScript, agent unittests and firmware compilation passed. Hosted workflow delivery, real voice, map tiles, physical secure storage and hardware rollback await deployment or device evidence.
+- The read-only Supabase guard blocked application of the migration. The version has not been registered. SQL and PL/pgSQL parsed offline. Full journey, migrated RLS and private Realtime verification remain outstanding. A quota test received 503 with the limiter absent.

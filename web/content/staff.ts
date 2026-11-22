@@ -39,6 +39,7 @@ export const STATIONS = {
   dbm: (n: number) => `${n} dBm`,
   print: "印刷",
   openSticker: "QRステッカー",
+  qrError: "QRコードを作成できませんでした。",
   empty: "ステーションが登録されていません。docs/DEPLOY.md の手順で追加してください。",
   // A device is online if it reported within this many seconds (heartbeat every 60 s).
   onlineWithinS: 180,

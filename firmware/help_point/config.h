@@ -7,7 +7,7 @@
 // Wiring: SDA -> GPIO21, SCL -> GPIO22, VCC -> 3V3, GND -> GND (address 0x3C). Delete this line to build without it.
 #define HAS_DISPLAY
 
-// Public half of the firmware signing key (RSA, 3072 bits or more).
+// Public half of the firmware signing key (RSA-3072 or RSA-4096).
 // Updates are installed only when their manifest is signed by the matching private key
 // (scripts/sign-firmware.mjs). While this is the placeholder, the device never installs an update.
 //

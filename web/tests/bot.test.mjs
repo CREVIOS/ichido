@@ -38,9 +38,9 @@ const soon = (s) => s.status === "done" || (s.due_at && Date.parse(s.due_at) - D
 
 // Join the console's presence channel as this operator, so the bot sees them online.
 async function online(op, name) {
-  const ch = op.c.channel("ichido:operators", { config: { presence: { key: op.uid } } });
-  await new Promise((resolve) => ch.subscribe((s) => s === "SUBSCRIBED" && resolve()));
-  await ch.track({ uid: op.uid, name, viewing: null });
+  const ch = op.c.channel("ichido:operator-presence", { config: { private: true, presence: { key: op.uid, enabled: true } } });
+  await new Promise((resolve, reject) => ch.subscribe((s, e) => s === "SUBSCRIBED" ? resolve() : reject(e ?? new Error(s))));
+  assert.equal(await ch.track({ uid: op.uid, name, viewing: null }), "ok");
   return () => op.c.removeChannel(ch);
 }
 

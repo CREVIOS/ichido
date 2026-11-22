@@ -39,6 +39,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    ["expo-secure-store", { faceIDPermission: false }],
     ["expo-splash-screen", { backgroundColor: "#FFFFFF", image: "./assets/images/splash-icon.png", imageWidth: 64 }],
     ["@livekit/react-native-expo-plugin", { android: { audioType: "communication" } }],
     "@config-plugins/react-native-webrtc",
