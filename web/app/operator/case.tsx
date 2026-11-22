@@ -79,7 +79,7 @@ function Actions({ d, mine, closed, paired, lang, replies, job, guards, card, ru
   return (
     <>
       {!paired && <PairCard incident={d.id} />}
-      <ReplyCard d={d} lang={lang} replies={replies} run={run} />
+      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
     </>

@@ -129,6 +129,8 @@ export const DESK = {
     mismatch: "お客様の申告または遠隔解除の結果と合いません",
     sent: (n: number) => `送信済み ${n}件`,
     toast: "お客様へ送信しました",
+    bundle: (name: string) => `送信して ${name} へ依頼`,
+    bundleToast: (name: string) => `送信し、${name} へ現地確認を依頼しました`,
   },
   dispatch: {
     title: "取次・出動依頼",

@@ -45,7 +45,7 @@ export function PairCard({ incident }: { incident: string }) {
 
 const INTENTS = Object.keys(REPLIES);
 
-export function ReplyCard({ d, lang, replies, run }: { d: Desk; lang: Lang; replies: Reply[]; run: Run }) {
+export function ReplyCard({ d, lang, replies, run, bundleTo }: { d: Desk; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard }) {
   const [intent, setIntent] = useState(INTENTS[0]);
   const r = replyOf(intent) ?? REPLIES[INTENTS[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
@@ -53,6 +53,11 @@ export function ReplyCard({ d, lang, replies, run }: { d: Desk; lang: Lang; repl
   const blocked = d.confirmed_rev == null ? DESK.reply.awaiting
     : r.needsHeld && (d.card_back !== "no" || d.remote_release === "released") ? DESK.reply.mismatch : "";
   const send = () => run("send", { incident: d.id, intent }).then((ok) => { if (ok) toast.success(DESK.reply.toast); });
+  // One step for the common case: the approved reply, then a site check by the first available guard.
+  const sendAndDispatch = async (g: Guard) => {
+    if (!(await run("send", { incident: d.id, intent }))) return;
+    if (await run("assign", { incident: d.id, assignee: g.uid })) toast.success(DESK.reply.bundleToast(g.display_name));
+  };
   return (
     <Panel title={DESK.reply.title} action={<span className="mono text-faint">{MANUAL_VERSION}</span>}>
       <div className="flex flex-col gap-1" role="radiogroup" aria-label={DESK.reply.title}>
@@ -74,7 +79,10 @@ export function ReplyCard({ d, lang, replies, run }: { d: Desk; lang: Lang; repl
       </div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[12px] text-muted-foreground">{blocked || (replies.length ? DESK.reply.sent(replies.length) : "")}</span>
-        <Button disabled={Boolean(blocked)} onClick={send}>{DESK.reply.send}</Button>
+        <div className="flex gap-2">
+          {bundleTo && <Button variant="secondary" disabled={Boolean(blocked)} onClick={() => sendAndDispatch(bundleTo)}>{DESK.reply.bundle(bundleTo.display_name)}</Button>}
+          <Button disabled={Boolean(blocked)} onClick={send}>{DESK.reply.send}</Button>
+        </div>
       </div>
     </Panel>
   );
