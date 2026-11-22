@@ -6,12 +6,24 @@ The Expo (React Native) app for every Ichido role: caller, operator, security gu
 |---|---|---|
 | Role entry | `/` | everyone: caller path (Help Point name or link, language) and staff sign-in |
 | Help Point | `/s/[station]` | caller: language, the operator's single-use code |
-| Caller | `/caller` | AI notice, voice or typed intake, read-back and correction, number withholding, operator reply, wait/leave, guard status and ETA, teach-back, ask a person |
-| Operator | `/operator`, `/operator/[id]` | queue, simulated fault, case view (machine state, original words, confirmed facts, timeline, teach-back with translation label), claim, remote release, pairing code, approved replies, dispatch / reassign, outcome, reset caller, abandon |
+| Caller | `/caller` | AI notice, voice or typed intake, read-back and correction, number withholding, operator reply, wait/leave, guard status and ETA, teach-back, ask a person, rating faces after a guided close |
+| Operator | `/operator`, `/operator/[id]` | queue with status dots and response-time countdowns (`SLA`), simulated fault, case view, Gemini suggestion (reasons, risks, timed trace; adopt = send + assign) (machine state, original words, confirmed facts, timeline, teach-back with translation label), claim, remote release, pairing code, approved replies, dispatch / reassign, outcome, reset caller, abandon |
 | Guard | `/field` | own assignments, on the way with own estimate, arrived, done |
-| Insights | `/insights` | operator, manager: funnel, per day, busiest hours, languages, median first reply |
+| Insights | `/insights`, `/insights/[metric]` | operator, manager: the web's metric cards (daily cases, funnel, first reply, languages, hours, wait/leave, ratings); each opens its definition, a 7/14/30-day period and a chart |
 
 Every screen refetches on Realtime inserts/updates of the same tables as `web/lib/live.ts`, plus a 5-second poll and pull-to-refresh.
+
+## Design and charts
+
+`theme.ts` holds the same tokens as `web/app/globals.css` (canvas `#F5F5F5`, white surfaces with `rgba(0,0,0,0.08)` hairlines, `#0A0A0A` actions, Inter 400 headings at −3% tracking, DM Mono numbers), converted from oklch to sRGB. `components/ui.tsx` has the shared pieces: tinted status `Pill`, status `Dot`, `SegBar`, `Segments`, hairline `Row` lists and the Ichido `Mark` (paths in `components/mark.ts`, copied from `web/components/mark.tsx`).
+
+Charts use [react-native-gifted-charts](https://github.com/Abhinandan-Kushwaha/react-native-gifted-charts) (MIT, on `react-native-svg` and `expo-linear-gradient`), wrapped in `components/charts.tsx` (`Lines`, `Bars`, `Donut`, with touch tooltips). `components/metrics.tsx` mirrors `web/app/insights/metrics.tsx` and reads the same RPCs, `insights` and `insights_ratings`.
+
+App icon, adaptive icon layers, favicon and splash are rendered from the mark with sharp (installed by the web app):
+
+```sh
+NODE_PATH=../web/node_modules node scripts/icons.mjs
+```
 
 ## Content
 

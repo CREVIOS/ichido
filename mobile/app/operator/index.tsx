@@ -6,8 +6,8 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
-import { type Desk, errorJa, faultJa, minutesAgo, when } from "@/lib/staff";
-import { DEVICE_FAULT, LANG_NAME, MOBILE, STAFF, STATUS, type L10n } from "@content/catalogue";
+import { type Desk, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
+import { DEVICE_FAULT, LANG_NAME, MOBILE, NAV, SLA, STAFF, STATUS, type L10n } from "@content/catalogue";
 
 const O = MOBILE.operator;
 const HISTORY = 8;
@@ -21,7 +21,9 @@ function Queue({ me }: { me: Me }) {
   const [open, setOpen] = useState<Desk[]>([]);
   const [done, setDone] = useState<Desk[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
+  const [replied, setReplied] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+  const now = useClock();
 
   // Open cases are fetched on their own so no amount of history can push one out of the queue.
   const load = useCallback(async () => {
@@ -31,9 +33,13 @@ function Queue({ me }: { me: Me }) {
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY),
       db.from("station").select("id, label").order("id"),
     ]);
-    setOpen((o.data ?? []) as Desk[]); setDone((h.data ?? []) as Desk[]); setStations((s.data ?? []) as Station[]);
+    const queue = (o.data ?? []) as Desk[];
+    // Which open cases already have a reply, for the first-reply target.
+    const r = queue.length ? await db.from("reply").select("incident").in("incident", queue.map((c) => c.id)) : { data: [] };
+    setOpen(queue); setDone((h.data ?? []) as Desk[]); setStations((s.data ?? []) as Station[]);
+    setReplied(new Set(((r.data ?? []) as { incident: string }[]).map((x) => x.incident)));
   }, []);
-  useLive(["desk"], load);
+  useLive(["desk", "reply"], load);
 
   const label = useMemo(() => Object.fromEntries(stations.map((s) => [s.id, s.label.ja])), [stations]);
   const simulate = (station: string) => cmd("simulate", { station, fault: DEVICE_FAULT }).then(() => setError("")).catch((e: Error) => setError(errorJa(e.message)));
@@ -47,7 +53,7 @@ function Queue({ me }: { me: Me }) {
       right={
         <View style={{ flexDirection: "row", gap: 4 }}>
           <Menu label={O.simulate} closeLabel={MOBILE.staff.close} items={stations.map((s) => ({ label: O.simulateAt(s.label.ja), onPress: () => simulate(s.id) }))} />
-          <IconButton icon={ChartColumn} label={MOBILE.insights.title} onPress={() => router.push("/insights")} />
+          <IconButton icon={ChartColumn} label={NAV.insights} onPress={() => router.push("/insights")} />
           <IconButton icon={LogOut} label={STAFF.signOut} onPress={me.signOut} />
         </View>
       }
@@ -59,23 +65,21 @@ function Queue({ me }: { me: Me }) {
       </View>
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
-      <Section label={O.queue} right={<T v="small" mono>{open.length}</T>}>
+      <Section label={O.queue} right={<T v="tiny" mono>{open.length}</T>}>
         {open.length === 0 ? (
-          <Card><T v="label">{O.empty}</T></Card>
+          <Card><T v="row" tone="muted">{O.empty}</T></Card>
         ) : (
           <Card style={{ padding: 4, gap: 0 }}>
-            {open.map((c) => (
-              <Row key={c.id} label={label[c.station] ?? c.station} meta={O.minutesAgo(minutesAgo(c.created_at))} chevron onPress={() => openCase(c.id)}
-                sub={
-                  <View style={{ gap: 6 }}>
-                    <T v="small">{faultJa(c.fault)}</T>
-                    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-                      <Tag value={STATUS[c.status].ja} tone={c.operator_id ? undefined : "solid"} />
-                      {c.lang && <Tag value={LANG_NAME[c.lang]} />}
-                    </View>
-                  </View>
-                } />
-            ))}
+            {open.map((c) => {
+              const sla = slaOf(c, replied.has(c.id), now);
+              const late = sla && sla.tone !== "ok";
+              return (
+                <Row key={c.id} status={c.status} label={label[c.station] ?? c.station} chevron onPress={() => openCase(c.id)}
+                  meta={late ? `${SLA.label[sla.kind]} ${slaText(sla)}` : O.minutesAgo(minutesAgo(c.created_at, now))}
+                  metaTone={sla?.tone === "late" ? "alert" : sla?.tone === "warn" ? "warn" : undefined}
+                  sub={`${faultJa(c.fault)}${c.lang ? ` · ${LANG_NAME[c.lang]}` : ""}${c.operator_id ? "" : ` · ${O.unclaimed}`}`} />
+              );
+            })}
           </Card>
         )}
       </Section>
@@ -84,7 +88,7 @@ function Queue({ me }: { me: Me }) {
         <Section label={O.history}>
           <Card style={{ padding: 4, gap: 0 }}>
             {done.map((c) => (
-              <Row key={c.id} label={label[c.station] ?? c.station} meta={when(c.created_at)} chevron onPress={() => openCase(c.id)}
+              <Row key={c.id} status={c.abandoned ? "alert" : "guided"} label={label[c.station] ?? c.station} meta={when(c.created_at)} chevron onPress={() => openCase(c.id)}
                 sub={c.abandoned ? O.abandonedChip : STATUS[c.status].ja} />
             ))}
           </Card>

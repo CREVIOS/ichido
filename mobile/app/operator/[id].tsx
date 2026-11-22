@@ -4,7 +4,8 @@ import { useLocalSearchParams } from "expo-router";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
-import { Brand, Button, Card, Fact, Inset, Menu, Notice, Row, Screen, T, Tag } from "@/components/ui";
+import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, Tag } from "@/components/ui";
+import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
   FACTS, REPLIES, LANG_NAME, FIELD_STATE, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS,
@@ -21,7 +22,6 @@ type Event = { id: number; actor: string; actor_name: string | null; kind: strin
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
 type Job = { assignee: string; state: FieldState; eta: string | null };
 type Guard = { uid: string; display_name: string };
-type Run = (name: string, body?: Record<string, unknown>) => Promise<unknown>;
 
 export default function CaseScreen() {
   return <StaffGate allow={["operator"]} title={O.title}>{(me) => <CaseView me={me} />}</StaffGate>;
@@ -87,8 +87,8 @@ function CaseView({ me }: { me: Me }) {
       ) : undefined}
     >
       <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-        <Tag value={d.abandoned ? O.abandonedChip : STATUS[d.status].ja} />
-        {d.lang && <Tag value={LANG_NAME[d.lang]} />}
+        <Pill tone={d.abandoned ? "alert" : d.status}>{d.abandoned ? O.abandonedChip : STATUS[d.status].ja}</Pill>
+        {d.lang && <Pill>{LANG_NAME[d.lang]}</Pill>}
       </View>
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
@@ -106,6 +106,7 @@ function CaseView({ me }: { me: Me }) {
       {!closed && mine && (
         <>
           {!paired && <PairCard incident={d.id} />}
+          <SuggestCard d={d} run={run} />
           <ReplyCard d={d} lang={lang} replies={replies} run={run} />
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
@@ -151,7 +152,7 @@ function Timeline({ events }: { events: Event[] }) {
 
 function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: CallerCard | null; lang: Lang; paired: boolean; canJudge: boolean; run: Run }) {
   return (
-    <Card title={O.words} action={card?.needs_human ? <Tag value={O.wantsHuman} tone="alert" /> : undefined}>
+    <Card title={O.words} action={card?.needs_human ? <Pill tone="alert">{O.wantsHuman}</Pill> : undefined}>
       {d.confirmed_rev == null ? (
         <T v="label">{paired ? O.confirming : O.notPaired}{d.clarifying ? `　${O.clarifying}` : ""}</T>
       ) : (
@@ -252,7 +253,7 @@ function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job |
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T v="body" tone="ink">{guards.find((g) => g.uid === job.assignee)?.display_name ?? O.guard}</T>
-            <Tag value={FIELD_STATE[job.state].ja} />
+            <Pill tone="field">{FIELD_STATE[job.state].ja}</Pill>
           </View>
           <T v="label">{job.eta ? O.eta(job.eta) : O.etaUnknown}</T>
         </View>
