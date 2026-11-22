@@ -10,6 +10,7 @@ import { ACTOR, DESK, FACT_STAFF, LANG_NAME, REMOTE_RELEASE, eventText, isFault,
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
+import { BankStatusCard, CallerFlags, FaultCard } from "./faults";
 import { hhmm, type CallerCard, type CaseEvent, type Desk, type Guard, type Job, type Reply, type Run } from "./types";
 
 // True while a caller is connected: paired, and not reset since.
@@ -27,7 +28,7 @@ function useCase(id: string) {
   const load = useCallback(async () => {
     const db = sb();
     const [c, e, r, j] = await Promise.all([
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
@@ -53,8 +54,10 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
       <div className="flex min-w-0 flex-col gap-8 p-5 lg:p-8">
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
+        <CallerFlags flags={card?.flags ?? []} />
         <Timeline events={events} />
         {d.operator_id && <HandoffPanel incident={d.id} />}
+        {d.operator_id && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{DESK.recordDraft}</Chip>}>
             <p className="text-[14px] leading-6 text-foreground">{summaryDraft({ card_back: d.card_back, cash_received: d.cash_received, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null })}</p>
@@ -83,7 +86,8 @@ function Actions({ d, mine, closed, paired, lang, replies, job, guards, card, ru
     <>
       {!paired && <PairCard incident={d.id} />}
       <SuggestCard d={d} run={run} />
-      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} />
+      <FaultCard d={d} flags={card?.flags ?? []} run={run} />
+      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} flags={card?.flags ?? []} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
     </>

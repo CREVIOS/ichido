@@ -35,14 +35,15 @@ const handler = createMcpHandler((server) => {
     title: "Case detail", description: "One case: facts the caller confirmed, the timeline, approved replies sent, guard job. Never the caller's draft.", inputSchema: incident, annotations: READ,
   }, async ({ incident: id }, ctx) => {
     const db = asUser(who(ctx.http?.authInfo?.extra).token);
-    const [d, e, r, j] = await Promise.all([
+    const [d, e, r, j, c] = await Promise.all([
       db.from("desk").select("id, station, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at").eq("id", id).maybeSingle(),
       db.from("case_event").select("at, actor, actor_name, kind, data").eq("incident", id).order("id"),
       db.from("reply").select("intent, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("state, eta").eq("incident", id).maybeSingle(),
+      db.from("caller_card").select("flags").eq("id", id).maybeSingle(),
     ]);
     if (!d.data) throw new Error("not_found");
-    return json({ case: d.data, timeline: e.data ?? [], replies: r.data ?? [], guard_job: j.data, eligible_replies: eligibleReplies(d.data) });
+    return json({ case: d.data, timeline: e.data ?? [], replies: r.data ?? [], guard_job: j.data, eligible_replies: eligibleReplies(d.data, c.data?.flags ?? []) });
   });
 
   server.registerTool("station_health", {

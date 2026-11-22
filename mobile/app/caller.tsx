@@ -7,7 +7,8 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { hasVoice } from "@/lib/voice";
-import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
+import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, Tag, TextScale, Toggle } from "@/components/ui";
+import { BankStatus, CallerFlags, FollowUp, PrefsBar, speechRate, textScale, usePrefs, type FollowUpCase } from "@/components/CallerFaults";
 import { color, radius, shadow, space, tint } from "@/theme";
 import {
   FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, FIELD_STATE, LANGS, LANG_NAME, LANG_LOCALE, FAULTS, MOBILE, VOICE, VOICE_LANGS, etaText, pick, replyOf, errorText,
@@ -17,6 +18,7 @@ import {
 type CallerCard = {
   id: string; station: string; fault: string; lang: Lang | null; confirmed_rev: number | null; status: Status;
   field_state: FieldState; eta: string | null; choice: string | null; teachback: string | null; teachback_result: string | null; needs_human: boolean; rating: number | null;
+  reply_id: string | null; flags: string[]; bank_status: string | null; bank_due: string | null;
 };
 type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -29,13 +31,20 @@ export default function CallerScreen() {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [station, setStation] = useState<Station | null>(null);
   const [staffSession, setStaffSession] = useState(false);
+  const [follow, setFollow] = useState<FollowUpCase | null>(null);
+  const [prefs, setPrefs] = usePrefs();
 
   // Only the case this phone is bound to; never "the first card visible" (staff can see many).
+  // Once the pairing has expired, a phone whose case closed with guidance can still follow it.
   const load = useCallback(async () => {
     const db = sb();
     const mine = await cmd<{ incident: string | null; staff: boolean }>("mine").catch(() => ({ incident: null, staff: false }));
     setStaffSession(mine.staff);
-    if (!mine.incident) return setCard(null);
+    if (!mine.incident) {
+      const f = mine.staff ? null : await cmd<{ case: FollowUpCase | null }>("followup").catch(() => null);
+      setFollow(f?.case ?? null);
+      return setCard(null);
+    }
     const { data: c } = await db.from("caller_card").select("*").eq("id", mine.incident).maybeSingle();
     setCard((c as CallerCard) ?? null);
     if (!c) return;
@@ -49,29 +58,36 @@ export default function CallerScreen() {
   useLive(["caller_card", "draft", "reply"], load);
 
   if (card === undefined) return null;
-  if (card === null) return <NotConnected staff={staffSession} />;
+  if (card === null) return follow ? <FollowUp f={follow} prefs={prefs} onPrefs={setPrefs} onRefresh={load} /> : <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
-  const latest = replies.at(-1);
+  // The current guidance only: a reply withdrawn after a fault-type change no longer shows.
+  const latest = replies.find((r) => r.id === card.reply_id);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
+  const open = card.status !== "guided";
 
   return (
-    <Screen eyebrow={<Brand />} onRefresh={load}>
-      <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => undefined); }} />
-      <View style={{ gap: 6 }}>
-        <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
-        <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
-      </View>
-      {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
-      {confirmed && !latest && <Waiting lang={lang} />}
-      {latest && <Guidance lang={lang} card={card} reply={latest} />}
-      <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
-        <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.showStaff[lang]}</T>
-        <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>
-        <T v="label" tone="onPrimary">{UI.caseNo.ja}：<T v="label" mono tone="onPrimary">{card.id.slice(0, 8)}</T></T>
-      </View>
-      <T v="small">{UI.helpDesk[lang]}</T>
-    </Screen>
+    <TextScale.Provider value={textScale(prefs)}>
+      <Screen eyebrow={<Brand />} onRefresh={load}>
+        <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => undefined); }} />
+        <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
+        <View style={{ gap: 6 }}>
+          <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
+          <Pill tone={card.status}>{STATUS[card.status][lang]}</Pill>
+        </View>
+        {!confirmed && draft && <Intake lang={lang} draft={draft} needsHuman={card.needs_human} />}
+        {confirmed && !latest && <Waiting lang={lang} />}
+        {latest && <Guidance lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
+        {open && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
+        {(card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
+        <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
+          <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.showStaff[lang]}</T>
+          <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>
+          <T v="label" tone="onPrimary">{UI.caseNo.ja}：<T v="label" mono tone="onPrimary">{card.id.slice(0, 8)}</T></T>
+        </View>
+        <T v="small">{UI.helpDesk[lang]}</T>
+      </Screen>
+    </TextScale.Provider>
   );
 }
 
@@ -133,11 +149,9 @@ function Intake({ lang, draft, needsHuman }: { lang: Lang; draft: Draft; needsHu
   );
 }
 
-const WAITING_HINT_MS = 30_000;
+// No timers in the caller flow: the handset hint is there from the start.
 function Waiting({ lang }: { lang: Lang }) {
-  const [late, setLate] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setLate(true), WAITING_HINT_MS); return () => clearTimeout(t); }, []);
-  return <Card><T v="h2">{STATUS.review[lang]}…</T>{late && <T v="label">{UI.waiting[lang]}</T>}</Card>;
+  return <Card><T v="h2">{STATUS.review[lang]}…</T><T v="label">{UI.waiting[lang]}</T></Card>;
 }
 
 // Whether the device has a speech voice for this language (Bengali often has none).
@@ -151,7 +165,7 @@ function useHasVoice(lang: Lang) {
   return has;
 }
 
-function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCard; reply: Reply }) {
+function Guidance({ lang, card, reply, rate }: { lang: Lang; card: CallerCard; reply: Reply; rate: number }) {
   const r = replyOf(reply.intent);
   const text = r ? r.text(reply.slots)[lang] : errorText("server", lang);
   const done = card.teachback_result === "understood";
@@ -167,7 +181,7 @@ function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCard; reply: 
     <>
       <T v="small">{UI.approved[lang]}</T>
       <T v="h1">{text}</T>
-      {hasVoice && <Button kind="secondary" icon={Volume2} label={UI.listen[lang]} onPress={() => Speech.speak(text, { language: LANG_LOCALE[lang] })} style={{ alignSelf: "flex-start" }} />}
+      {hasVoice && <Button kind="secondary" icon={Volume2} label={UI.listen[lang]} onPress={() => Speech.speak(text, { language: LANG_LOCALE[lang], rate })} style={{ alignSelf: "flex-start" }} />}
       {note ? <Notice tone="alert">{note}</Notice> : null}
 
       {card.field_state !== "none" && (

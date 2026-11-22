@@ -22,14 +22,15 @@ function useHasVoice(lang: Lang) {
   return has;
 }
 
-export function Guidance({ lang, card, reply }: { lang: Lang; card: CallerCase; reply: Reply }) {
+// rate: the caller's read-aloud speed (slower when they asked for it).
+export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: CallerCase; reply: Reply; rate?: number }) {
   const r = replyOf(reply.intent);
   const text = r ? r.text(reply.slots)[lang] : errorText("server", lang);
   const done = card.teachback_result === "understood";
   const [note, setNote] = useState("");
   const act = (name: string, body: Record<string, unknown> = {}) => cmd(name, body).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
   const hasVoice = useHasVoice(lang);
-  const speak = () => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; window.speechSynthesis.speak(u); };
+  const speak = () => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; u.rate = rate; window.speechSynthesis.speak(u); };
 
   return (
     <>

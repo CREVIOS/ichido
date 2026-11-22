@@ -1,4 +1,4 @@
-import { ANSWER, ERRORS, FACTS, FAULTS, FIELD_STATE, MOBILE, RATING, REPLIES, STATION, STATUS, UI, VOICE, etaText } from "../content/catalogue.ts";
+import { ANSWER, BANK_STATUS, CALLER_FLAGS, ERRORS, FACTS, FAULTS, FAULT_UI, FIELD_STATE, MOBILE, RATING, REPLIES, STATION, STATUS, UI, VOICE, etaText } from "../content/catalogue.ts";
 
 // Familiar banking and pairing terms, and the language name in the help-desk notice.
 const allowed = new Set(["カード", "コード", "シール", "ベンガル"]);
@@ -33,7 +33,9 @@ function checkCatalogue() {
   const slots = { branch: { ja: "駅前支店" }, hours: { ja: "平日 9時から 15時まで" } };
   const replies = Object.fromEntries(Object.entries(REPLIES).map(([key, r]) => [key, r.text(slots)]));
   const entries = japanese({ UI, STATION, VOICE, ERRORS, FACTS, FAULTS, ANSWER, STATUS, FIELD_STATE, RATING, MOBILE: { entry: { caller: MOBILE.entry.caller, staff: MOBILE.entry.staff }, station: MOBILE.station, back: MOBILE.back, speak: MOBILE.speak, stopSpeaking: MOBILE.stopSpeaking }, REPLIES: replies,
-    ETA: { pending: { ja: etaText(null, "ja") }, provided: { ja: etaText("10-20", "ja") } } });
+    ETA: { pending: { ja: etaText(null, "ja") }, provided: { ja: etaText("10-20", "ja") } },
+    FAULT_UI, CALLER_FLAGS: Object.fromEntries(Object.entries(CALLER_FLAGS).map(([k, f]) => [k, f.label])),
+    BANK_STATUS: Object.fromEntries(Object.entries(BANK_STATUS).map(([k, b]) => [k, { ja: b.caller("2026-12-01", "ja") }])) });
   const rows = [];
   let checked = 0;
   for (const [entry, text] of entries) {
