@@ -125,16 +125,22 @@ test("invite → email link sets the password (verifies the address) → forced 
   assert.equal((await ok(cmd({ token: minted }, "me"))).role, "operator");
 
   // Realtime with the same token: the private staff topic for a table this operator may read, and its broadcast.
-  // Local Realtime can take about 5 s to authorise a private join.
+  // Local Realtime can take about 5 s to authorise a private join, and on a fresh stack (this is the first test file)
+  // it starts its message replication only now, so the first broadcast can be lost: keep touching the row until one
+  // arrives. setAuth first, as lib/live.ts does: otherwise the join can go out before the token is attached.
+  await reader.realtime.setAuth();
   const seen = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("no realtime broadcast")), 20_000);
+    let poke;
+    const stop = () => { clearTimeout(timer); clearInterval(poke); reader.removeChannel(ch); };
+    const timer = setTimeout(() => { stop(); reject(new Error("no realtime broadcast")); }, 60_000);
+    const touch = () => service.from("light").update({ updated_at: new Date().toISOString() }).eq("station", "TABLE-A");
     const ch = reader.channel("live:light", { config: { private: true } }).on("broadcast", { event: "change" }, () => {
-      clearTimeout(timer); reader.removeChannel(ch); resolve();
+      stop(); resolve();
     });
     ch.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") await service.from("light").update({ updated_at: new Date().toISOString() }).eq("station", "TABLE-A");
-      else if (status !== "CLOSED") { clearTimeout(timer); reader.removeChannel(ch); reject(new Error(`realtime join: ${status}`)); }
-    }, 15_000);
+      if (status === "SUBSCRIBED") { await touch(); poke = setInterval(touch, 1_000); }
+      else if (status !== "CLOSED") { stop(); reject(new Error(`realtime join: ${status}`)); }
+    }, 45_000);
   });
   await seen;
 
