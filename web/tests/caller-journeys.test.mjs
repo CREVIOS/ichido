@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import pg from "pg";
+import { canConfirm } from "../content/caller-session.ts";
 import { LANGS, MANUAL_VERSION, REPLIES, JOURNEY, allergyFacts, flagsFor, sentText } from "../content/catalogue.ts";
 
 test("stored manuals retain historical promises and slot values in every language",() => {
@@ -15,6 +16,11 @@ test("stored manuals retain historical promises and slot values in every languag
 });
 
 test("need-first intake opens only the chosen details and the food card excludes unrelated facts",() => {
+  const unknown = {card_back:"unknown",cash_received:"unknown",needs_clarification:false};
+  assert.ok(flagsFor("card_retained").includes("need_other"));
+  assert.ok(canConfirm(true,unknown,["need_other"]));
+  assert.ok(!canConfirm(true,unknown,[]));
+  assert.ok(!canConfirm(true,{...unknown,needs_clarification:true},["need_other"]));
   assert.ok(!flagsFor("shelter_checkin").includes("party_family"));
   assert.ok(flagsFor("shelter_checkin").includes("diet_allergy"));
   const selected = flagsFor("shelter_checkin",["diet_allergy"]);

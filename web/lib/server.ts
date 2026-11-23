@@ -46,6 +46,7 @@ async function staffSession(uid: string, session: string): Promise<Actor> {
 
 async function callerFrom(token: string): Promise<Actor> {
   const { data, error } = await admin.auth.getUser(token);
+  if (error && (!error.status || error.status >= 500 || error.status === 429)) throw error;
   if (error || !data.user?.is_anonymous) return { kind: "none" };
   const uid = data.user.id;
   const { data: b, error: bindingError } = await priv()

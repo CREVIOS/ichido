@@ -189,7 +189,7 @@ test("follow-up: after the case closes and the pairing expires, the caller still
   assert.equal((await cmd(op, "bank_status", { incident, status: "collect_your_card" })).status, 400, "catalogue statuses only");
   assert.equal((await cmd(op, "bank_status", { incident, status: "contact_by" })).status, 400, "contact_by needs a date");
   // Any operator may record it on the bank's behalf, after the case has closed.
-  await ok(cmd(op2, "bank_status", { incident, status: "contact_by", due: "2026-12-01" }));
+  await ok(cmd(op2, "bank_status", { incident, status: "contact_by", channel:"phone", due: "2026-12-01" }));
   assert.equal((await a.c.from("caller_card").select("bank_status").eq("id", incident).single()).data.bank_status, "contact_by");
 
   // The two-hour pairing runs out; the phone can still follow its closed case, and only that.

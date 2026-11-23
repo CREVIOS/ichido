@@ -203,7 +203,7 @@ const COMMON_FLAGS = ["foreign_card", "leaving_japan", "helper"];
 // flags: the caller's current taps (a pack also shows the details of the situations they point to).
 export function flagsFor(fault: string, flags: readonly string[] = []) {
   const p = contentPack(fault);
-  return p ? packTapsFor(p, fault, flags) : [...GROUP_FLAGS[groupOf(fault)], ...COMMON_FLAGS];
+  return p ? packTapsFor(p, fault, flags) : ["need_other", ...GROUP_FLAGS[groupOf(fault)], ...COMMON_FLAGS];
 }
 
 // Fault types the caller's taps point to that differ from the current one (a hint for the operator, never automatic).

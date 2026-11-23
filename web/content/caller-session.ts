@@ -22,3 +22,8 @@ export type CallerView = {
   screen?: { card: CallerCase; draft: Draft; station: Station; reply: Reply | null; turns: Turn[]; generation: string };
   staff?: boolean; reason?: import("./caller-journey.ts").EndReason; lang?: Lang; follow?: FollowUpCase | null;
 };
+
+export function canConfirm(atm: boolean, draft: Draft, flags: readonly string[]) {
+  if (draft.needs_clarification) return false;
+  return atm ? draft.card_back !== "unknown" || draft.cash_received !== "unknown" || flags.includes("need_other") : flags.length > 0;
+}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { DESK, DEVICE_FAULT, FACTS, LANG_NAME, REPLIES, SLA, staffError, type Fact as FactValue, type Lang, STAFF_JA } from "@/content/catalogue";
+import { MANUAL_VERSION, DESK, DEVICE_FAULT, FACTS, LANG_NAME, REPLIES, SLA, staffError, type Fact as FactValue, type Lang, STAFF_JA } from "@/content/catalogue";
 import { TRAINING, TRAINING_SLOTS, feedback, type Scenario, type ScoreItem } from "@/content/training";
 import { DispatchCard, ReplyCard } from "@/app/operator/actions";
 import { hhmm, type Reply, type Run } from "@/app/operator/types";
@@ -65,7 +65,7 @@ export function SessionView({ s, sc, onChange, onAgain, onBack }: { s: SessionRo
   const run: Run = useCallback((name, body = {}) => act(TRAINING_CMD[name] ?? name, name === "send" ? { intent: body.intent } : {}), [act]);
 
   if (s.finished_at) return <Debrief s={s} sc={sc} turns={turns} onAgain={onAgain} onBack={onBack} />;
-  const replies: Reply[] = turns.filter((t) => t.kind === "reply").map((t) => ({ id: String(t.id), intent: t.data.intent, slots: TRAINING_SLOTS, sent_at: t.at }));
+  const replies: Reply[] = turns.filter((t) => t.kind === "reply").map((t) => ({ id: String(t.id), intent: t.data.intent, slots: TRAINING_SLOTS, manual_version:MANUAL_VERSION, sent_at: t.at }));
 
   return (
     <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">

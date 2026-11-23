@@ -11,7 +11,7 @@ import { entry, errorFields, ship } from "./log";
 type Caller = Extract<Actor, { kind: "caller" }>;
 type Submitted = {
   seq: number; rev: number; epoch: number; locale: Lang; handler: string; fault: string;
-  flags: string[]; card_back: Fact; cash_received: Fact; replay?: boolean;
+  flags: string[]; card_back: Fact; cash_received: Fact; replay?: boolean; act?: string;
 };
 const UUID = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
 const FACT = new Set(["yes", "no", "unknown"]);
@@ -87,7 +87,7 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
   const words = checked.withheld ? null : text || null;
   const s = await rpc<Submitted>("frontline_submit", { ...args, p_rev: rev, p_act: checked.withheld ? "withheld" : act,
     p_words: words, p_facts: facts, p_priority: transfer?.priority ?? null, p_reason: transfer?.reason ?? null });
-  if (s.replay) return { replay: true };
+  if (s.replay) return { replay: true, withheld: s.act === "withheld" };
   if (words && s.locale !== "ja") after(() => translate(s.seq, words));
   if (s.handler !== "ai" || act === "start") return { handler: s.handler, withheld: checked.withheld };
   let wording = checked.withheld ? "withheld" : "readback";

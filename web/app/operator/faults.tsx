@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Chip, Dot, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AMOUNT_MAX, BANK_STATUS, CALLER_FLAGS, FAULT_DESK, PACK_DESK, STAFF_JA, bankStatusStaff, isUrgentTap, packOfFault, situationsOf, suggestedFaults, takesAmount } from "@/content/catalogue";
+import { ASSIST, AMOUNT_MAX, BANK_STATUS, CALLER_FLAGS, FAULT_DESK, PACK_DESK, STAFF_JA, bankStatusStaff, isUrgentTap, packOfFault, situationsOf, suggestedFaults, takesAmount } from "@/content/catalogue";
 import type { CallerCard, Desk, Run } from "./types";
 
 const field = "h-9 rounded-lg border bg-card px-2.5 text-[14px] text-foreground";
@@ -85,16 +85,21 @@ export function CallerFlags({ flags }: { flags: string[] }) {
 export function BankStatusCard({ incident, card, run }: { incident: string; card: Pick<CallerCard, "bank_status" | "bank_due"> | null; run: Run }) {
   const [status, setStatus] = useState(Object.keys(BANK_STATUS)[0]);
   const [due, setDue] = useState("");
+  const [channel,setChannel] = useState("");
+  const needsChannel = status === "contact_by" || status === "contacted";
   const needsDue = Boolean(BANK_STATUS[status]?.due);
-  const save = () => run("bank_status", { incident, status, due: needsDue ? due : undefined }).then((ok) => { if (ok) toast.success(FAULT_DESK.bank); });
+  const save = () => run("bank_status", { incident, status, channel:needsChannel ? channel : null, due: needsDue ? due : undefined }).then((ok) => { if (ok) toast.success(FAULT_DESK.bank); });
   return (
     <Panel title={FAULT_DESK.bank} action={<Chip>{card?.bank_status ? bankStatusStaff(card.bank_status, card.bank_due) : FAULT_DESK.bankNone}</Chip>}>
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label={FAULT_DESK.bank} className={field} value={status} onChange={(e) => setStatus(e.target.value)}>
           {Object.keys(BANK_STATUS).map((k) => <option key={k} value={k}>{BANK_STATUS[k].label}</option>)}
         </select>
+        {needsChannel && <select aria-label={ASSIST.channel} className={field} value={channel} onChange={e => setChannel(e.target.value)}>
+          <option value="">{ASSIST.channel}</option><option value="phone">{ASSIST.phone}</option><option value="email">{ASSIST.email}</option>
+        </select>}
         {needsDue && <input type="date" aria-label={FAULT_DESK.bankDue} className={field} value={due} onChange={(e) => setDue(e.target.value)} />}
-        <Button variant="secondary" disabled={needsDue && !due} onClick={save}>{FAULT_DESK.bankSave}</Button>
+        <Button variant="secondary" disabled={(needsDue && !due) || (needsChannel && !channel)} onClick={save}>{FAULT_DESK.bankSave}</Button>
       </div>
       <Notice>{FAULT_DESK.bankNote}</Notice>
     </Panel>

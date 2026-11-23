@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { FRONT_DESK, ACCESS_STAFF, ACTOR, BOT, CALLER_FLAGS, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, PACKS, PACK_DESK, REMOTE_RELEASE, eventText, isFault, packOfFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { Pill } from "@/components/charts";
 import { FrontlineMonitor } from "./frontline";
+import { AssistedIntake } from "./assisted";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
@@ -22,13 +23,8 @@ type Approval = { reviewer: string; reviewed_at: string; note: string | null };
 type BotState = { steps: BotStep[]; escalations: string[]; prepared: Prepared | null; summary: string | null; approval: Approval | null };
 const NO_BOT: BotState = { steps: [], escalations: [], prepared: null, summary: null, approval: null };
 
-// True while a caller is connected: paired, and not reset since.
-const isPaired = (events: CaseEvent[]) => {
-  const last = events.findLastIndex((x) => x.kind === "paired");
-  return last >= 0 && !events.slice(last + 1).some((e) => e.kind === "caller_reset");
-};
-
 function useCase(id: string) {
+  const [checkedAt, setCheckedAt] = useState(0);
   const [card, setCard] = useState<CallerCard | null>(null);
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
@@ -38,9 +34,9 @@ function useCase(id: string) {
   const load = useCallback(async () => {
     const db = sb();
     const [c, e, r, j, b, x, p, rec, ok] = await Promise.all([
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback_lang, teachback, teachback_ja, teachback_reply, needs_human, notice, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
-      db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
+      db.from("reply").select("id, intent, slots, manual_version, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta, accepted_at, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
       db.from("bot_step").select("step, status, code, due_at, data, at").eq("incident", id),
       db.from("escalation").select("reason").eq("incident", id),
@@ -48,15 +44,16 @@ function useCase(id: string) {
       db.from("case_record").select("summary").eq("incident", id).maybeSingle(),
       db.from("review_state").select("reviewer, reviewed_at, note").eq("incident", id).eq("kind", "record").eq("decision", "approved").maybeSingle(),
     ]);
+    setCheckedAt(Date.now());
     setCard(c.data as CallerCard); setEvents((e.data ?? []) as CaseEvent[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
     setBot({ steps: (b.data ?? []) as BotStep[], escalations: (x.data ?? []).map((row) => row.reason as string), prepared: p.data as Prepared | null, summary: rec.data?.summary ?? null, approval: ok.data as Approval | null });
   }, [id]);
   useLive(["caller_card", "case_event", "reply", "field_job", "bot_step", "bot_suggestion", "case_record", "escalation", "review_state"], load);
-  return { card, events, replies, job, bot };
+  return { card, events, replies, job, bot, checkedAt };
 }
 
 export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
-  const { card, events, replies, job, bot } = useCase(d.id);
+  const { card, events, replies, job, bot, checkedAt } = useCase(d.id);
   const [reference,setReference] = useState<string>();
   const [work, setWork] = useState<string[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
@@ -76,7 +73,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const mine = d.operator_id === me.uid;
   const closed = Boolean(d.finished_at);
   const lang: Lang = d.lang ?? "bn";
-  const paired = isPaired(events);
+  const paired = Boolean(d.binding_expires && Date.parse(d.binding_expires) > checkedAt);
   const company = useCompany(d.station);
   const atm = packOfFault(d.fault) === "atm";
   useAbuseKey(d, mine && !closed, run);
@@ -125,7 +122,8 @@ function Actions({ reference, work, d, me, mine, closed, paired, lang, replies, 
     <>
       {packOfFault(d.fault) === "atm" && <FraudCard d={d} run={run} />}
       {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
-      {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
+      {!paired && <AssistedIntake key={d.id} desk={d} reply={replies.find(r => r.id === card?.reply_id)} run={run} />}
+      {!paired && !d.assisted_source && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <FaultCard d={d} flags={card?.flags ?? []} run={run} />
       <ReplyCard reference={reference} work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
@@ -174,9 +172,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           <div className="surface flex flex-col gap-2 p-4">
-            <span className="label">{DESK.original(LANG_NAME[lang])}</span>
-            <span lang={lang} className="text-[17px] leading-7 text-foreground">{d.caller_words ?? DESK.choiceOnly}</span>
-            {d.caller_words && lang !== "ja" && (d.caller_words_ja
+            <span className="label">{DESK.original(d.caller_words_lang ? LANG_NAME[d.caller_words_lang] : "—")}</span>
+            <span lang={d.caller_words_lang ?? undefined} className="text-[17px] leading-7 text-foreground">{d.caller_words ?? DESK.choiceOnly}</span>
+            {d.caller_words && d.caller_words_lang !== "ja" && (d.caller_words_ja
               ? <span className="flex items-start gap-2 text-[14px] leading-6"><Chip className="shrink-0">{DESK.teach.mt}</Chip>{d.caller_words_ja}</span>
               : <span className="text-[12px] text-muted-foreground">{DESK.teach.noMt(LANG_NAME[lang])}</span>)}
           </div>
@@ -190,7 +188,7 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
       )}
       {d.confirmed_rev != null && d.triage && <TriageNote d={d} flags={card?.flags ?? []} />}
       {card?.choice && <span className="text-[14px]">{DESK.choice}：<span className="text-foreground">{DESK.choiceText[card.choice]}</span></span>}
-      {card?.teachback && <TeachBack card={card} lang={lang} canJudge={canJudge} onJudge={(result) => run("outcome", { incident: d.id, reply: card.teachback_reply, result })} />}
+      {card?.teachback && <TeachBack card={card} lang={card.teachback_lang ?? lang} canJudge={canJudge} onJudge={(result) => run("outcome", { incident: d.id, reply: card.teachback_reply, result })} />}
     </Panel>
   );
 }
@@ -216,7 +214,7 @@ function TeachBack({ card, lang, canJudge, onJudge }: { card: CallerCard; lang: 
   return (
     <div className="surface flex flex-col gap-2.5 p-4">
       <span className="label">{DESK.teach.title}</span>
-      <span lang={lang} className="text-[17px] leading-7 text-foreground">{card.teachback}</span>
+      <span lang={card.teachback_lang ?? undefined} className="text-[17px] leading-7 text-foreground">{card.teachback}</span>
       {lang !== "ja" && (card.teachback_ja
         ? <span className="flex items-start gap-2 text-[14px] text-foreground"><Chip className="shrink-0">{DESK.teach.mt}</Chip>{card.teachback_ja}</span>
         : <Notice tone="warn">{DESK.teach.noMt(LANG_NAME[lang])}</Notice>)}

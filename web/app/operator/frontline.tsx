@@ -3,11 +3,11 @@ import { useCallback, useState } from "react";
 import { Notice, Panel } from "@/components/kit";
 import { useLive } from "@/lib/live";
 import { cmd } from "@/lib/supabase";
-import { ANSWER, CALLER_FLAGS, DESK, FACTS, LANG_NAME, FRONTLINE, FRONT_DESK, UI, replyOf, staffError, type Fact, type Lang, type ReplySlots } from "@/content/catalogue";
+import { ANSWER, CALLER_FLAGS, DESK, FACTS, LANG_NAME, FRONTLINE, FRONT_DESK, UI, sentText, staffError, type Fact, type Lang, type ReplySlots } from "@/content/catalogue";
 import type { Desk } from "./types";
 
 type Turn = {
-  seq: number; slots: ReplySlots | null; locale: Lang; words: string | null; ja: string | null; speaker: string; wording: string;
+  seq: number; manual_version:string | null; slots: ReplySlots | null; locale: Lang; words: string | null; ja: string | null; speaker: string; wording: string;
   facts: { flag?: string; on?: boolean; card_back?: Fact; cash_received?: Fact; triage?: { taps: string[]; ask: string[]; situation: string | null } };
 };
 
@@ -18,7 +18,7 @@ function turnText(t: Turn) {
   if (t.wording === "confirm") return UI.confirm[t.locale];
   if (t.wording === "unsure") return UI.unsure[t.locale];
   if (Object.hasOwn(FRONTLINE,t.wording)) return FRONTLINE[t.wording as keyof typeof FRONTLINE][t.locale];
-  return replyOf(t.wording)?.text(t.slots ?? {})[t.locale] ?? null;
+  return t.manual_version && sentText({ manual_version:t.manual_version,intent:t.wording,slots:t.slots ?? {} },t.locale);
 }
 
 export function FrontlineMonitor({ desk }: { desk: Desk }) {

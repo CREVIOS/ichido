@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, flagsFor, packTaps, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { screenTurn } from "@/content/frontline-policy";
 import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
@@ -62,7 +62,49 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
 
   // Caller: which case this phone is bound to (none for staff sessions or unpaired phones).
   async mine(a) {
-    return { incident: a.kind === "caller" ? a.incident : null, staff: a.kind === "staff" };
+    if (a.kind !== "caller" || !a.incident) return { incident: null, staff: a.kind === "staff" };
+    const { data } = await admin.from("desk").select("station,finished_at").eq("id", a.incident).single().throwOnError();
+    return { incident: a.incident, station: data.station, finished: Boolean(data.finished_at), staff: false };
+  },
+
+  async caller_screen(a) {
+    if (a.kind !== "caller") return { staff: a.kind === "staff" };
+    const screen = await rpc<object | null>("caller_screen", { p_uid: a.uid });
+    if (screen) return { screen };
+    const { data: binding } = await priv().from("binding").select("expires,lang,incident").eq("uid", a.uid).maybeSingle().throwOnError();
+    const { data: ended } = await priv().from("pair_end").select("reason,lang").eq("uid", a.uid).gt("until_at",new Date().toISOString()).maybeSingle().throwOnError();
+    const reason = binding && Date.parse(binding.expires) <= Date.now() ? "expired" : ended?.reason;
+    const previous = ended ? null : (await faults.followup(a)).case;
+    const follow = binding && previous?.id !== binding.incident ? null : previous;
+    return { reason, lang: binding?.lang ?? ended?.lang, follow };
+  },
+
+  async assisted_intake(a,b) {
+    const op = staff(a,"operator");
+    const fault = str(b,"fault");
+    const pack = contentPack(fault);
+    const flags = b.flags;
+    const allowed = pack ? packTaps(pack) : flagsFor(fault);
+    const facts = ["yes","no","unknown"];
+    if (!Array.isArray(flags) || !flags.every(f => allowed.includes(f)) || !facts.includes(String(b.card)) || !facts.includes(String(b.cash))
+      || !LANGS.includes(b.lang as Lang) || !isFault(fault) || b.consent !== true || !["handset","in_person"].includes(str(b,"source"))) fail(400,"bad_request");
+    await rpc("assisted_intake",{ p_uid:op.uid,p_name:op.name,p_incident:str(b,"incident"),p_fault:fault,p_source:b.source,p_lang:b.lang,p_consent:b.consent,p_flags:flags,p_card:b.card,p_cash:b.cash });
+    return {};
+  },
+
+  async assisted_delivery(a,b) {
+    const op = staff(a,"operator");
+    const text = str(b,"teach").trim();
+    if (!text || text.length>500 || frontlineNumber(text) || !["handset","in_person"].includes(str(b,"source"))) fail(400,"bad_request");
+    await rpc("assisted_delivery",{ p_uid:op.uid,p_name:op.name,p_incident:str(b,"incident"),p_reply:str(b,"reply"),p_source:b.source,p_teach:text });
+    return {};
+  },
+
+  async ack_allergy(a,b) {
+    const f = staff(a,"field");
+    if (!Number.isInteger(b.generation) || !Array.isArray(b.flags) || !b.flags.every(v => typeof v === "string")) fail(400,"bad_request");
+    await rpc("ack_allergy",{ p_uid:f.uid,p_incident:str(b,"incident"),p_generation:b.generation,p_flags:b.flags });
+    return {};
   },
 
   // Operator
@@ -209,7 +251,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   // Caller (anonymous user)
   async pair(a, b) {
     const c = caller(a);
-    if (c.incident) fail(409, "conflict");
+
     const lang = str(b, "lang");
     if (!(LANGS as readonly string[]).includes(lang)) fail(400, "bad_request");
     const station = str(b, "station");
@@ -232,7 +274,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (!desk || desk.handler !== "legacy") fail(409, "conflict");
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
-    if (text && looksLikeNumber(text)) return { withheld: true };
+    if (text && frontlineNumber(text)) return { withheld: true };
     // The ATM has two facts to extract and read back. Any other pack's caller answers with taps; their words are
     // kept as they are, and the model only suggests the pack's situation and taps for the caller to confirm (lib/triage.ts).
     const pack = contentPack(desk?.fault);
@@ -265,8 +307,8 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     // The model's suggestion, as codes, labelled for the operator; what the caller tapped is what counts.
     const { data: dr } = await admin.from("draft").select("triage").eq("incident", c.incident!).eq("rev", b.rev).maybeSingle();
     if (dr?.triage) await admin.from("desk").update({ triage: dr.triage }).eq("id", c.incident!).eq("confirmed_rev", b.rev);
-    const { data: d } = await admin.from("desk").select("id, lang, caller_words").eq("id", c.incident!).single();
-    if (d?.caller_words && d.lang !== "ja") {
+    const { data: d } = await admin.from("desk").select("id, caller_words_lang, caller_words").eq("id", c.incident!).single();
+    if (d?.caller_words && d.caller_words_lang !== "ja") {
       const ja = await toJapanese(d.caller_words);
       if (ja) await admin.from("desk").update({ caller_words_ja: ja }).eq("id", d.id).eq("confirmed_rev", b.rev);
     }

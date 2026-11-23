@@ -47,9 +47,11 @@ begin
     perform public.ack_allergy(worker,s,gen,array['diet_allergy']);
     assert false,'must acknowledge the exact confirmed choices';
   exception when raise_exception then assert sqlerrm='conflict'; end;
-  perform public.ack_allergy(worker,s,gen,array['diet_allergy','allergy_child']);
-  assert (select allergy_ack_at is not null from public.field_job where incident=s);
   perform public.cmd_field(worker,'Worker',s,gen,'accept',null);
+  assert not ichido.work_fits(s,'SHELTER_NEEDS'),'worker has not acknowledged the allergy';
+  perform public.ack_allergy(worker,s,gen,array['diet_allergy','allergy_child']);
+  assert ichido.work_fits(s,'SHELTER_NEEDS');
+  assert (select allergy_ack_at is not null from public.field_job where incident=s);
   perform public.cmd_field(worker,'Worker',s,gen,'on_way','10-20');
   assert public.caller_screen(phone)->'card'->>'eta_at' is not null;
   perform public.cmd_flag(phone,'allergy_child',false);

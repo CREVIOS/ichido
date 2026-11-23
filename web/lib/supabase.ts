@@ -50,13 +50,15 @@ export function sb(): SupabaseClient {
 // Call a server command: as staff with the minted token, as a caller with the anonymous session's token.
 // With neither, the request still carries this site's staff session cookie, if any (the station page asks "mine").
 export async function cmd<T = unknown>(name: string, body: Record<string, unknown> = {}): Promise<T> {
-  const bearer = staff ? await staffToken() : (await sb().auth.getSession()).data.session?.access_token;
+  const session = staff ? null : await sb().auth.getSession();
+  if (session?.error) throw new Error("server");
+  const bearer = staff ? await staffToken() : session?.data.session?.access_token;
   const res = await fetch("/api/cmd", {
     method: "POST",
     headers: { "content-type": "application/json", ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
     body: JSON.stringify({ cmd: name, ...body }),
   });
-  const json = await res.json().catch(() => ({}));
+  const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
   return json as T;
 }

@@ -10,6 +10,17 @@ alter table public.station add column if not exists host_org text, add column if
 alter table public.field_job add column if not exists allergy_flags text[] not null default '{}',
   add column if not exists allergy_ack_at timestamptz;
 
+-- Only the five matching fictional fixtures receive demo identification on an existing installation.
+update public.station s set host_org=coalesce(s.host_org,v.host),short_address=coalesce(s.short_address,v.place)
+from (values
+  ('TABLE-A','長崎駅前 店舗外ATM','出島銀行','長崎駅前 店舗外ATM'),
+  ('HOSP-A','浦上みなと病院 外来受付 Help Point','浦上みなと病院','浦上みなと病院 1階 外来受付'),
+  ('CITY-A','出島市役所 多言語窓口 Help Point','出島市役所','本館1階 市民課'),
+  ('RAIL-A','みなと線 浦上駅 改札 Help Point','みなと鉄道','浦上駅 改札横'),
+  ('SHELTER-A','稲佐小学校 体育館 避難所 Help Point','稲佐小学校 避難所受付','稲佐小学校 体育館入口')
+) v(id,label,host,place)
+where s.id=v.id and s.label->>'ja'=v.label and (s.host_org is null or s.short_address is null);
+
 create table if not exists ichido.pair_end (
   uid uuid primary key references auth.users on delete cascade,
   reason text not null check (reason in ('expired','replaced','abandoned')),
@@ -81,6 +92,21 @@ end $$;
 create or replace trigger words_language before update of words on public.draft for each row execute function ichido.words_language();
 create or replace trigger teachback_language before update of teachback on public.caller_card for each row execute function ichido.words_language();
 create or replace trigger confirmed_language before update of caller_words on public.desk for each row execute function ichido.words_language();
+
+-- Recover old text locales only from matching submitted words or an unchanged, recorded pairing.
+update public.draft dr set words_lang=coalesce(
+  (select t.locale from public.frontline_turn t join ichido.binding b on b.incident=t.incident and b.voice_room=t.generation
+    where t.incident=dr.incident and t.words=dr.words order by t.seq desc limit 1),
+  (select d.lang from public.desk d where d.id=dr.incident and not exists
+    (select from public.case_event e where e.incident=d.id and e.kind in ('lang_changed','caller_reset'))))
+where dr.words is not null and dr.words_lang is null;
+update public.desk d set caller_words_lang=dr.words_lang from public.draft dr
+ where dr.incident=d.id and d.caller_words=dr.words and d.caller_words_lang is null and dr.words_lang is not null;
+update public.caller_card c set teachback_lang=(
+  select coalesce(e.data->>'to',e.data->>'lang') from public.case_event e where e.incident=c.id
+  and e.kind in ('paired','lang_changed') and e.id<(select max(last.id) from public.case_event last
+    where last.incident=c.id and last.kind='teachback') order by e.id desc limit 1)
+where c.teachback is not null and c.teachback_lang is null;
 
 create or replace function ichido.eta_timestamp() returns trigger language plpgsql set search_path='' as $$
 begin
@@ -194,5 +220,57 @@ revoke all on function public.assisted_intake(uuid,text,uuid,text,text,text,bool
   public.assisted_delivery(uuid,text,uuid,uuid,text,text),public.bank_update(uuid,text,uuid,text,date,text) from public,anon,authenticated;
 grant execute on function public.assisted_intake(uuid,text,uuid,text,text,text,boolean,public.fact,public.fact,text[]),
   public.assisted_delivery(uuid,text,uuid,uuid,text,text),public.bank_update(uuid,text,uuid,text,date,text) to service_role;
+
+-- Other needs reach a person without asserting an ATM fact. Held-card instructions still require the confirmed card fact.
+create or replace function public.cmd_confirm(p_uid uuid, p_rev int) returns void
+language plpgsql security definer set search_path = '' as $$
+declare d public.desk; dr public.draft; atm boolean; tapped boolean;
+begin
+  d := ichido.caller_case(p_uid);
+  select * into dr from public.draft where incident = d.id for update;
+  atm := coalesce((select pack = 'atm' from ichido.situation where code = d.fault), true);
+  select case when atm then 'need_other'=any(flags) else cardinality(flags)>0 end into tapped from public.caller_card where id = d.id;
+  if dr.rev <> p_rev or dr.needs_clarification
+     or (atm and not tapped and dr.card_back = 'unknown' and dr.cash_received = 'unknown')
+     or (not atm and not tapped) then
+    perform ichido.fail('conflict');
+  end if;
+  if exists (select 1 from public.caller_card where id = d.id and confirmed_rev is not null) then perform ichido.fail('conflict'); end if;
+  update public.desk set card_back = dr.card_back, cash_received = dr.cash_received, confirmed_rev = dr.rev,
+                         caller_words = dr.words, clarifying = false where id = d.id;
+  update public.caller_card set confirmed_rev = dr.rev where id = d.id;
+  perform ichido.event(d.id, 'caller', 'confirmed', jsonb_build_object('card_back', dr.card_back, 'cash_received', dr.cash_received));
+end $$;
+
+create or replace function public.frontline_monitor(p_uid uuid,p_session uuid,p_incident uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare g uuid;
+begin
+  if not exists(select from auth_ba."session" s join auth_ba."user" u on u.id=s."userId"
+    join ichido.staff st on st.uid=u.id where s.id=p_session and u.id=p_uid and not u.banned
+      and st.role='operator' and s.aal='aal2' and s."expiresAt">now()) then perform ichido.fail('forbidden'); end if;
+  select b.voice_room into g from ichido.binding b join public.desk d on d.id=b.incident
+    where b.incident=p_incident and b.expires>now() and d.handler<>'legacy' and d.finished_at is null;
+  if not found then return '[]'::jsonb; end if;
+  insert into ichido.frontline_monitor(incident,generation,staff_id,session_id) values(p_incident,g,p_uid,p_session)
+    on conflict do nothing;
+  return (select coalesce(jsonb_agg(jsonb_build_object('seq',t.seq,'speaker',t.speaker,'locale',t.locale,
+    'words',t.words,'ja',j.ja,'slots',r.slots,'manual_version',r.manual_version,'wording',t.wording,'facts',t.facts,'rev',t.rev,'at',t.at) order by t.seq),'[]')
+    from public.frontline_turn t left join public.frontline_translation j using(seq) left join public.reply r on r.id=t.reply_id
+    where t.incident=p_incident and t.generation=g);
+end $$;
+
+create or replace function ichido.work_fits(i uuid,intent text) returns boolean language sql stable security definer set search_path='' as $$
+ select case
+ when intent in ('HOSP_STAFF_COMING','CITY_STAFF_COMING','SHELTER_STAFF_COMING','TRANSIT_ACCESS')
+   then exists(select from public.field_job where incident=i and state='on_way' and declined_at is null and not case_closed)
+ when intent in ('SHELTER_NEEDS','SHELTER_FAMILY')
+   then exists(select from public.field_job where incident=i and accepted_at is not null and declined_at is null and not case_closed
+     and (intent<>'SHELTER_NEEDS' or cardinality(allergy_flags)=0 or allergy_ack_at is not null))
+ when intent in ('HOSP_INTERPRETER','CITY_APPOINTMENT')
+   then exists(select from public.partner_work where incident=i and recipient=case intent when 'HOSP_INTERPRETER' then 'medical_interpreter' else 'consult_desk' end and requested_at is not null)
+ when intent='TRANSIT_LEAVE' then exists(select from public.partner_work where incident=i and recipient='railway' and accepted_at is not null and railway_ref is not null)
+ else true end
+$$;
 
 commit;

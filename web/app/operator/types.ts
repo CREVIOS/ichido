@@ -2,6 +2,7 @@ import type { Lang, Status, Fact, FieldState, L10n } from "@/content/catalogue";
 
 export type Station = { id: string; label: L10n; kind?: string };
 export type Desk = {
+  binding_expires: string | null; caller_words_lang: Lang | null; assisted_source: "handset" | "in_person" | null;
   handler: "legacy" | "ai" | "queued" | "human"; handler_epoch: number; queued_at: string | null; priority: number | null; transfer_reason: string | null;
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
@@ -12,7 +13,7 @@ export type Desk = {
 };
 export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
-  teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
+  teachback_lang?: Lang | null; teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
   notice?: string; flags: string[]; bank_status: string | null; bank_due: string | null;
 };
 export type OpenDesk = Desk & {
@@ -20,7 +21,7 @@ export type OpenDesk = Desk & {
 };
 export type Targets = Partial<Record<string, number>>;
 export type CaseEvent = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
-export type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
+export type Reply = { manual_version:string; id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
 export type Job = { accepted_at?: string | null; acknowledged_at?: string | null; declined_at?: string | null; provider_at?: string | null; help_at?: string | null; assignee: string; state: FieldState; eta: string | null };
 export type Guard = { uid: string; display_name: string };
 export type BotStep = { step: string; status: "waiting" | "done" | "skipped"; code: string | null; due_at: string | null; data: Record<string, unknown>; at: string };

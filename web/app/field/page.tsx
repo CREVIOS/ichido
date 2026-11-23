@@ -8,9 +8,9 @@ import { AppShell, Chip, Dot, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BOT, DESK, nextFieldStep, SHIFT, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
+import { BOT, DESK, ASSIST, CALLER_FLAGS, nextFieldStep, SHIFT, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
-type Job = { accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
+type Job = { allergy_flags:string[]; allergy_ack_at:string|null; accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
 type Site = { label: string; company: string };
 const UNKNOWN_ETA = "";
 const STEPS = ["on_way", "arrived", "done"] as const;
@@ -82,6 +82,9 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
       </div>
       {j.state === "requested" && j.reminded_gen === j.generation && <Notice tone="warn">{BOT.fieldBanner}</Notice>}
       {j.reestimate_gen === j.generation && <Notice tone="warn">{j.state === "arrived" ? OPS.field.arrivedLong : OPS.field.reestimate}</Notice>}
+      {j.allergy_flags.length > 0 && <section className="grid gap-2"><p>{j.allergy_flags.map(f => CALLER_FLAGS[f].staff).join(" · ")}</p>
+        <Button variant="secondary" disabled={Boolean(j.allergy_ack_at || j.declined_at)} onClick={() =>
+          cmd("ack_allergy",{incident:j.incident,generation:j.generation,flags:j.allergy_flags}).catch(() => toast.error(FIELD.changed))}>{j.allergy_ack_at ? ASSIST.acknowledged : ASSIST.ack}</Button></section>}
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
       {(j.state === "requested" || j.state === "on_way") && (
         <div className="flex flex-col gap-1.5 border-t pt-4">

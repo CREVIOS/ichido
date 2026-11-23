@@ -38,7 +38,7 @@ export function bankStatus(op: Op, b: Body) {
   if (!isBankStatus(status)) fail(400, "bad_request");
   const due = BANK_STATUS[status].due ? str(b, "due") : null;
   if (due !== null && !(/^\d{4}-\d{2}-\d{2}$/.test(due) && !Number.isNaN(Date.parse(due)))) fail(400, "bad_request");
-  return rpc("cmd_bank_status", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident"), p_status: status, p_due: due });
+  return rpc("bank_update", { p_channel: b.channel ?? null, p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident"), p_status: status, p_due: due });
 }
 
 // Caller: one of their own taps, on or off. A tap is turned on only if the case's pack offers it (any can be turned off).
@@ -47,7 +47,7 @@ export async function flag(c: Caller, b: Body) {
   if (b.on && c.incident) {
     const { data: d } = await admin.from("desk").select("fault").eq("id", c.incident).maybeSingle();
     const p = contentPack(d?.fault);
-    if (p ? !packTaps(p).includes(b.flag as string) : Object.hasOwn(PACK_TAPS, b.flag as string)) fail(400, "bad_request");
+    if (p ? !packTaps(p).includes(b.flag as string) : b.flag !== "need_other" && Object.hasOwn(PACK_TAPS, b.flag as string)) fail(400, "bad_request");
   }
   return rpc("cmd_flag", { p_uid: c.uid, p_flag: b.flag, p_on: b.on });
 }
@@ -62,14 +62,14 @@ export async function defaultFault(station: string): Promise<string> {
 // Only what the caller already saw, plus the bank's status: never staff notes, amounts or the timeline.
 export async function followup(c: Caller) {
   const { data: f } = await priv().from("follow_up").select("incident").eq("uid", c.uid).gt("expires", new Date().toISOString())
-    .order("expires", { ascending: false }).limit(1).maybeSingle();
+    .order("expires", { ascending: false }).limit(1).maybeSingle().throwOnError();
   if (!f) return { case: null };
   const { data: card, error } = await admin.from("caller_card")
-    .select("id, station, fault, lang, reply_id, bank_status, bank_due, bank_updated_at").eq("id", f.incident).single();
+    .select("id, station, fault, lang, reply_id, bank_status, bank_due, callback_channel, bank_updated_at").eq("id", f.incident).single();
   if (error) throw error;
   const [{ data: reply }, { data: station }] = await Promise.all([
-    card.reply_id ? admin.from("reply").select("intent, slots").eq("id", card.reply_id).maybeSingle() : Promise.resolve({ data: null }),
-    admin.from("station").select("label").eq("id", card.station).maybeSingle(),
+    card.reply_id ? admin.from("reply").select("intent, slots, manual_version").eq("id", card.reply_id).maybeSingle().throwOnError() : Promise.resolve({ data: null }),
+    admin.from("station").select("label,branch,counter_hours").eq("id", card.station).maybeSingle().throwOnError(),
   ]);
-  return { case: { ...card, reply, station } };
+  return { case: { ...card, station_id:card.station, reply, station } };
 }

@@ -48,7 +48,7 @@ export function can(role: string | null | undefined, permission: Permission): bo
 // What each /api/cmd command needs. "any": anyone (answers who they are); "caller": a Supabase anonymous caller.
 export type Access = Permission | "any" | "caller";
 export const COMMANDS: Record<string, Access> = {
-  me: "any", mine: "any",
+  me: "any", mine: "any", caller_screen: "any", ack_allergy: "field:act", assisted_intake: "case:act", assisted_delivery: "case:act",
   // Caller
   frontline_turn: "caller", pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
   rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller",
