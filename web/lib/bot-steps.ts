@@ -167,6 +167,7 @@ export async function remind(incident: string, reason: "no_reply" | "guard_late"
   "use step";
   const t0 = performance.now();
   const code = await rpc<string>("bot_remind", { p_incident: incident, p_reason: reason, p_gen: generation });
+  await (await import("@/lib/alerts")).flushAlerts();   // the owning operator's push (lib/alerts.ts)
   await log(reason === "no_reply" ? "remind_reply" : "remind_guard", incident, t0, code);
 }
 

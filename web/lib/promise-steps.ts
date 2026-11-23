@@ -21,5 +21,6 @@ export async function expirePromise(incident: string, id: string) {
   const t0 = performance.now();
   const { rpc, ship, entry } = await lib();
   const code = await rpc<string>("ops_promise_expire", { p_id: id });
+  await (await import("@/lib/alerts")).flushAlerts();   // "promise due" to the owning operator (lib/alerts.ts)
   await ship([entry("info", "bot_step", { route: "workflow", step: "promise", incident, code, duration_ms: Math.round(performance.now() - t0) })]);
 }

@@ -12,6 +12,7 @@ import { DisasterNotice } from "./disaster";
 import { BankStatus, CallerFlags, FollowUp, type FollowUpCase } from "./faults";
 import { PrefsBar, speechRate, usePrefs } from "./prefs";
 import { CallerNotice, FraudScreen } from "./ops";
+import { LineUpdates } from "./line";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
 const noop = () => () => {};
@@ -75,6 +76,7 @@ export default function CallerPage() {
       {latest && <Guidance lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
       {open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
       {P.atm && (card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
+      {confirmed && <LineUpdates lang={lang} />}
       <ShowStaff card={card} lang={lang} />
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]}</p>
     </Phone>

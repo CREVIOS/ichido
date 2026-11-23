@@ -8,6 +8,7 @@ import { AppShell, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ACCOUNT, AUTH, STAFF, authError } from "@/content/catalogue";
+import { PushPanel } from "./push";
 
 // The signed-in person's own account: where they are signed in, their passkeys, password and backup codes.
 export default function AccountPage() {
@@ -69,6 +70,8 @@ function Account({ me }: { me: Me }) {
             ))}
           </ul>
         </Panel>
+
+        <PushPanel />
 
         <Panel title={ACCOUNT.passkeys} action={<Button variant="ghost" size="sm" onClick={() => act(authClient.passkey.addPasskey({ name: AUTH.enrol.passkeyName }).then((r) => ({ error: r?.error ?? null })))}><Plus />{ACCOUNT.addPasskey}</Button>}>
           <p className="text-[13px] text-muted-foreground">{totp ? ACCOUNT.totpOn : ACCOUNT.totpOff}</p>

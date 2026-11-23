@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { admin, reply } from "@/lib/server";
-import { authenticateDevice, boundedJson } from "@/lib/request-security";
+import { authenticateDevice, boundedJson, limitKey } from "@/lib/request-security";
+import { flushAlerts } from "@/lib/alerts";
 import { requestLog, errorFields } from "@/lib/log";
 
 // Device telemetry, every 60 s, with the same per-station secret as /api/device.
@@ -42,13 +43,19 @@ export async function POST(req: Request): Promise<Response> {
     ack_ms: t.ack_ms ?? undefined, poll_ms: t.poll_ms ?? undefined,
   });
 
-  const urls = JSON.parse(process.env.BETTERSTACK_DEVICE_HEARTBEATS_JSON ?? "{}") as Record<string, string>;
+  // Alerts the database wrote on its own (the escalation cron's SLA breaches): each Help Point heartbeat is a tick.
+  after(flushAlerts);
+
+  // The station's Better Stack heartbeat, at most once a minute (Better Stack's shortest period), fire-and-forget.
+  const urls = JSON.parse(process.env.BETTERSTACK_HEARTBEATS_JSON || process.env.BETTERSTACK_DEVICE_HEARTBEATS_JSON || "{}") as Record<string, string>;
   const url = Object.hasOwn(urls, station) ? urls[station] : undefined;
   if (url) {
-    if (!URL.canParse(url) || new URL(url).origin !== "https://uptime.betterstack.com") {
+    const origin = process.env.BETTERSTACK_UPTIME_ORIGIN || "https://uptime.betterstack.com";
+    if (!URL.canParse(url) || new URL(url).origin !== origin) {
       log.warn("heartbeat_forward_failed", { station, code: "invalid_destination" });
       return new Response(null, { status: 204 });
     }
+    if (await limitKey("betterstack_heartbeat", station, 1, 60)) return new Response(null, { status: 204 });
     after(async () => {
       const res = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(3000) }).catch((e: unknown) => e);
       if (!(res instanceof Response) || !res.ok) {

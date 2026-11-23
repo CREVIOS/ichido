@@ -16,6 +16,9 @@ import { accessCommands, str, digest } from "@/lib/access";
 import { boundedJson, limitKey, limitSource } from "@/lib/request-security";
 import { disasterCommands } from "@/lib/disaster";
 import { OPS_COMMANDS, fieldPromise } from "@/lib/ops";
+import { ALERT_COMMANDS, flushAlerts } from "@/lib/alerts";
+import { issueCode, lineEnabled, lineStatus } from "@/lib/line";
+import { after } from "next/server";
 
 // Every state change is one SQL function (supabase/migrations/*_commands.sql) that checks its own
 // preconditions in the same transaction. This route checks the role first, validates input against the
@@ -296,9 +299,22 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   ...disasterCommands,
   // Fraud mode, mass-incident broadcast, promises, harassment flag and takeover (lib/ops.ts).
   ...OPS_COMMANDS,
+  // Staff push notifications for this session (lib/alerts.ts).
+  ...ALERT_COMMANDS,
+
+  // Caller: LINE follow-up for their own case (lib/line.ts). Hidden unless the server has LINE keys.
+  async line_status(a) {
+    const c = caller(a);
+    return c.incident ? lineStatus(c.incident) : { enabled: false, linked: false };
+  },
+  async line_code(a) {
+    const c = caller(a);
+    if (!c.incident || !lineEnabled()) fail(404, "not_found");
+    return issueCode(c.incident!);
+  },
 };
 
-const callerLimits: Record<string, number> = { rate: 5, set_lang: 10, teachback: 12, draft: 30 };
+const callerLimits: Record<string, number> = { rate: 5, set_lang: 10, teachback: 12, draft: 30, line_code: 5 };
 
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/cmd");
@@ -326,6 +342,7 @@ export async function POST(req: Request): Promise<Response> {
     authorize(actor, COMMANDS[name]);   // lib/rbac.ts; a command missing there is refused
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
+    after(flushAlerts);   // whatever this command made the database enqueue (lib/alerts.ts)
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
     return reply(200, out);
   } catch (e) {
