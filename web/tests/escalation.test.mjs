@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { frontlineCase } from "./frontline-fixture.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { caller, staff } from "./helpers.mjs";
 import { eventText } from "../content/catalogue.ts";
@@ -75,4 +76,13 @@ test("only overdue open cases escalate, once per reason, with a staff-only audit
   await admin.from("field_job").insert({ ...job, incident: answered, state: "on_way", updated_at: ago(900) }).throwOnError();
   await run();
   assert.deepEqual(await reasons(op.c, answered), []);
+});
+
+test("time spent waiting for a caller to type never triggers an AI or human timeout", async (t) => {
+  const f = await frontlineCase(t);
+  await f.turn("start");
+  await f.admin.from("desk").update({ created_at: ago(86400) }).eq("id", f.incident).throwOnError();
+  await f.admin.schema("ichido").rpc("escalate_due").throwOnError();
+  assert.equal((await f.desk()).handler, "ai");
+  assert.deepEqual((await f.op.c.from("escalation").select("reason").eq("incident", f.incident).throwOnError()).data, []);
 });

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { frontlineCase } from "./frontline-fixture.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { caller, closeOpen, cmd, mint, ok, openPairedCase, signIn, staff } from "./helpers.mjs";
 
@@ -103,4 +104,18 @@ test("the operator toast feed carries the case event id, the incident and the re
   assert.deepEqual(due.payload, { id: id("promise_due"), incident: desk.id, kind: "eta" });
   await sleep(500);
   assert.equal(feed.got.filter((x) => x.payload.incident === desk.id).length, 2, "other case events stay off the feed");
+});
+
+test("frontline sends only invalidations to the operator and bound caller", async (t) => {
+  const f = await frontlineCase(t);
+  const monitoring = await join(t, f.op, "live:frontline_turn");
+  const mine = await join(t, f.phone, "live:incident:" + f.incident);
+  assert.equal(monitoring.status, "SUBSCRIBED");
+  assert.equal(mine.status, "SUBSCRIBED");
+  assert.equal((await join(t, await staff("guard1@ichido.demo"), "live:frontline_turn")).status, "CHANNEL_ERROR");
+  await f.turn("start");
+  for (const sub of [monitoring, mine]) {
+    const message = await next(sub, (x) => x.payload.table === "frontline_turn");
+    assert.deepEqual(message.payload, { table: "frontline_turn" });
+  }
 });

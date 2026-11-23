@@ -137,3 +137,15 @@ test("authenticated caller command quotas count rejected requests independently"
     assert.equal((await cmd(phone, name, args)).status, 429);
   }
 });
+
+test("frontline roles require an operator session for monitoring and reserve counts for managers", async () => {
+  const incident = randomUUID();
+  const phone = await caller();
+  const operator = await staff("operator@ichido.demo");
+  const manager = await staff("manager@ichido.demo");
+  assert.deepEqual(await ok(cmd(operator, "frontline_monitor", { incident })), { turns: [] });
+  assert.equal((await cmd(manager, "frontline_monitor", { incident })).status, 403);
+  assert.equal((await cmd(operator, "frontline_qa_counts")).status, 403);
+  assert.equal((await cmd(phone, "frontline_qa_counts")).status, 403);
+  assert.deepEqual(Object.keys((await ok(cmd(manager, "frontline_qa_counts"))).counts).sort(), ["ai", "human", "queued"]);
+});
