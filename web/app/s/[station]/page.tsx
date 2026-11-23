@@ -9,7 +9,7 @@ import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, STATION, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, UI, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
 const noop = () => () => {};
@@ -84,6 +84,7 @@ function StationForm() {
           </div>
           {error && <Notice tone="warn">{error}</Notice>}
           <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
+          <Button type="button" variant="secondary" onClick={alertSilently} disabled={busy}>{UI.human[lang]}</Button>
           {silent ? <Notice tone="info">{ACCESS.alertSent[lang]}</Notice> : (
             <div className="flex flex-col gap-2">
               <Button type="button" variant="secondary" size="lg" className="h-11" disabled={busy} onClick={alertSilently}><EarOff className="stroke-[1.5]" />{ACCESS.cantHear[lang]}</Button>

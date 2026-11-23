@@ -137,7 +137,7 @@ export function PromiseCard({ d, run }: { d: Desk; run: Run }) {
 
 // Another operator holds the case: a supervisor (any operator) can take it over.
 export function TakeoverPanel({ d, run, title, body }: { d: Desk; run: Run; title: string; body: string }) {
-  const take = () => run("takeover", { incident: d.id }).then((ok) => { if (ok) toast.success(OPS.takeover.toast); });
+  const take = () => run("takeover", { incident: d.id, epoch: d.handler_epoch }).then((ok) => { if (ok) toast.success(OPS.takeover.toast); });
   return (
     <Panel title={title}>
       <p className="text-[14px]">{body}</p>

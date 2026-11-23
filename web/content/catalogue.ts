@@ -387,6 +387,7 @@ export const UI = {
   },
 } satisfies Record<string, L10n>;
 
+export * from "./frontline.ts";
 export * from "./staff.ts";
 export * from "./review.ts";
 export * from "./numbers.ts";

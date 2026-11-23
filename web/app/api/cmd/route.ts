@@ -187,7 +187,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const station = str(b, "station");
     if (!(await rpc<boolean>("note_pair_attempt", { p_uid: c.uid, p_station: station }))) fail(429, "rate_limited");
     // Same answer for a wrong, expired, used or wrong-station code.
-    return { incident: await rpc("redeem_pair", { p_uid: c.uid, p_station: station, p_digest: digest(str(b, "code")), p_lang: lang }) };
+    return { incident: await rpc("frontline_pair", { p_frontline: b.frontline === true, p_uid: c.uid, p_station: station, p_digest: digest(str(b, "code")), p_lang: lang }) };
   },
 
   async draft(a, b) {

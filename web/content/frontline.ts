@@ -1,0 +1,41 @@
+import type { L10n } from "./catalogue.ts";
+
+// All non-English wording awaits native review. The pilot's only informational answer is in the shelter pack.
+export const FRONTLINE = {
+  greeting: {
+    en: "Hello, I’m Ichido’s AI assistant. What do you need?",
+    ja: "こんにちは。わたしは 一度の AIです。なにに こまっていますか？",
+    bn: "নমস্কার, আমি ইচিদোর এআই সহকারী। আপনার কী সাহায্য দরকার?",
+    ne: "नमस्ते, म इचिदोको एआई सहायक हुँ। तपाईंलाई कस्तो सहयोग चाहिन्छ?",
+    vi: "Xin chào, tôi là trợ lý AI của Ichido. Bạn cần giúp gì?",
+    id: "Halo, saya asisten AI Ichido. Anda perlu bantuan apa?",
+  },
+  disclosure: {
+    en: "Authorized operators can read messages you send. They cannot see what you are still typing. You can ask for a person at any time.",
+    ja: "おくった 文は 係の 人が よめます。まだ おくって いない 文は みえません。いつでも 人と はなせます。",
+    bn: "আপনি পাঠালে অনুমোদিত কর্মীরা বার্তাটি পড়তে পারবেন। লেখার সময় তাঁরা তা দেখেন না। যেকোনো সময় একজন মানুষের সাহায্য চাইতে পারেন।",
+    vi: "Nhân viên có quyền có thể đọc tin nhắn bạn đã gửi. Họ không thấy phần bạn đang gõ. Bạn có thể yêu cầu gặp nhân viên bất cứ lúc nào.",
+    id: "Petugas yang berwenang dapat membaca pesan yang Anda kirim. Mereka tidak melihat tulisan yang belum dikirim. Anda bisa meminta petugas kapan saja.",
+    ne: "तपाईंले पठाएका सन्देश अधिकृत कर्मचारीले पढ्न सक्छन्। टाइप गर्दै गरेको कुरा उनीहरूले देख्दैनन्। जुनसुकै बेला कर्मचारीसँग कुरा गर्न सक्नुहुन्छ।",
+  },
+  start: { en: "Continue with AI", ja: "AIと つづける", bn: "এআইয়ের সঙ্গে চালিয়ে যান", vi: "Tiếp tục với AI", id: "Lanjut dengan AI", ne: "एआईसँग जारी राख्नुहोस्" },
+  readback: { en: "Is this what you meant? You can change it.", ja: "これで あっていますか？ なおせます。", bn: "আপনি কি এটাই বোঝাতে চেয়েছেন? বদলাতে পারেন।", vi: "Đây có đúng ý bạn không? Bạn có thể sửa.", id: "Apakah ini maksud Anda? Anda bisa mengubahnya.", ne: "तपाईंले भन्न खोजेको यही हो? सच्याउन सक्नुहुन्छ।" },
+  queued: {
+    en: "I’ve asked a person to join. They can see what you’ve already sent.",
+    ja: "係の 人に つなぐよう たのみました。係の 人は あなたが おくった 文を よめます。",
+    bn: "একজন কর্মীকে যোগ দিতে বলা হয়েছে। আপনি যা পাঠিয়েছেন তিনি তা দেখতে পারবেন।",
+    vi: "Tôi đã yêu cầu nhân viên tham gia. Họ có thể đọc những gì bạn đã gửi.",
+    id: "Saya telah meminta petugas untuk bergabung. Mereka bisa membaca pesan yang sudah Anda kirim.",
+    ne: "मैले कर्मचारीलाई जोडिन अनुरोध गरेको छु। तपाईंले पठाएका सन्देश उहाँले पढ्न सक्नुहुन्छ।",
+  },
+  connected: { en: "An operator has joined your case.", ja: "係の 人が つながりました。", bn: "একজন কর্মী আপনার কেসে যুক্ত হয়েছেন।", vi: "Một nhân viên đã tham gia hỗ trợ bạn.", id: "Petugas sudah bergabung.", ne: "एक जना कर्मचारी तपाईंको केसमा जोडिनुभएको छ।" },
+  fallback: { en: "I need a person’s help with this.", ja: "これは 係の 人に ききます。", bn: "এ বিষয়ে একজন কর্মীর সাহায্য দরকার।", vi: "Việc này cần nhân viên hỗ trợ.", id: "Saya perlu bantuan petugas untuk ini.", ne: "यसका लागि कर्मचारीको सहायता चाहिन्छ।" },
+  inPerson: { en: "Show this screen to a staff member or scan the Help Point sticker to request help by text.", ja: "この 画面を 係の 人に みせて ください。たすけを よぶ シールを よむと、文字でも たのめます。", bn: "কর্মীকে এই স্ক্রিন দেখান বা লিখে সাহায্য চাইতে হেল্প পয়েন্টের স্টিকার স্ক্যান করুন।", vi: "Hãy cho nhân viên xem màn hình này hoặc quét nhãn Help Point để yêu cầu hỗ trợ bằng chữ.", id: "Tunjukkan layar ini kepada petugas atau pindai stiker Help Point untuk meminta bantuan lewat teks.", ne: "कर्मचारीलाई यो स्क्रिन देखाउनुहोस् वा लेखेर मद्दत माग्न हेल्प पोइन्टको स्टिकर स्क्यान गर्नुहोस्।" },
+  answered: { en: "Yes, that answered my question", ja: "はい、わかりました", bn: "হ্যাঁ, আমার প্রশ্নের উত্তর পেয়েছি", vi: "Có, tôi đã nhận được câu trả lời", id: "Ya, pertanyaan saya terjawab", ne: "हो, मैले उत्तर पाएँ" },
+} satisfies Record<string, L10n>;
+
+export const FRONT_DESK = {
+  ai: "AI対応中", queued: "担当者待ち", monitor: "送信済みの会話", submitted: "相談者", aiSpeaker: "AI",
+  translation: "機械翻訳", transfer: "引き継ぎ", joined: "担当者が参加", takeover: "担当する",
+  reasons: { human_request: "本人の希望", suspected_risk: "危険の可能性", staff_needed: "職員による確認", staffed_entry: "職員による受付", limit: "対応上限", unclear: "再確認が必要", provider: "自動応答が利用できません", withheld: "番号を非表示" } as Record<string,string>,
+};

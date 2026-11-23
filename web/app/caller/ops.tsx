@@ -1,3 +1,4 @@
+import { Human } from "./human";
 import { OctagonAlert } from "lucide-react";
 import { OPS_CALLER, type Lang } from "@/content/catalogue";
 
@@ -5,6 +6,7 @@ import { OPS_CALLER, type Lang } from "@/content/catalogue";
 export function FraudScreen({ lang }: { lang: Lang }) {
   return (
     <main lang={lang} role="alert" className="fixed inset-0 z-50 flex flex-col justify-center gap-6 overflow-y-auto bg-alert p-8 text-white">
+      <Human lang={lang} />
       <OctagonAlert className="size-14 stroke-[1.5]" aria-hidden />
       <h1 className="text-[44px] leading-none font-semibold tracking-[-0.02em]">{OPS_CALLER.fraud.title[lang]}</h1>
       <p className="max-w-md text-[24px] leading-[1.45]">{OPS_CALLER.fraud.body[lang]}</p>

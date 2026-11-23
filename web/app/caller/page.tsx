@@ -1,4 +1,5 @@
 "use client";
+import { Human } from "./human";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
@@ -62,6 +63,7 @@ export default function CallerPage() {
 
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={(l) => cmd("set_lang", { lang: l }).then(load).catch(() => undefined)} />}>
+      <Human lang={lang} open={open} />
       <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>
@@ -99,6 +101,7 @@ function NotConnected({ staff }: { staff: boolean }) {
   const lang = chosen ?? detected;
   return (
     <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      <Human lang={lang} open={false} />
       <h1 className="text-[24px] leading-snug">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</h1>
     </Phone>
   );
