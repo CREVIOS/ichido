@@ -13,7 +13,7 @@ export type Suggestion = { intent: string | null; dispatch: boolean; guard: { ui
 
 const MODEL = () => process.env.GEMINI_MODEL ?? "gemini-4-hydrogen";
 // Tests point this at a local stub of generateContent; production uses the official endpoint.
-const BASE = () => process.env.GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta";
+const BASE = () => process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 const MAX_TURNS = 5;
 
 const SYSTEM = `You support an operator at a Japanese monitoring centre for staffed service points: ATMs, and also hospital

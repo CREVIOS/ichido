@@ -28,7 +28,7 @@ export type Patch = { card_back: Fact | "unchanged"; cash_received: Fact | "unch
 
 export const MODEL = () => process.env.OPENAI_MODEL ?? "gpt-6.1-terra";
 // Tests point this at a local stub of the Responses API; production uses the official endpoint.
-export const OPENAI_URL = () => `${process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"}/responses`;
+export const OPENAI_URL = () => `${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/responses`;
 
 type Output = { type: string; content?: { type: string; text?: string }[] }[];
 export type Response = { output?: Output };

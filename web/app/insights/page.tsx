@@ -1,12 +1,11 @@
 "use client";
 import { useCallback, useState } from "react";
-import { ChartLine, ChevronDown, CalendarDays, Code, GripVertical } from "lucide-react";
+import { ChartLine, ChevronDown, CalendarDays, Code, GripVertical, Sparkles } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Notice } from "@/components/kit";
 import { openAssistant, useAssistantEnabled } from "@/components/assistant";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";

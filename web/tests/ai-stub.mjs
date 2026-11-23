@@ -85,8 +85,9 @@ export function startStub(port = STUB_PORT) {
   const server = createServer(async (req, res) => {
     let raw = "";
     for await (const c of req) raw += c;
-    const body = raw ? JSON.parse(raw) : null;
     const json = (status, v) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(v)); };
+    let body = null;
+    try { body = raw ? JSON.parse(raw) : null; } catch { return json(400, { error: { message: "invalid JSON" } }); }   // stray clients on the port
     if (req.url === "/__stub/log") return json(200, log);
     if (req.url === "/__stub/reset") { log = []; script = {}; return json(200, {}); }
     if (req.url === "/__stub/script") { script[body.key] = body.value; return json(200, {}); }
