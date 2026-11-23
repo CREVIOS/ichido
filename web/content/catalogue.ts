@@ -262,6 +262,17 @@ const HANDSET_HINT: L10n = {
 
 export const UI = {
   language: { bn: "ভাষা", en: "Language", ja: "ことば", vi: "Ngôn ngữ", id: "Bahasa", ne: "भाषा" },
+  // Pack triage read-back (lib/triage.ts): the AI's suggestion of the caller's own taps, each confirmed by the caller.
+  aiRead: {
+    ja: "あなたの ことばから こう よみとりました。あって いる ものを おして ください。",
+    en: "From your words, the assistant understood this. Tap each one that is right.",
+    bn: "আপনার কথা থেকে সহকারী এটা বুঝেছে। যেগুলো ঠিক, সেগুলোতে চাপুন।",
+    vi: "Từ lời bạn nói, trợ lý hiểu như sau. Hãy chạm vào từng mục đúng.",
+    id: "Dari kata-kata Anda, asisten memahami ini. Ketuk setiap yang benar.",
+    ne: "तपाईंको कुराबाट सहायकले यस्तो बुझ्यो। जुन ठीक छ, त्यसमा थिच्नुहोस्।",
+  },
+  // A red-flag tap is only ever asked about, with the tap's own approved wording below this question.
+  aiAsk: { ja: "いま、これが ありますか？", en: "Is this happening now?", bn: "এখন কি এমন হচ্ছে?", vi: "Việc này có đang xảy ra không?", id: "Apakah ini sedang terjadi?", ne: "के अहिले यस्तो भइरहेको छ?" },
   aiNotice: {
     bn: "আমি একটি AI সহকারী। আপনার কথা জাপানি অপারেটরের কাছে পৌঁছে দেব। সিদ্ধান্ত নেবেন একজন মানুষ।",
     en: "I'm an AI assistant. I pass what you say to a Japanese operator. A person makes every decision.",

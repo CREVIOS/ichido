@@ -12,12 +12,16 @@ export type Step = { tool: string; ms: number };
 export type Suggestion = { intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; fraud: boolean; reasons: string[]; risks: string[]; model: string; steps: Step[]; ms: number };
 
 const MODEL = () => process.env.GEMINI_MODEL ?? "gemini-4-hydrogen";
+// Tests point this at a local stub of generateContent; production uses the official endpoint.
+const BASE = () => process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 const MAX_TURNS = 5;
 
 const SYSTEM = `You support an operator at a Japanese monitoring centre for staffed service points: ATMs, and also hospital
 receptions, city-office desks, station help points and disaster shelters (get_case.pack). A human operator makes every decision.
 Never diagnose, give medical, legal or immigration advice, or guess at symptoms: recommend only an approved reply that routes to a person.
-Call the tools to read the case. Then recommend exactly ONE reply intent, chosen only from list_replies where eligible is true,
+Call the tools to read the case. For a pack case (pack is not "atm"), get_case lists the situation and the taps the caller
+confirmed themselves, and get_pack_rules says which taps each of the pack's replies needs or is blocked by; an "ai_triage" entry is
+only the intake model's suggestion, never a fact. Then recommend exactly ONE reply intent, chosen only from list_replies where eligible is true,
 and whether to request a security guard site check; if so, pick the guard with the fewest open jobs from list_guards.
 Set "fraud" to true only if get_case shows a suspected phone-fraud alert and fraud mode is not active yet; the operator decides.
 Write "reasons" and "risks" in short, plain Japanese (at most 3 items each, one sentence each), citing facts from the tools.
@@ -42,7 +46,7 @@ type Part = { text?: string; functionCall?: { name: string; args?: unknown }; fu
 type Content = { role: "user" | "model"; parts: Part[] };
 
 async function generate(key: string, contents: Content[]): Promise<Part[]> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL())}:generateContent`, {
+  const res = await fetch(`${BASE()}/models/${encodeURIComponent(MODEL())}:generateContent`, {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(20_000),
     headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({

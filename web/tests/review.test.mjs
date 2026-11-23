@@ -44,6 +44,12 @@ async function confirmedCase(op, a, facts) {
   await ok(cmd(a, "draft", { base_rev: 0, text: "the machine kept my card" }));
   await ok(cmd(a, "draft", { base_rev: 1, ...facts }));
   await ok(cmd(a, "confirm", { rev: 2 }));
+  // With a model configured, the Ichido Bot stores its own suggestion for this revision: let it finish first, so a
+  // seeded suggestion is not overwritten.
+  if (process.env.GEMINI_API_KEY) await until("bot prepared", async () => {
+    const { data } = await admin.from("bot_step").select("status, data").eq("incident", incident).eq("step", "prepare").maybeSingle();
+    return data && data.status !== "waiting" && data.data?.rev === 2 ? data : null;
+  });
   return incident;
 }
 

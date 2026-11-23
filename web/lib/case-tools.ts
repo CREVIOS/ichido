@@ -1,5 +1,5 @@
 import "server-only";
-import { FRAUD_FAULT, REPLIES, REPLY_RULES, packOfFault, replyBlock, type Fact } from "@/content/catalogue";
+import { CALLER_FLAGS, FRAUD_FAULT, REPLIES, REPLY_RULES, STAFF_JA, contentPack, packOfFault, replyBlock, type Fact } from "@/content/catalogue";
 import { admin, priv } from "@/lib/server";
 
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
@@ -27,12 +27,13 @@ export const TOOL_DECLARATIONS = [
   { name: "get_case", description: "The case: fault, status, what the caller confirmed (card_back, cash_received), remote release result, caller language, choice, guard job state, minutes open, whether a suspected phone-fraud alert was raised and whether fraud mode is already active." },
   { name: "list_replies", description: "The bank's approved replies with their code, Japanese title, and whether each is eligible for this case right now (and why not)." },
   { name: "list_guards", description: "Security guards who can be dispatched, with how many open jobs each has." },
+  { name: "get_pack_rules", description: "For a hospital, city-office, station or shelter case: each of the pack's approved replies with the situations it fits and the caller taps it needs or is blocked by (urgent taps allow only the urgent reply)." },
   { name: "station_status", description: "The ATM's Help Point device health and how many cases this station had in the last 7 days." },
 ];
 
 export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
   const db = ctx.db ?? admin;
-  const { data: d } = await db.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at, fraud_at").eq("id", ctx.incident).single();
+  const { data: d } = await db.from("desk").select("station, fault, status, card_back, cash_received, confirmed_rev, remote_release, lang, created_at, finished_at, fraud_at, triage").eq("id", ctx.incident).single();
   if (!d) return { error: "not_found" };
   switch (name) {
     case "get_case": {
@@ -40,8 +41,16 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
         db.from("caller_card").select("choice, field_state, eta, needs_human, flags").eq("id", ctx.incident).maybeSingle(),
         db.from("field_job").select("state, eta").eq("incident", ctx.incident).maybeSingle(),
       ]);
+      // A pack case: the situation and the caller's own confirmed taps in staff wording, and the intake model's
+      // suggestion labelled as such (codes only; never the caller's words).
+      const p = contentPack(d.fault);
+      const packView = p && {
+        situation: { code: d.fault, ja: STAFF_JA.fault[d.fault] ?? d.fault },
+        caller_taps: (c?.flags ?? []).map((f: string) => ({ code: f, ja: CALLER_FLAGS[f]?.staff ?? f, urgent: Boolean(p.taps[f]?.urgent) })),
+        ai_triage: d.triage ? { note: "intake model suggestion, not confirmed by the caller", situation: d.triage.situation ?? null, taps: d.triage.taps ?? [] } : null,
+      };
       return {
-        ...d, pack: packOfFault(d.fault), caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
+        ...d, triage: undefined, ...packView, pack: packOfFault(d.fault), caller_confirmed: d.confirmed_rev != null, minutes_open: Math.round((Date.now() - Date.parse(d.created_at)) / 60000), caller: c, guard_job: j,
         suspected_phone_fraud_alert: d.fault === FRAUD_FAULT, fraud_mode_active: d.fraud_at != null,
       };
     }
@@ -55,6 +64,13 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
         db.from("field_job").select("assignee").neq("state", "done"),
       ]);
       return (g ?? []).map((x: { uid: string; display_name: string }) => ({ uid: x.uid, name: x.display_name, open_jobs: (jobs ?? []).filter((j) => j.assignee === x.uid).length }));
+    }
+    case "get_pack_rules": {
+      const p = contentPack(d.fault);
+      if (!p) return { pack: "atm", note: "ATM cases use list_replies only" };
+      return { pack: p.id, replies: Object.entries(p.replies).map(([intent, r]) => ({
+        intent, code: r.code, title_ja: r.title, fits_situations: r.rule.faults ?? "any", needs_one_of_taps: r.rule.needsFlags ?? [], blocked_by_taps: r.rule.blockedBy ?? [],
+      })), urgent_taps: Object.keys(p.taps).filter((t) => p.taps[t].urgent) };
     }
     case "station_status": {
       const since = new Date(Date.now() - 7 * 86_400_000).toISOString();

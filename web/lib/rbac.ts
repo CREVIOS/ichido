@@ -18,6 +18,7 @@ export const STATEMENTS = {
   stations: ["read", "disaster"],
   audit: ["read"],
   mcp: ["use"],
+  assistant: ["use"],   // Ask Ichido (/api/assistant): read-only questions over the MCP tools, as the person asking
   // Better Auth admin plugin statements (account administration), plus resetting someone's second factor.
   user: ["create", "list", "set-role", "ban", "impersonate", "impersonate-admins", "delete", "set-password", "set-email", "set-phone", "get", "update", "reset-mfa"],
   session: ["list", "revoke", "delete"],
@@ -27,15 +28,15 @@ export type Grants = { [K in keyof Statements]?: Statements[K][number][] };
 export type Permission = { [K in keyof Statements]: `${K}:${Statements[K][number]}` }[keyof Statements];
 
 export const MATRIX: Record<Role, Grants> = {
-  operator: { case: ["read", "act", "dispatch", "takeover"], training: ["use"], insights: ["read"], stations: ["read", "disaster"], mcp: ["use"] },
+  operator: { case: ["read", "act", "dispatch", "takeover"], training: ["use"], insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"] },
   field: { field: ["act"] },
-  manager: { insights: ["read"], stations: ["read", "disaster"], mcp: ["use"] },
+  manager: { insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"] },
   // A manager's reach plus accounts. Never impersonation, deletion or setting someone's password: people set their own.
   admin: {
-    insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], audit: ["read"],
+    insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"], audit: ["read"],
     user: ["create", "list", "set-role", "ban", "get", "update", "reset-mfa"], session: ["list", "revoke"],
   },
-  auditor: { case: ["read"], insights: ["read"], stations: ["read"], audit: ["read"], mcp: ["use"] },
+  auditor: { case: ["read"], insights: ["read"], stations: ["read"], audit: ["read"], mcp: ["use"], assistant: ["use"] },
 };
 
 export function can(role: string | null | undefined, permission: Permission): boolean {
@@ -54,7 +55,7 @@ export const COMMANDS: Record<string, Access> = {
   // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
   push_key: "any", push_subscribe: "any", push_unsubscribe: "any",
   // Operator on a case
-  simulate: "case:act", suggest: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
+  simulate: "case:act", suggest: "case:act", summary_draft: "case:act", summary_save: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
   review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",
   reset_caller: "case:act", abandon: "case:act", set_fault: "case:act", stated_amount: "case:act", bank_status: "case:act",
   issue_code: "case:act", show_code_on_device: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",

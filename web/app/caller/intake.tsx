@@ -7,9 +7,9 @@ import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ACCESS, ANSWER, FACTS, FACT_KEYS, STATUS, UI, callerPack, errorText, type Fact, type Lang } from "@/content/catalogue";
-import { CallerFlags } from "./faults";
-import type { CallerCase, Draft } from "./types";
+import { ACCESS, ANSWER, CALLER_FLAGS, FACTS, FACT_KEYS, STATUS, UI, callerPack, contentPack, errorText, type Fact, type Lang } from "@/content/catalogue";
+import { CallerFlags, tapFlag } from "./faults";
+import type { CallerCase, Draft, Triage } from "./types";
 
 // textOnly: the caller cannot hear or speak, so no voice and no "use the handset" hints.
 // An ATM caller confirms the read-back of two facts; any other pack's caller confirms their own taps (content/packs).
@@ -52,6 +52,7 @@ export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: 
       {draft.needs_clarification && <Notice tone="info">{UI.unsure[lang]}</Notice>}
       {P.atm ? <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
         : draft.words && <p className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
+      {!P.atm && draft.triage && <TriageReadBack lang={lang} card={card} triage={draft.triage} onError={fail} />}
       <Button size="lg" className="h-11" disabled={busy || !ready} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
       {card.needs_human ? <Notice tone="info">{textOnly ? ACCESS.humanAsked[lang] : P.humanAsked(lang)}</Notice>
         : <Button variant="secondary" size="lg" onClick={() => cmd("human").catch(fail)}>{UI.human[lang]}</Button>}
@@ -79,6 +80,42 @@ function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; b
             ))}
           </div>
           {draft[k] !== "unknown" && <span className="flex items-center gap-1.5 text-[14px] text-foreground"><Check className="size-4 stroke-[1.5] text-ok" />{FACTS[k][draft[k]][lang]}</span>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// The AI's reading of a pack caller's words, as the pack's own taps: each one counts only when the caller taps it.
+// A red flag is never suggested as a fact: it is asked, with the tap's approved wording, and the caller answers.
+function TriageReadBack({ lang, card, triage, onError }: { lang: Lang; card: CallerCase; triage: Triage; onError: (e: Error) => void }) {
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const p = contentPack(card.fault);
+  if (!p) return null;
+  const need = triage.situation ? Object.keys(p.taps).find((t) => p.taps[t].suggests === triage.situation) : undefined;
+  const open = (t: string) => !card.flags.includes(t) && !dismissed.includes(t) && Object.hasOwn(CALLER_FLAGS, t);
+  const suggested = [...new Set([...(need ? [need] : []), ...triage.taps])].filter(open);
+  const asks = triage.ask.filter(open);
+  if (!suggested.length && !asks.length) return null;
+  const tap = (t: string) => tapFlag(card.flags, t, true).catch(onError);
+  const answer = (t: string, v: Fact) => (v === "yes" ? tap(t) : setDismissed((d) => [...d, t]));
+  return (
+    <section className="flex flex-col gap-2.5" aria-live="polite">
+      <span className="text-[13px] text-muted-foreground">{UI.aiRead[lang]}</span>
+      {asks.map((t) => (
+        <div key={t} className="flex flex-col gap-2 rounded-xl border border-alert/50 p-3.5">
+          <span className="text-[15px] text-foreground">{UI.aiAsk[lang]}</span>
+          <span className="text-[17px] leading-7 text-foreground">{CALLER_FLAGS[t].label[lang]}</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(["yes", "no"] as Fact[]).map((v) => <Button key={v} variant={v === "yes" ? "default" : "secondary"} className="h-11" onClick={() => answer(t, v)}>{ANSWER[v][lang]}</Button>)}
+          </div>
+        </div>
+      ))}
+      {suggested.map((t) => (
+        <div key={t} className="flex min-h-12 items-center gap-3 rounded-lg border border-dashed px-3.5 py-2">
+          <span className="flex-1 text-[15px] leading-6 text-foreground">{CALLER_FLAGS[t].label[lang]}</span>
+          <Button size="sm" onClick={() => tap(t)}>{ANSWER.yes[lang]}</Button>
+          <Button size="sm" variant="ghost" onClick={() => answer(t, "no")}>{ANSWER.no[lang]}</Button>
         </div>
       ))}
     </section>
