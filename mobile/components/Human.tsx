@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { CHAT } from "@content/chat";
+import { Headphones } from "lucide-react-native";
 import { Button, LiveText } from "./ui";
 import { cmd } from "@/lib/supabase";
 import { FRONTLINE, UI, errorText, type Lang } from "@content/catalogue";
@@ -14,6 +16,7 @@ export function Human({ lang, connected = true, state, requested, receipt, refre
     catch (error) { setNote(`${errorText((error as Error).message, lang)} ${FRONTLINE.inPerson[lang]}`); }
     finally { setBusy(false); }
   };
-  if (state === "human" || state === "queued" || requested || sent) return <LiveText>{(state === "human" ? FRONTLINE.connected : FRONTLINE.requested)[lang]}</LiveText>;
-  return <><Button kind="secondary" busy={busy} label={UI.human[lang]} onPress={request} />{note && <LiveText>{note}</LiveText>}</>;
+  const joined = state === "human";
+  const asked = requested || sent || state === "queued";
+  return <><Button icon={Headphones} style={{borderRadius:24,alignSelf:"flex-end"}} kind="secondary" busy={busy} disabled={joined || asked} label={(joined ? CHAT.joined : asked ? CHAT.asked : UI.human)[lang]} onPress={request} />{note && <LiveText>{note}</LiveText>}</>;
 }

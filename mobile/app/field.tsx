@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { LogOut } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
-import { Brand, Button, Card, Hairline, IconButton, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
+import { Brand, Button, Card, IconButton, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { faultJa } from "@/lib/staff";
 import { ASSIST, CALLER_FLAGS, nextFieldStep, SHIFT, ETA_OPTIONS, MOBILE, STAFF, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@content/catalogue";
 
@@ -24,6 +24,7 @@ function Jobs({ me }: { me: Me }) {
   const { job } = useLocalSearchParams<{ job?: string }>();
   const [all, setAll] = useState(false);
   const [correct, setCorrect] = useState("");
+  const [showPrevious,setShowPrevious] = useState(false);
   const [previous,setPrevious] = useState<{ incident: string; station: string; generation: number }[]>([]);
   const [loaded,setLoaded] = useState(false);
   const [failed,setFailed] = useState(false);
@@ -60,9 +61,9 @@ function Jobs({ me }: { me: Me }) {
       <Tag value={F.header(me.name)} />
       {me.push && <T v="small">{me.push}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
-      {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
+
       {failed && <Notice tone="alert">{SHIFT.readFailed}</Notice>}
-        {loaded && !failed && jobs.length === 0 && <Card><T v="body">{F.empty}</T></Card>}
+        {loaded && !failed && jobs.length === 0 && <T v="body">{F.empty}</T>}
       {job && !all && <Button kind="ghost" label={F.title} onPress={() => setAll(true)} />}
       {job && !all && !jobs.some((j) => j.incident === job) && <Notice>{F.changed}</Notice>}
       {jobs.filter((j) => !job || all || j.incident === job).map((j) => {
@@ -82,14 +83,14 @@ function Jobs({ me }: { me: Me }) {
             <Button kind="secondary" label={j.allergy_ack_at ? ASSIST.acknowledged : ASSIST.ack} disabled={Boolean(j.allergy_ack_at || j.declined_at)} onPress={() =>
               cmd("ack_allergy",{incident:j.incident,generation:j.generation,flags:j.allergy_flags}).then(load).catch(() => setError(F.changed))} /></>}
           {j.eta && <Tag label={F.eta} value={F.minutes(j.eta)} />}
-          <Hairline />
+
           <T v="label">{F.etaMine}</T>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          <ScrollView horizontal contentContainerStyle={{gap:6}} showsHorizontalScrollIndicator={false}>
             {ETA_OPTIONS.map((v) => (
               <Toggle key={v} on={(eta[j.incident] ?? UNKNOWN_ETA) === v} label={v ? F.minutes(v) : F.etaUnknown}
-                onPress={() => setEta({ ...eta, [j.incident]: v })} style={{ minWidth: 72 }} />
+                onPress={() => setEta({ ...eta, [j.incident]: v })} style={{ minWidth: 72,borderRadius:24 }} />
             ))}
-          </View>
+          </ScrollView>
           {j.declined_at ? <Notice>{SHIFT.declined}</Notice> : <>
             {next && <Button label={actions[next]} onPress={() => act(j, next)} block />}
             {j.state === "requested" && <Button kind="secondary" label={SHIFT.decline} onPress={() => act(j, "decline")} />}
@@ -101,6 +102,8 @@ function Jobs({ me }: { me: Me }) {
           <T v="small">{F.note}</T>
         </Card>
       ); })}
+      {previous.length > 0 && <Button kind="ghost" label={SHIFT.reassigned + " · " + previous.length} onPress={() => setShowPrevious(!showPrevious)}/>}
+      {showPrevious && previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
     </Screen>
   );
 }

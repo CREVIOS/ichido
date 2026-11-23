@@ -1,9 +1,10 @@
-import { committedReadback } from "@content/frontline-policy";
+import { Conversation } from "@/components/Conversation";
+import { ChatBubble } from "@/components/ChatBubble";
+import { CHAT } from "@content/chat";
 import { canConfirm } from "@content/caller-session";
 import { useCallback, useRef, useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { uuid } from "expo";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import { Check, CircleCheck, OctagonAlert, Volume2 } from "lucide-react-native";
@@ -12,18 +13,19 @@ import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { Human } from "@/components/Human";
 import { hasVoice } from "@/lib/voice";
-import { Brand, Button, Card, Icon, Input, LangPicker, LiveText, Notice, Pill, Screen, T, TextScale, Toggle } from "@/components/ui";
+import { Brand, Mark, Button, Card, Icon, Input, LangPicker, LiveText, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
 import { BankStatus, CallerFlags, Rate, FollowUp, Receipt, SyncStatus, type Sync, PrefsBar, speechRate, textScale, usePrefs } from "@/components/CallerFaults";
 import { color, radius, space, tint } from "@/theme";
 import {
-  JOURNEY, CONSULTATION, allergyFacts, ACCESS, FRONTLINE, CALLER_FLAGS, urgentText, FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, sentText, callerPack, pick, replyOf, errorText,
+  JOURNEY, CONSULTATION, allergyFacts, ACCESS, FRONTLINE, CALLER_FLAGS, FACTS, FACT_KEYS, ANSWER, STATUS, UI, STATION, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, sentText, callerPack, pick, replyOf, errorText,
   type Lang, type Fact,
 } from "@content/catalogue";
 
-import type { CallerCase as CallerCard, CallerView, Reply, Draft, Turn } from "@content/caller-session";
+import type { CallerCase as CallerCard, CallerView, Reply, Draft } from "@content/caller-session";
 const MAX_TEXT = 500;
 
 export default function CallerScreen() {
+  const [detailsOpen,setDetailsOpen] = useState(false);
   const [allergyOpen,setAllergyOpen] = useState(false);
   const [view, setView] = useState<CallerView>();
   const [updated, setUpdated] = useState<Date>();
@@ -51,29 +53,18 @@ export default function CallerScreen() {
 
   const confirmed = card.confirmed_rev != null;
   const frontline = card.handler !== "legacy" && open;
-  return (
-    <TextScale.Provider value={textScale(prefs)}>
-      <Screen eyebrow={<Brand />} pinned={<Human key={generation + String(open)} lang={lang} state={open ? card.handler : undefined} requested={open && card.needs_human} />} onRefresh={load}>
-        <SyncStatus sync={sync} lang={lang} />
+  const chat = frontline && !card.fraud;
+  const stationName = pick(station?.label,lang) || card.station;
+  const changeLang = (l:Lang) => {cmd("set_lang",{lang:l}).then(load).catch(() => setOffline(true));};
+  const alerts = <>
         {card.field_state !== "none" && <Card><LiveText>{callerPack(card.fault).field(card.field_state,lang)}</LiveText>
           {card.field_state === "on_way" && <T>{callerPack(card.fault).eta(card.eta,lang)} {card.eta_at && new Date(card.eta_at).toLocaleString(lang)}</T>}</Card>}
-        {card.fraud ? <FraudScreen lang={lang} /> : <>
-        <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => setOffline(true)); }} />
-        <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
-        <View style={{ gap: 6 }}>
-          <T v="label" tone="muted">{pick(station?.label, lang)}{confirmed && ` · ${pick(FAULTS[card.fault], lang)}`}</T>
-          <Pill tone={card.status}>{callerPack(card.fault).status(card.status, lang)}</Pill>
-        </View>
         {card.notice && OPS_CALLER.notice[card.notice] && (
           <Card title={OPS_CALLER.noticeLabel[lang]}><T v="h2">{OPS_CALLER.notice[card.notice][lang]}</T></Card>
         )}
         {card.text_only && <Notice>{ACCESS.textOnly[lang]}</Notice>}
-        {frontline && <NativeConversation key={generation} card={card} draft={draft} turns={turns} lang={lang} refresh={load} />}
-        {frontline && hasVoice && !card.text_only && VOICE_LANGS.includes(lang) && turns.some(t => t.speaker === "caller" && t.wording === "start") && <VoiceIntake key={generation+lang} generation={generation} handler={card.handler} lang={lang} />}
-        {!frontline && !confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}
-        {!frontline && confirmed && !latest && <Waiting lang={lang} fault={card.fault} />}
-        {latest && <Guidance key={latest.id+lang} refresh={load} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
-        {!frontline && open && (callerPack(card.fault).atm || confirmed) && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
+  </>;
+  const details = <>
         {callerPack(card.fault).atm && (card.bank_status || !open) && <BankStatus status={(card.bank_status === "contact_by" || card.bank_status === "contacted") && !card.callback_channel ? null : card.bank_status} due={card.bank_due} lang={lang} />}
         {allergyFacts(card.flags).length>0 && <Card><Button kind="secondary" label={JOURNEY.allergyCard[lang]} onPress={() => setAllergyOpen(!allergyOpen)} />
           {allergyOpen && (["bn","ja"] as const).map(l => <T key={l} accessibilityLanguage={l}>{allergyFacts(card.flags).map(f => CALLER_FLAGS[f].label[l]).join(" · ")}</T>)}</Card>}
@@ -85,12 +76,28 @@ export default function CallerScreen() {
           <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>
           <T v="label" tone="onPrimary">{UI.caseNo.ja}：<T v="label" mono tone="onPrimary">{card.id.slice(0, 8)}</T></T>
         </View>}
-        <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T></>}
-      </Screen>
-    </TextScale.Provider>
-  );
+        <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T>
+    {chat && <T v="small">{JOURNEY.privacy[lang]} {!card.text_only && VOICE_LANGS.includes(lang) && VOICE.notice[lang]}</T>}
+  </>;
+  const guidance = latest && <Guidance key={latest.id+lang} refresh={load} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} chat={chat} inThread={chat && turns.some(t=>t.speaker===latest.author && t.wording===latest.intent)}/>;
+  return <TextScale.Provider value={textScale(prefs)}>
+    <Screen fixed={chat} onRefresh={load} eyebrow={<><Mark/><T style={{flex:1}} numberOfLines={1} weight={500}>{stationName}</T></>}
+      right={<View style={{flexDirection:"row"}}><LangPicker compact lang={lang} onChange={changeLang}/><PrefsBar prefs={prefs} onChange={setPrefs} lang={lang}/></View>}
+      pinned={<View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:6}}><T style={{flex:1}} v="small">{callerPack(card.fault).status(card.status,lang)}</T><Human key={generation+String(open)} lang={lang} state={open ? card.handler : undefined} requested={open && card.needs_human} refresh={load}/></View>}>
+      {card.fraud ? <FraudScreen lang={lang}/> : chat ?
+        <Conversation key={generation} generation={generation} lang={lang} card={card} draft={draft} turns={turns} refresh={load} sync={sync} alerts={alerts} reply={latest} answerChips={latest && <AnswerChips key={latest.id+lang} card={card} reply={latest} lang={lang} refresh={load}/>}>
+          {guidance}<Button kind="ghost" label={CHAT.details[lang]} onPress={()=>setDetailsOpen(!detailsOpen)}/>{detailsOpen && details}
+        </Conversation> : <>
+          <SyncStatus sync={sync} lang={lang}/>{alerts}
+          {!confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card}/>}
+          {confirmed && !latest && <Waiting lang={lang} fault={card.fault}/>}
+          {guidance}
+          {open && (callerPack(card.fault).atm || confirmed) && <CallerFlags fault={card.fault} flags={card.flags} lang={lang}/>}
+          {details}
+        </>}
+    </Screen>
+  </TextScale.Provider>;
 }
-
 // An ATM caller confirms the read-back of two facts; any other pack's caller confirms their own taps (content/packs).
 function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerCard }) {
   const P = callerPack(card.fault);
@@ -158,59 +165,6 @@ function NativeFacts({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft
       </Card>);
 }
 
-function NativeConversation({ card, draft, turns, lang, refresh }: { card: CallerCard; draft: Draft; turns: Turn[]; lang: Lang; refresh: () => Promise<void> }) {
-  const [text,setText] = useState("");
-  const [note,setNote] = useState("");
-  const [busy,setBusy] = useState(false);
-  const pending = useRef<{ text:string; id:string } | null>(null);
-  const pack = callerPack(card.fault);
-  const ready = canConfirm(pack.atm,draft,card.flags);
-  const started = turns.some(t => t.wording === "start" && t.speaker === "caller");
-  const ai = card.handler === "ai";
-  const last = turns.filter(t => t.speaker === "ai" && t.rev === draft.rev && t.locale === lang).at(-1);
-  async function submit(act:string,fields:Record<string,unknown> = {}) {
-    setBusy(true); setNote("");
-    try {
-      const id = act === "text" && pending.current?.text === text ? pending.current.id : uuid.v4();
-      if (act === "text") pending.current = { text,id };
-      const r = await cmd<{withheld?:boolean}>("frontline_turn",{act,request_id:id,base_rev:draft.rev,...fields});
-      if (r.withheld) setNote(UI.numbersWithheld[lang]);
-      else if (act === "text") { setText(value => value === fields.text ? "" : value); setNote(JOURNEY.sent[lang]); }
-      if (pending.current?.id === id) pending.current = null;
-      await refresh();
-    } catch (error) { setNote(errorText((error as Error).message,lang)); }
-    finally { setBusy(false); }
-  }
-  const warning = urgentText(card.fault,card.flags,lang);
-  return <>
-    {ai && <T v="h1">{FRONTLINE.greeting[lang]}</T>}
-    {card.transfer_reason === "suspected_risk" && <Notice tone="alert">{FRONTLINE.risk[lang]}</Notice>}
-    {card.handler === "queued" && <Notice>{FRONTLINE.queued[lang]}</Notice>}
-    {card.confirmed_rev !== null && warning && <Notice tone="alert">{warning}</Notice>}
-    <T>{FRONTLINE.disclosure[lang]} {!card.text_only && VOICE_LANGS.includes(lang) && FRONTLINE.voicePrivacy[lang]}</T>
-    {!started ? <Button busy={busy} label={(ai ? FRONTLINE.start : FRONTLINE.write)[lang]} onPress={() => submit("start")} /> : <>
-      <Notice>{pack.neverAsk[lang]}</Notice>
-      {pack.scope && <Notice>{pack.scope[lang]}</Notice>}
-      {turns.filter(t => t.words).map(t => <T key={t.seq} accessibilityLanguage={t.locale}>{t.words}</T>)}
-      <Card><T v="small">{JOURNEY.privacy[lang]}</T><Input label={UI.whatHappened[lang]} value={text} onChangeText={setText} multiline maxLength={MAX_TEXT} />
-        <Button busy={busy} label={UI.send[lang]} disabled={!text.trim()} onPress={() => submit("text",{text})} /></Card>
-      {card.confirmed_rev === null && <>
-        {ai && last?.wording === "readback" && <T>{last.facts ? committedReadback(last.facts,lang) : FRONTLINE.readback[lang]}</T>}
-        {ai && last?.wording === "withheld" && <Notice>{UI.numbersWithheld[lang]}</Notice>}
-        {draft.triage?.taps.filter(f => CALLER_FLAGS[f] && !card.flags.includes(f)).map(f =>
-          <Button key={f} kind="secondary" disabled={busy} label={CALLER_FLAGS[f].label[lang]} onPress={() => submit("tap",{flag:f,on:true})} />)}
-        {pack.atm && !card.flags.includes("need_other") && <NativeFacts lang={lang} draft={{...draft,words:null}} busy={busy} onAnswer={(key,value) => submit("facts",{key,value})} />}
-        <CallerFlags lang={lang} fault={card.fault} flags={card.flags} submit={(flag,on) => submit("tap",{flag,on})} />
-        {!ready && <T>{(draft.needs_clarification ? UI.unsure : JOURNEY.choose)[lang]}</T>}
-        <Button label={UI.confirm[lang]} disabled={busy || !ready} onPress={() => submit("confirm")} />
-      </>}
-      {ai && draft.rev>0 && <><Button kind="secondary" label={FRONTLINE.change[lang]} disabled={busy} onPress={() => submit("change")} />
-        <Button kind="ghost" label={ANSWER.unknown[lang]} disabled={busy} onPress={() => submit("unsure")} /></>}
-    </>}
-    <LiveText>{note}</LiveText>
-  </>;
-}
-
 // No timers in the caller flow: the handset hint is there from the start.
 function Waiting({ lang, fault }: { lang: Lang; fault: string }) {
   return <Card><T v="h2">{STATUS.review[lang]}…</T><T v="label">{callerPack(fault).waiting(lang)}</T></Card>;
@@ -227,21 +181,13 @@ function useHasVoice(lang: Lang) {
   return has;
 }
 
-function Guidance({ lang, card, reply, rate, refresh }: { refresh:()=>Promise<void>; lang: Lang; card: CallerCard; reply: Reply; rate: number }) {
+function Guidance({ lang, card, reply, rate, chat, inThread }: { chat?:boolean; inThread?:boolean; refresh:()=>Promise<void>; lang: Lang; card: CallerCard; reply: Reply; rate: number }) {
   const r = replyOf(reply.intent);
   const text = sentText(reply,lang) ?? errorText("server", lang);
   const done = card.teachback_result === "understood";
   const [teach, setTeach] = useState("");
   const [note, setNote] = useState("");
   const hasVoice = useHasVoice(lang);
-  const [ready,setReady] = useState(false);
-  const eligible = card.handler === "ai" && reply.author === "ai" && card.confirmed_rev !== null && !!sentText(reply,lang);
-  const consent = {reply:reply.id, rev:card.confirmed_rev, lang};
-  useLive(["caller_card"], () => {
-    void cmd<{ready:boolean}>("info_delivery",consent).then(r => setReady(r.ready)).catch((e:Error) => {
-      setReady(false); setNote(errorText(e.message,lang));
-    });
-  }, eligible, {incident:card.id});
   const act = (name: string, body: Record<string, unknown> = {}) => cmd(name, body).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
   const sendTeach = () => cmd<{ withheld?: boolean }>("teachback", { text: teach })
     .then((x) => setNote(x.withheld ? UI.numbersWithheld[lang] : ""))
@@ -249,8 +195,7 @@ function Guidance({ lang, card, reply, rate, refresh }: { refresh:()=>Promise<vo
 
   return (
     <>
-      <T v="small">{UI.approved[lang]}</T>
-      <T v="h1">{text}</T>
+      {inThread ? null : chat ? <ChatBubble text={text} from={reply.author === "human" ? "operator" : "ai"} label={reply.author === "human" ? CHAT.operator[lang] : undefined}/> : <><T v="small">{UI.approved[lang]}</T><T v="h1">{text}</T></>}
       {hasVoice && lang !== "ne" && reply.author !== "ai" && !card.text_only && <Button kind="secondary" icon={Volume2} label={UI.listen[lang]} onPress={() => Speech.speak(text, { language: LANG_LOCALE[lang], rate })} style={{ alignSelf: "flex-start" }} />}
       <LiveText>{note}</LiveText>
 
@@ -264,11 +209,6 @@ function Guidance({ lang, card, reply, rate, refresh }: { refresh:()=>Promise<vo
         </View>
       )}
 
-      {eligible && ready && <Button label={FRONTLINE.answered[lang]} onPress={async () => {
-        setReady(false);
-        await act("resolve_info",{...consent,ack:true});
-        await refresh();
-      }} />}
       {(card.handler === "legacy" || (card.handler === "human" && reply.author === "human")) && (done ? (
         <>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.card, padding: space.lg, backgroundColor: tint.guided.bg }}>
@@ -288,6 +228,28 @@ function Guidance({ lang, card, reply, rate, refresh }: { refresh:()=>Promise<vo
       ))}
     </>
   );
+}
+
+function AnswerChips({card,reply,lang,refresh}: {card:CallerCard; reply:Reply; lang:Lang; refresh:()=>Promise<void>}) {
+  const [ready,setReady] = useState(false);
+  const [note,setNote] = useState("");
+  const rev = card.confirmed_rev;
+  const eligible = card.handler === "ai" && reply.author === "ai" && rev !== null && !!sentText(reply,lang);
+  const delivery = useCallback(async () => {
+    try { const r = await cmd<{ready:boolean}>("info_delivery",{reply:reply.id,rev,lang}); setReady(r.ready); }
+    catch (e) { setReady(false); setNote(errorText((e as Error).message,lang)); }
+  },[reply.id,rev,lang]);
+  useLive(["caller_card"],delivery,eligible,{incident:card.id});
+  async function answer(resolved:boolean) {
+    setReady(false);
+    try {
+      if (resolved) await cmd("resolve_info",{reply:reply.id,rev,lang,ack:true});
+      else await cmd("human");
+      setNote(""); await refresh();
+    } catch (e) { setNote(errorText((e as Error).message,lang)); }
+  }
+  return <>{eligible && ready && <><Button label={FRONTLINE.answered[lang]} onPress={()=>answer(true)} style={{borderRadius:24}}/>
+    <Button kind="secondary" label={FRONTLINE.stillHelp[lang]} onPress={()=>answer(false)} style={{borderRadius:24}}/></>}{!!note && <LiveText>{note}</LiveText>}</>;
 }
 
 // Fraud-in-progress mode (the operator's decision; web/app/caller/ops.tsx): the approved warning, full screen.

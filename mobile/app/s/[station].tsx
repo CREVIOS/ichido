@@ -1,10 +1,11 @@
+import { View } from "react-native";
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { callerAuth, cmd, signOut } from "@/lib/supabase";
-import { textScale, usePrefs } from "@/components/CallerFaults";
+import { PrefsBar, textScale, usePrefs } from "@/components/CallerFaults";
 import { Human } from "@/components/Human";
-import { Brand, Button, Card, Input, LangPicker, LiveText, Notice, Screen, T, Tag, Toggle, TextScale } from "@/components/ui";
-import { ACCESS, JOURNEY, FAULT_UI, FRONTLINE, UI, LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
+import { Mark, Button, Card, Input, LangPicker, LiveText, Notice, Screen, T, TextScale } from "@/components/ui";
+import { ACCESS, JOURNEY, FRONTLINE, UI, LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
 
 const CODE_LENGTH = 6;
 
@@ -51,12 +52,9 @@ export default function StationScreen() {
   }
 
   return (
-    <TextScale.Provider value={textScale(prefs)}><Screen back backLabel={MOBILE.back[lang]} eyebrow={<Brand />} title={STATION.title[lang]}
-      pinned={staffSession ? <Human lang={lang} connected={false} /> : <Button kind="secondary" disabled={alerted} label={(alerted ? FRONTLINE.requested : UI.human)[lang]} onPress={() => connect(true)} busy={busy} />}>
-      <Toggle label={FAULT_UI.largeText[lang]} on={prefs.large} onPress={() => setPrefs({...prefs,large:!prefs.large})} />
+    <TextScale.Provider value={textScale(prefs)}><Screen back backLabel={MOBILE.back[lang]} eyebrow={<><Mark/><T numberOfLines={1} style={{flex:1}}>{station}</T></>} title={STATION.title[lang]} right={<View style={{flexDirection:"row"}}><LangPicker compact lang={lang} onChange={setLang}/><PrefsBar lang={lang} prefs={prefs} onChange={setPrefs}/></View>}>
+
       {resume && <Button kind="secondary" label={`${JOURNEY.resume[lang]} · ${resume}`} onPress={() => router.replace("/caller")} />}
-      <Tag label="Help Point" value={station} />
-      <LangPicker lang={lang} onChange={setLang} />
       {staffSession ? (
         <Card>
           <T v="body" tone="ink">{STATION.staffSession[lang]}</T>
@@ -73,6 +71,7 @@ export default function StationScreen() {
           <Button label={STATION.go[lang]} onPress={() => connect()} busy={busy} disabled={code.length < CODE_LENGTH} block />
         </Card>
       )}
+      {staffSession ? <Human lang={lang} connected={false} /> : <Button kind="secondary" disabled={alerted} label={(alerted ? FRONTLINE.requested : UI.human)[lang]} onPress={() => connect(true)} busy={busy} />}
       <T v="label">{STATION.why[lang]}</T>
     </Screen></TextScale.Provider>
   );

@@ -68,7 +68,7 @@ export const type = {
   code: { fontSize: 30, lineHeight: 38, letterSpacing: 4 },
 } as const;
 
-export const control = { height: 36, rowHeight: 40, icon: 16, stroke: 1.5 } as const;
+export const control = { height: 44, rowHeight: 48, icon: 16, stroke: 1.5 } as const;
 
 // web .surface: 0 1px 2px oklch(0 0 0 / 0.03).
 export const shadow = {

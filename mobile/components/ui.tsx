@@ -71,8 +71,8 @@ export const Brand = () => (
 );
 
 type ButtonKind = "primary" | "secondary" | "ghost";
-export function Button({ label, accessibilityLabel, onPress, kind = "primary", disabled, busy, icon, block, style }: {
-  label: string; accessibilityLabel?: string; onPress?: () => void; kind?: ButtonKind; disabled?: boolean; busy?: boolean; icon?: LucideIcon; block?: boolean; style?: StyleProp<ViewStyle>;
+export function Button({ label, accessibilityLabel, onPress, kind = "primary", disabled, busy, selected, icon, block, style }: {
+  label: string; accessibilityLabel?: string; onPress?: () => void; kind?: ButtonKind; disabled?: boolean; busy?: boolean; selected?:boolean; icon?: LucideIcon; block?: boolean; style?: StyleProp<ViewStyle>;
 }) {
   const primary = kind === "primary";
   const fg = primary ? "onPrimary" : "ink";
@@ -80,7 +80,7 @@ export function Button({ label, accessibilityLabel, onPress, kind = "primary", d
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: Boolean(disabled || busy) }}
+      accessibilityState={{ disabled: Boolean(disabled || busy), selected }}
       disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [
@@ -102,7 +102,7 @@ export function Button({ label, accessibilityLabel, onPress, kind = "primary", d
 }
 
 // A choice that stays visibly selected (yes / no / not sure, wait / leave, periods).
-export const Toggle = ({ on, ...p }: { on: boolean } & Omit<Parameters<typeof Button>[0], "kind">) => <Button {...p} kind={on ? "primary" : "secondary"} />;
+export const Toggle = ({ on, ...p }: { on: boolean } & Omit<Parameters<typeof Button>[0], "kind">) => <Button {...p} selected={on} kind={on ? "primary" : "secondary"} />;
 
 // Small segmented control (periods): a hairline track with the selected segment on white.
 export function Segments<K extends string | number>({ value, options, onChange }: { value: K; options: { key: K; label: string }[]; onChange: (k: K) => void }) {
@@ -124,7 +124,7 @@ export function Segments<K extends string | number>({ value, options, onChange }
 export function IconButton({ icon, label, onPress }: { icon: LucideIcon; label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={8}
-      style={({ pressed }) => ({ width: 32, height: 32, borderRadius: radius.control, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? color.press : "transparent" })}>
+      style={({ pressed }) => ({ width: 44, height: 44, borderRadius: radius.control, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? color.press : "transparent" })}>
       <Icon icon={icon} size={18} tone="body" />
     </Pressable>
   );
@@ -138,7 +138,7 @@ export function Row({ label, sub, icon, status, count, meta, metaTone, selected,
   label: string; sub?: ReactNode; icon?: LucideIcon; status?: string; count?: number | string; meta?: string; metaTone?: Tone; selected?: boolean; chevron?: boolean; onPress?: () => void;
 }) {
   return (
-    <Pressable accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={label} onPress={onPress} disabled={!onPress}
+    <Pressable accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={label} accessibilityState={{selected}} onPress={onPress} disabled={!onPress}
       style={({ pressed }) => ({
         minHeight: control.rowHeight, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.control,
         flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: selected ? color.selected : pressed ? color.press : "transparent",
@@ -198,10 +198,10 @@ export function SegBar({ value, of = 6, label }: { value: number; of?: number; l
 // A white surface; the title is a quiet 13px label, as in the web Panel.
 export function Card({ title, action, children, style }: { title?: ReactNode; action?: ReactNode; children?: ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
-    <View style={[{ backgroundColor: color.surface, borderRadius: radius.card, borderWidth: 1, borderColor: color.line, padding: space.lg, gap: space.md }, shadow, style]}>
+    <View style={[{ backgroundColor: color.surface, borderRadius: radius.card, padding: space.lg, gap: space.md }, style]}>
       {(title || action) && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm, minHeight: 24 }}>
-          {typeof title === "string" ? <T v="label" tone="muted" style={{ flex: 1 }}>{title}</T> : <View style={{ flex: 1 }}>{title}</View>}
+          {typeof title === "string" ? <T v="row" weight={500} style={{ flex: 1 }}>{title}</T> : <View style={{ flex: 1 }}>{title}</View>}
           {action}
         </View>
       )}
@@ -267,17 +267,17 @@ export function Notice({ children, tone = "neutral" }: { children: ReactNode; to
 export const Hairline = () => <View style={{ height: 1, backgroundColor: color.line }} />;
 
 // The "···" menu: a bottom sheet of plain rows.
-export function Menu({ label, items, closeLabel }: { label: string; closeLabel: string; items: { label: string; onPress: () => void }[] }) {
+export function Menu({ label, items, closeLabel, icon = Ellipsis }: { label: string; closeLabel: string; icon?: LucideIcon; items: { label: string; selected?: boolean; onPress: () => void }[] }) {
   const [open, setOpen] = useState(false);
   if (!items.length) return null;
   return (
     <>
-      <IconButton icon={Ellipsis} label={label} onPress={() => setOpen(true)} />
+      <IconButton icon={icon} label={label} onPress={() => setOpen(true)} />
       <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
         <Pressable accessibilityLabel={closeLabel} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.2)", justifyContent: "flex-end" }} onPress={() => setOpen(false)}>
           <SafeAreaView edges={["bottom"]} style={{ backgroundColor: color.surface, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.sm }}>
             <T v="small" style={{ paddingHorizontal: space.md, paddingVertical: space.sm }}>{label}</T>
-            {items.map((it) => <Row key={it.label} label={it.label} onPress={() => { setOpen(false); it.onPress(); }} />)}
+            {items.map((it) => <Row key={it.label} label={it.label} selected={it.selected} icon={it.selected ? Check : undefined} onPress={() => { setOpen(false); it.onPress(); }} />)}
           </SafeAreaView>
         </Pressable>
       </Modal>
@@ -286,12 +286,12 @@ export function Menu({ label, items, closeLabel }: { label: string; closeLabel: 
 }
 
 // Page frame: safe area, a hairline top bar (back, eyebrow, actions), a 28px title, scrolling content with pull-to-refresh.
-export function Screen({ title, eyebrow, right, pinned, back, backLabel, onRefresh, children }: {
-  title?: string; eyebrow?: ReactNode; right?: ReactNode; pinned?: ReactNode; back?: boolean; backLabel?: string; onRefresh?: () => void; children: ReactNode;
+export function Screen({ title, eyebrow, right, pinned, back, backLabel, onRefresh, children, fixed }: {
+  fixed?:boolean; title?: string; eyebrow?: ReactNode; right?: ReactNode; pinned?: ReactNode; back?: boolean; backLabel?: string; onRefresh?: () => void; children: ReactNode;
 }) {
   const [refreshing, setRefreshing] = useState(false);
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: color.canvas }}>
+    <SafeAreaView edges={fixed ? ["top","bottom"] : ["top"]} style={{ flex: 1, backgroundColor: fixed ? color.surface : color.canvas }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, height: 48, borderBottomWidth: 1, borderBottomColor: color.line }}>
           {back && <IconButton icon={ChevronLeft} label={backLabel ?? MOBILE.back.ja} onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />}
@@ -301,7 +301,7 @@ export function Screen({ title, eyebrow, right, pinned, back, backLabel, onRefre
           {right}
         </View>
         {pinned && <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>{pinned}</View>}
-        <ScrollView
+        {fixed ? children : <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: 48, gap: space.lg }}
           refreshControl={onRefresh ? (
@@ -310,7 +310,7 @@ export function Screen({ title, eyebrow, right, pinned, back, backLabel, onRefre
         >
           {title ? <T v="h1">{title}</T> : null}
           {children}
-        </ScrollView>
+        </ScrollView>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -335,8 +335,10 @@ export function Fact({ label, value, tone }: { label: string; value: ReactNode; 
 }
 
 // One compact picker: the current language; tap to open the list, pick one, it closes. Names in their own script.
-export function LangPicker({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
+export function LangPicker({ lang, onChange, compact }: { lang: Lang; onChange: (l: Lang) => void; compact?:boolean }) {
   const [open, setOpen] = useState(false);
+  if (compact) return <Menu label={UI.language[lang]} closeLabel={MOBILE.back[lang]} icon={Languages}
+    items={LANGS.map(l => ({label:LANG_NAME[l],selected:l===lang,onPress:()=>onChange(l)}))}/>;
   return (
     <View style={{ alignSelf: "stretch" }}>
       <Pressable accessibilityRole="button" accessibilityLabel={UI.language[lang]} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}

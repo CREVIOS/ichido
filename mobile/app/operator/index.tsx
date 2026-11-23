@@ -1,3 +1,4 @@
+import { FRONT_DESK } from "@content/frontline";
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
@@ -5,7 +6,7 @@ import { ClipboardList, ChartColumn, LogOut } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
-import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
+import { Brand, IconButton, Menu, Notice, Row, Screen, Section, T } from "@/components/ui";
 import { type Desk, type OpenDesk, type Targets, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
 import { PARTNER, LANG_NAME, MOBILE, NAV, STAFF, type L10n, STAFF_JA } from "@content/catalogue";
 
@@ -60,19 +61,16 @@ function Queue({ me }: { me: Me }) {
         </View>
       }
     >
-      <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-        <Tag label={O.open} value={MOBILE.staff.count(open.length)} />
-        <Tag value={me.name} />
-      </View>
       {me.push && <T v="small">{me.push}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
-      <Section label={O.queue} right={<T v="tiny" mono>{open.length}</T>}>
-        {open.length === 0 ? (
-          <Card><T v="row" tone="muted">{O.empty}</T></Card>
-        ) : (
-          <Card style={{ padding: 4, gap: 0 }}>
-            {open.map((c) => {
+      {[
+        {label:FRONT_DESK.queued,rows:open.filter(c=>c.handler === "queued"),empty:FRONT_DESK.emptyQueued},
+        {label:FRONT_DESK.ai,rows:open.filter(c=>c.handler === "ai"),empty:FRONT_DESK.emptyAI},
+        {label:O.queue,rows:open.filter(c=>c.handler === "human" || c.handler === "legacy"),empty:O.empty},
+      ].map(lane => <Section key={lane.label} label={lane.label} right={<T v="label">{lane.rows.length}</T>}>
+        {lane.rows.length === 0 ? <T v="label">{lane.empty}</T> : <View>
+            {lane.rows.map((c) => {
               const sla = slaOf(c, targets, now);
               const late = sla && sla.tone !== "ok";
               return (
@@ -82,18 +80,17 @@ function Queue({ me }: { me: Me }) {
                   sub={`${faultJa(c.fault)}${c.lang ? ` · ${LANG_NAME[c.lang]}` : ""}${c.operator_id ? "" : ` · ${O.unclaimed}`}`} />
               );
             })}
-          </Card>
-        )}
-      </Section>
+          </View>}
+      </Section>)}
 
       {done.length > 0 && (
         <Section label={O.history}>
-          <Card style={{ padding: 4, gap: 0 }}>
+          <View>
             {done.map((c) => (
               <Row key={c.id} status={c.abandoned ? "alert" : "guided"} label={label[c.station] ?? c.station} meta={when(c.created_at)} chevron onPress={() => openCase(c.id)}
                 sub={c.abandoned ? O.abandonedChip : STAFF_JA.status[c.status]} />
             ))}
-          </Card>
+          </View>
         </Section>
       )}
     </Screen>

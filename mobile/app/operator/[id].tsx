@@ -1,3 +1,4 @@
+import { OperatorThread } from "@/components/OperatorThread";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
@@ -110,6 +111,7 @@ function CaseView({ me }: { me: Me }) {
 
       {me.push && <T v="small">{me.push}</T>}
       <Machine d={d} />
+      {!closed && d.handler !== "legacy" && <OperatorThread key={d.id} incident={d.id}/>}
       {closed ? (
         <Card title={O.finished}><T v="body">{d.abandoned ? O.finishedAbandoned : O.finishedDone}</T></Card>
       ) : !d.operator_id ? (

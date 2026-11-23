@@ -1,13 +1,14 @@
 import type { FollowUpCase } from "@content/caller-session";
-import { Frown, Meh, Smile } from "lucide-react-native";
+import { Settings2, Frown, Meh, Smile } from "lucide-react-native";
 import { color, radius, shadow } from "@/theme";
 import { Human } from "./Human";
 import { useEffect, useState } from "react";
 import { Pressable, Share, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cmd } from "@/lib/supabase";
-import { Brand, Button, Card, LangPicker, LiveText, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
-import { FRONTLINE, RATING, RATINGS, CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, receipt, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, sentText, urgentText, type Lang } from "@content/catalogue";
+import { CHAT } from "@content/chat";
+import { Menu, Mark, Button, Card, LangPicker, LiveText, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
+import { MOBILE, FRONTLINE, RATING, RATINGS, CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, receipt, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, sentText, urgentText, type Lang } from "@content/catalogue";
 
 // Caller additions for the real-world fault paths (web/app/caller/faults.tsx and prefs.tsx on the web).
 
@@ -33,12 +34,10 @@ export const speechRate = (p: Prefs) => (p.slow ? 0.7 : 1);
 export const textScale = (p: Prefs) => (p.large ? 1.3 : 1);
 
 export function PrefsBar({ prefs, onChange, lang }: { prefs: Prefs; onChange: (p: Prefs) => void; lang: Lang }) {
-  return (
-    <View style={{ flexDirection: "row", gap: 8 }}>
-      <Toggle on={prefs.large} label={FAULT_UI.largeText[lang]} onPress={() => onChange({ ...prefs, large: !prefs.large })} style={{ flex: 1 }} />
-      <Toggle on={prefs.slow} label={FAULT_UI.slowVoice[lang]} onPress={() => onChange({ ...prefs, slow: !prefs.slow })} style={{ flex: 1 }} />
-    </View>
-  );
+  return <Menu icon={Settings2} label={CHAT.settings[lang]} closeLabel={MOBILE.back[lang]} items={[
+    {label:FAULT_UI.largeText[lang],selected:prefs.large,onPress:() => onChange({...prefs,large:!prefs.large})},
+    {label:FAULT_UI.slowVoice[lang],selected:prefs.slow,onPress:() => onChange({...prefs,slow:!prefs.slow})},
+  ]}/>;
 }
 
 // The caller's own taps about what happened and who is with them. A scenario pack groups them under headings, a
@@ -108,10 +107,8 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
   const told = f.reply && (sentText(f.reply, lang) ?? errorText("server",lang));
   return (
     <TextScale.Provider value={textScale(prefs)}>
-      <Screen eyebrow={<Brand />} pinned={<Human lang={lang} requested={f.recontacted} receipt={resolved ? f.id : undefined} refresh={sync.retry} />} onRefresh={sync.retry}>
+      <Screen eyebrow={<><Mark/><T numberOfLines={1} style={{flex:1}}>{pick(f.station?.label,lang) || f.station_id}</T></>} right={<View style={{flexDirection:"row"}}><LangPicker compact lang={lang} onChange={setLang}/><PrefsBar lang={lang} prefs={prefs} onChange={onPrefs}/></View>} pinned={<Human lang={lang} requested={f.recontacted} receipt={resolved ? f.id : undefined} refresh={sync.retry} />} onRefresh={sync.retry}>
         <SyncStatus sync={sync} lang={lang} />
-        <LangPicker lang={lang} onChange={setLang} />
-        <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
         <T v="label" tone="muted">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</T>
         <T v="h1">{FAULT_UI.followTitle[lang]}</T>
         <T v="body">{FAULT_UI.followLead[lang]}</T>
@@ -120,7 +117,7 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
         {f.station?.contact && <T selectable>{f.station.contact}</T>}
         {resolved && <>
           <Rate lang={lang} rating={f.rating ?? null} receipt={f.id} refresh={sync.retry} onNote={setNote} />
-          <Button label={FRONTLINE.stillHelp[lang]} disabled={f.recontacted} onPress={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch((e:Error) => setNote(errorText(e.message,lang)))} />
+          <Button style={{borderRadius:24,alignSelf:"flex-start"}} kind="secondary" label={FRONTLINE.stillHelp[lang]} disabled={f.recontacted} onPress={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch((e:Error) => setNote(errorText(e.message,lang)))} />
           <LiveText>{note}</LiveText></>}
         <Receipt station={f.station_id} id={f.id} lang={lang} />
         <T>{pick(f.station?.branch,lang)} · {pick(f.station?.hours,lang)}</T>

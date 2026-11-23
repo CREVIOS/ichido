@@ -14,13 +14,13 @@ const AGENT_WAIT_MS = 12_000;
 
 // Same protocol as web/components/VoiceIntake.tsx. Caller transcripts arrive on lk.transcription under the
 // caller's own identity; the agent's audio plays through the native audio session without attaching anything.
-function wire(r: Room, onFinal: (t: string) => void, onPartial: (t: string) => void) {
+function wire(r: Room, onFinal: ((t: string) => void) | undefined, onPartial: (t: string) => void) {
   r.registerTextStreamHandler("lk.transcription", async (reader, info) => {
     const text = await callerTranscript(reader, info.identity === r.localParticipant.identity);
     if (text === null) return;
     if (reader.info.attributes?.["lk.transcription_final"] !== "true") return onPartial(text);
     onPartial("");
-    if (text.trim()) onFinal(text.trim());
+    if (text.trim()) onFinal?.(text.trim());
   });
 }
 
@@ -46,7 +46,7 @@ async function micAllowed(): Promise<boolean> {
 
 // Joins the case's private LiveKit room. The agent transcribes; each final transcript of *this* caller goes to onFinal.
 // `say` is server-signed text (the read-back) the agent may speak; the agent rejects anything unsigned.
-export function VoiceIntake({ lang, onFinal, say, generation, handler }: { lang: Lang; generation?: string; handler?: string; onFinal?: (text: string) => void; say?: SignedSpeech | null }) {
+export function VoiceIntake({ lang, onFinal, say, generation, handler, onCaption }: { onCaption?: (text:string) => void; lang: Lang; generation?: string; handler?: string; onFinal?: (text: string) => void; say?: SignedSpeech | null }) {
   const room = useRef<Room | null>(null);
   const owner = useRef(handler);
   useEffect(() => {
@@ -78,6 +78,7 @@ export function VoiceIntake({ lang, onFinal, say, generation, handler }: { lang:
     let timer: ReturnType<typeof setTimeout> | undefined;
     const release = () => {
       clearTimeout(timer);
+      onCaption?.("");
       if (!lease || !generation) return;
       const session = lease;
       lease = undefined;
@@ -99,7 +100,7 @@ export function VoiceIntake({ lang, onFinal, say, generation, handler }: { lang:
       lease = session;
       if (room.current !== r) { release(); return; }
       await AudioSession.startAudioSession();
-      if (onFinal) wire(r, (t) => finalRef.current?.(t), setPartial);
+      if (onFinal || onCaption) wire(r, finalRef.current ? t => finalRef.current?.(t) : undefined, onCaption ?? setPartial);
       if (generation) r.on(RoomEvent.TrackPublished, (pub,p) => {
         pub.setSubscribed(p.isAgent && owner.current === "ai");
       });
@@ -140,6 +141,10 @@ export function VoiceIntake({ lang, onFinal, say, generation, handler }: { lang:
     setState("idle");
   }
 
+  if (onCaption) return <View>
+    <Button kind="secondary" icon={state === "live" ? Square : Mic} label="" accessibilityLabel={(state === "live" ? MOBILE.stopSpeaking : MOBILE.speak)[lang]} busy={state === "connecting"} onPress={state === "live" ? stop : start} style={{width:44,height:44,paddingHorizontal:0,borderRadius:22}}/>
+    {state === "unavailable" && <T v="small">{VOICE.unavailable[lang]}</T>}
+  </View>;
   return (
     <View style={{ gap: 8 }}>
       <T v="small">{VOICE.notice[lang]}</T>
