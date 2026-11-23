@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { caller, cmd, newKey, ok, staff } from "./helpers.mjs";
 
-export async function frontlineCase(t, lang = "en", kind = "atm") {
+export async function frontlineCase(t, lang = "en", kind = "atm", { pair = true } = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname));
   const admin = createClient(url, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
@@ -16,11 +16,11 @@ export async function frontlineCase(t, lang = "en", kind = "atm") {
     await admin.from("light").delete().eq("station", station).throwOnError();
     await admin.from("station").delete().eq("id", station).throwOnError();
   });
-  const code = "FRTABC";
+  const code = randomUUID().slice(0, 6).toUpperCase();
   const fault = kind === "shelter" ? "shelter_checkin" : "card_retained";
   const args = { p_station: station, p_key: newKey(), p_code: code, p_fault: fault, p_digest: createHash("sha256").update(code).digest("hex") };
   const { data: incident } = await admin.rpc("cmd_display_press", args).throwOnError();
-  await ok(cmd(phone, "pair", { station, code, lang, frontline: true }));
+  if (pair) await ok(cmd(phone, "pair", { station, code, lang, frontline: true }));
   const turn = async (act, fields = {}) => {
     const { data } = await phone.c.from("draft").select("rev").eq("incident", incident).single().throwOnError();
     return ok(cmd(phone, "frontline_turn", { act, request_id: randomUUID(), base_rev: data.rev, ...fields }));
