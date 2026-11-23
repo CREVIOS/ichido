@@ -1,6 +1,6 @@
 import { RoomAgentDispatch, RoomConfiguration, TrackSource } from "@livekit/protocol";
-import { AccessToken } from "livekit-server-sdk";
-import { actorFrom, admin, reply } from "@/lib/server";
+import { AccessToken, AgentDispatchClient } from "livekit-server-sdk";
+import { actorFrom, admin, priv, rpc, reply, HttpError } from "@/lib/server";
 import { boundedText, limitKey, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 import { roomFor } from "@/lib/speech";
@@ -27,10 +27,23 @@ export async function POST(req: Request): Promise<Response> {
     log.warn("voice_token", { role, incident, status: 403, code, duration_ms: log.ms() });
     return reply(403, { error: "forbidden" });
   };
+  const incident = new URL(req.url).searchParams.get("incident");
+  if (incident) {
+    if (a.kind !== "staff" || a.role !== "operator" || a.aal !== "aal2" || !/^[a-f0-9-]{36}$/i.test(incident)) return refuse("not_monitor");
+    const turns = await rpc<{wording:string}[]>("frontline_monitor",{p_uid:a.uid,p_session:a.session,p_incident:incident});
+    const {data:b} = await priv().from("binding").select("voice_room,expires,lang").eq("incident",incident).gt("expires",new Date().toISOString()).maybeSingle().throwOnError();
+    const {data:d} = await admin.from("desk").select("text_only").eq("id",incident).is("finished_at",null).maybeSingle().throwOnError();
+    if (!turns.some(t => t.wording==="start") || !b || !d || d.text_only || !VOICE_LANGS.includes(b.lang)) return refuse("unavailable");
+    const ttl = Math.min(60,Math.floor((Date.parse(b.expires)-Date.now())/1000));
+    if (ttl<=0) return refuse("expired");
+    const token = new AccessToken(LIVEKIT_API_KEY,LIVEKIT_API_SECRET,{identity:`op-${a.session}`,ttl});
+    token.addGrant({roomJoin:true,room:roomFor(b.voice_room),canSubscribe:true,canPublish:false,canPublishData:false,canUpdateOwnMetadata:false});
+    return reply(200,{url:LIVEKIT_URL,token:await token.toJwt(),ttl});
+  }
   if (a.kind !== "caller" || !a.incident || !a.lang || !a.expires || !a.voiceRoom) return refuse(a.kind === "caller" ? "unpaired" : "not_caller");
   const { data: open } = await admin.from("desk").select("id,text_only,handler").eq("id", a.incident).is("finished_at", null).maybeSingle();
   if (!open) return refuse("case_closed", a.incident);
-  if (open.text_only || open.handler !== "legacy") return refuse("text_only", a.incident);
+  if (open.text_only) return refuse("text_only", a.incident);
   const limited = await limitKey("voice", a.uid, 10, 60);
   if (limited) return limited;
   // Nepali has no speech recognition: the caller types.
@@ -43,13 +56,30 @@ export async function POST(req: Request): Promise<Response> {
 
   const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: `c-${a.uid}`, ttl });
   token.addGrant({
-    roomJoin: true, room: roomFor(a.voiceRoom), canSubscribe: true, canPublish: true, canPublishData: true,
+    roomJoin: true, room: roomFor(a.voiceRoom), canSubscribe: true, canPublish: true, canPublishData: open.handler === "legacy",
     canPublishSources: [TrackSource.MICROPHONE], canUpdateOwnMetadata: false,
   });
-  token.roomConfig = new RoomConfiguration({
+  let session: string | undefined;
+  if (open.handler !== "legacy") {
+    try {
+      const lease = await rpc<{session:string;epoch:number;handler:string}>("voice_begin",{p_uid:a.uid,p_generation:a.voiceRoom,p_lang:a.lang});
+      session = lease.session;
+      if (lease.handler === "ai") {
+        if (!process.env.AGENT_BRIDGE_SECRET) throw new Error("missing_bridge");
+        const scope = {uid:a.uid,incident:a.incident,generation:a.voiceRoom,lang:a.lang,session,epoch:lease.epoch};
+        const dispatch = new AgentDispatchClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
+        await dispatch.createDispatch(roomFor(a.voiceRoom),process.env.AGENT_NAME ?? "ichido-intake",{
+          metadata:JSON.stringify({locale:LANG_LOCALE[a.lang],scope}),
+        });
+      }
+    } catch (error) {
+      if (session) await rpc("voice_end",{p_uid:a.uid,p_generation:a.voiceRoom,p_session:session});
+      return reply(error instanceof HttpError ? error.status : 503,{error:"voice_unavailable"});
+    }
+  } else token.roomConfig = new RoomConfiguration({
     agents: [new RoomAgentDispatch({ agentName: process.env.AGENT_NAME ?? "ichido-intake", metadata: JSON.stringify({ locale: LANG_LOCALE[a.lang as Lang] }) })],
   });
   const jwt = await token.toJwt();
   log.info("voice_token", { role, incident: a.incident, status: 200, ttl_s: ttl, duration_ms: log.ms() });
-  return reply(200, { url: LIVEKIT_URL, token: jwt });
+  return reply(200, { url: LIVEKIT_URL, token: jwt, session, ttl, needsAgent: open.handler === "ai" || open.handler === "legacy" });
 }

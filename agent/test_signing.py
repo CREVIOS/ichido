@@ -51,3 +51,15 @@ class SigningTest(unittest.TestCase):
         self.assertIsNone(app.signed_text("case-1", "c-2", "invalid", self.seen))
         with mock.patch.object(app, "BRIDGE_SECRET", b""):
             self.assertIsNone(self.verify(msg))
+
+class ScopedSigningTest(unittest.TestCase):
+    def test_turn_language_epoch_expiry_and_legacy_downgrade(self):
+        scope = {"lang":"en","epoch":3}
+        msg = {"seq":42,"lang":"en","epoch":3,"text":"Approved","issued":2000000000,"nonce":"a"*32}
+        wire = f"ichido-say/3\n42\nen\n3\ncase-r\nc-u\n{msg['issued']}\n{msg['nonce']}\nApproved"
+        msg["sig"] = base64.urlsafe_b64encode(hmac.digest(b"test",wire.encode(),"sha256")).rstrip(b"=").decode()
+        with mock.patch.object(app,"BRIDGE_SECRET",b"test"), mock.patch.object(app.time,"time",return_value=msg["issued"]):
+            for bad in ({"seq":43},{"epoch":4},{"lang":"ja"},{"issued":msg["issued"]-31}):
+                self.assertIsNone(app.signed_text("case-r","c-u",json.dumps({**msg,**bad}),{},scope))
+            self.assertIsNone(app.signed_text("case-r","c-u",json.dumps(msg),{}))
+            self.assertEqual(app.signed_text("case-r","c-u",json.dumps(msg),{},scope),"Approved")

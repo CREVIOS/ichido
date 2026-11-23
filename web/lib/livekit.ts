@@ -1,4 +1,6 @@
 import "server-only";
+import { ParticipantInfo_Kind } from "@livekit/protocol";
+import { priv } from "@/lib/server";
 import { RoomServiceClient } from "livekit-server-sdk";
 import { after } from "next/server";
 import { roomFor } from "@/lib/speech";
@@ -14,6 +16,23 @@ export async function closeVoice(incident: string, voiceRoom: string): Promise<v
   } catch (e) {
     // A room that was never created is fine; anything else is logged, the case itself is already closed.
     const line = entry("warn", "voice_close_failed", { incident, ...errorFields(e) });
+    after(() => ship([line]));
+  }
+}
+
+// Removing only the worker preserves the direct caller-to-operator subscription.
+export async function revokeAgentAudio(incident:string) {
+  const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
+  if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) return;
+  const {data:b} = await priv().from("binding").select("voice_room").eq("incident",incident).maybeSingle().throwOnError();
+  if (!b) return;
+  const room = roomFor(b.voice_room);
+  const client = new RoomServiceClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
+  try {
+    const participants = await client.listParticipants(room);
+    await Promise.all(participants.filter(p => p.kind===ParticipantInfo_Kind.AGENT).map(p => client.removeParticipant(room,p.identity)));
+  } catch (error) {
+    const line = entry("warn","voice_revoke_failed",{incident,...errorFields(error)});
     after(() => ship([line]));
   }
 }

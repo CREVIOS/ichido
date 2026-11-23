@@ -1,4 +1,5 @@
 "use client";
+import { VoiceIntake } from "@/components/VoiceIntake";
 import { Human } from "./human";
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { cmd } from "@/lib/supabase";
@@ -63,6 +64,7 @@ export default function CallerPage() {
       {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
       {card.notice && <CallerNotice code={card.notice} lang={lang} />}
       <DisasterNotice station={card.station} lang={lang} />
+      {frontline && !card.text_only && turns.some(t => t.speaker==="caller" && t.wording==="start") && <VoiceIntake key={generation + lang} generation={generation} handler={card.handler} lang={lang} />}
       {frontline && draft && <Conversation key={generation} turns={turns} card={card} draft={draft} lang={lang} refresh={load} />}
       {!frontline && !confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}
       {!frontline && confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}

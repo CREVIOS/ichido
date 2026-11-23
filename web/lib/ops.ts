@@ -1,5 +1,6 @@
 import "server-only";
 import { OPERATOR_PROMISES, PROMISE_MINUTES } from "@/content/catalogue";
+import { revokeAgentAudio } from "./livekit";
 import { fail, priv, rpc, type Actor } from "@/lib/server";
 
 // Operator commands for the real-world paths in content/ops.ts: fraud mode, the mass-incident broadcast, promises,
@@ -69,6 +70,7 @@ export const OPS_COMMANDS: Record<string, (a: Actor, b: Body) => Promise<object>
   async takeover(a, b) {
     const op = operator(a);
     await rpc("frontline_takeover", { p_epoch: Number.isInteger(b.epoch) ? b.epoch : null, p_uid: op.uid, p_name: op.name, p_incident: id(b, "incident") });
+    await revokeAgentAudio(id(b,"incident"));
     return {};
   },
 };

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
+import { VoiceIntake } from "@/components/VoiceIntake";
 import { Notice, Panel } from "@/components/kit";
 import { useLive } from "@/lib/live";
 import { cmd } from "@/lib/supabase";
@@ -35,6 +36,7 @@ export function FrontlineMonitor({ desk }: { desk: Desk }) {
   useLive(["frontline_turn","frontline_translation","desk"],load);
   return <Panel title={FRONT_DESK.monitor}>
     {desk.transfer_reason && <p>{FRONT_DESK.transfer} · P{desk.priority} · {FRONT_DESK.reasons[desk.transfer_reason]}</p>}
+    {desk.lang && desk.lang !== "ne" && !desk.text_only && turns.some(t => t.wording==="start") && <VoiceIntake key={desk.id + desk.lang} lang="ja" monitor={desk.id} />}
     {error && <Notice tone="warn">{error}</Notice>}
     <ol className="grid gap-3">{turns.map((t) => {
       if (t.wording === "start") return <li key={t.seq} className="text-sm text-muted-foreground">{FRONT_DESK.event} · {FRONT_DESK.consent}</li>;

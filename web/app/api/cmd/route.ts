@@ -11,7 +11,7 @@ import { createHandoff, listHandoffs, revokeHandoff, partnerReport } from "@/lib
 import * as training from "@/lib/training";
 import * as faults from "@/lib/faults";
 import { signSpeech } from "@/lib/speech";
-import { closeVoice } from "@/lib/livekit";
+import { closeVoice, revokeAgentAudio } from "@/lib/livekit";
 import { actorFrom, authorize, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
 import { COMMANDS } from "@/lib/rbac";
 import { requestLog, errorFields, entry, ship } from "@/lib/log";
@@ -219,6 +219,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async claim(a, b) {
     const op = staff(a, "operator");
     await rpc("cmd_claim", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident") });
+    await revokeAgentAudio(str(b,"incident"));
     return {};
   },
 
@@ -320,6 +321,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const lang = str(b, "lang");
     if (!(LANGS as readonly string[]).includes(lang)) fail(400, "bad_request");
     await rpc("cmd_set_lang", { p_uid: c.uid, p_lang: lang });
+    if (c.voiceRoom && c.incident && c.lang !== lang) await closeVoice(c.incident,c.voiceRoom);
     return {};
   },
 
@@ -349,6 +351,16 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
+  async voice_end(a,b) {
+    const c = caller(a);
+    await rpc("voice_end",{p_uid:c.uid,p_generation:str(b,"generation"),p_session:str(b,"session")});
+    return {};
+  },
+  async voice_failure(a,b) {
+    const c = caller(a);
+    await rpc("voice_failure",{p_uid:c.uid,p_generation:str(b,"generation")});
+    return {};
+  },
   async human(a) {
     const c = caller(a);
     await rpc("cmd_human", { p_uid: c.uid });

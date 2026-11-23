@@ -50,7 +50,7 @@ export type Access = Permission | "any" | "caller";
 export const COMMANDS: Record<string, Access> = {
   me: "any", mine: "any", caller_screen: "any", ack_allergy: "field:act", assisted_intake: "case:act", assisted_delivery: "case:act",
   // Caller
-  frontline_turn: "caller", pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
+  voice_failure: "caller", voice_end: "caller", frontline_turn: "caller", pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
   rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller",
   // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
   push_key: "any", push_subscribe: "any", push_unsubscribe: "any",

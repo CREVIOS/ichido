@@ -55,12 +55,12 @@ async function read(s: Submitted, text: string) {
   }
   let transfer = safety.status === "fulfilled" ? safety.value : null;
   if (taps?.ask.length) transfer = { priority: 0, reason: "suspected_risk" };
-  else if (!transfer && failed) transfer = { priority: 2, reason: "provider" };
+  else if (!transfer && (failed || !process.env.OPENAI_API_KEY)) transfer = { priority: 2, reason: "provider" };
   else if (!transfer && (patch?.clarify || taps?.clarify || (pack && taps && !taps.situation && !taps.taps.length))) transfer = { priority: 2, reason: "unclear" };
   return { facts, taps, transfer };
 }
 
-export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
+export async function frontlineTurn(a: Caller, body: Record<string, unknown>, voiceScope?: Record<string, unknown>) {
   if (!a.incident || !a.voiceRoom || !a.lang) return fail(403, "forbidden");
   const { act, request_id: request, base_rev: rev } = body;
   if (typeof act !== "string" || !ACTS.has(act) || typeof request !== "string" || !UUID.test(request) || !Number.isInteger(rev)) return fail(400, "bad_request");
@@ -85,7 +85,7 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
   }
   const args = { p_uid: a.uid, p_generation: a.voiceRoom, p_request: request };
   const words = checked.withheld ? null : text || null;
-  const s = await rpc<Submitted>("frontline_submit", { ...args, p_rev: rev, p_act: checked.withheld ? "withheld" : act,
+  const s = await rpc<Submitted>(voiceScope ? "voice_submit" : "frontline_submit", { ...(voiceScope && {p_scope:voiceScope}), ...args, p_rev: rev, p_act: checked.withheld ? "withheld" : act,
     p_words: words, p_facts: facts, p_priority: transfer?.priority ?? null, p_reason: transfer?.reason ?? null });
   if (s.replay) return { replay: true, withheld: s.act === "withheld" };
   if (words && s.locale !== "ja") after(() => translate(s.seq, words));
@@ -103,7 +103,7 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
     transfer = result.transfer;
   }
   if (!transfer && wording !== "SHELTER_INFO" && !conversationText(checked.withheld ? "withheld" : "readback", s.locale)?.trim()) transfer = { priority: 2, reason: "unclear" };
-  const delivered = await rpc<boolean>("frontline_finish", { ...args, p_wording: wording, p_patch: patch, p_triage: taps,
+  const delivered = await rpc<boolean>(voiceScope ? "voice_finish" : "frontline_finish", { ...(voiceScope && {p_scope:voiceScope}), ...args, p_wording: wording, p_patch: patch, p_triage: taps,
     p_priority: transfer?.priority ?? null, p_reason: transfer?.reason ?? null, p_manual: MANUAL_VERSION });
   return { delivered, withheld: checked.withheld };
 }

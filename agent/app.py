@@ -1,19 +1,4 @@
-"""Ichido intake voice agent (LiveKit Agents).
-
-Speech in, text out: the agent transcribes the caller in their language (Soniox) and publishes the
-transcript to the room. The web app turns each final transcript into a draft the caller confirms.
-The agent speaks (ElevenLabs) only fresh text the web server signed for this room and caller,
-relayed by the caller's client on `ichido.say`; anything else is ignored.
-It never runs a conversational LLM, never decides anything, and never asks for numbers.
-
-Audio: LiveKit background voice cancellation (BVC, LiveKit Cloud only) cleans the caller's microphone, and
-the multilingual turn detector ends Japanese, English and Indonesian turns; Bengali and Vietnamese use Silero VAD
-endpointing. Nepali has no voice path: Soniox cannot transcribe it, so the web app never asks for an agent in Nepali. Both
-are optional: without the plugin or its downloaded model files the agent runs on VAD endpointing alone.
-
-Logs: structured events on the "ichido-agent" logger (job start/end, STT and TTS timings, spoken and
-rejected speech requests, errors) with room, locale, sizes and timings only, never transcripts or spoken text.
-"""
+"""Ichido voice intake. Only committed, server-signed catalogue speech reaches TTS."""
 
 import asyncio
 import base64
@@ -23,6 +8,9 @@ import logging
 import os
 import re
 import time
+import uuid
+
+import aiohttp
 
 from dotenv import load_dotenv
 from livekit import rtc
@@ -75,7 +63,7 @@ SAY_WINDOW_S = 30
 BRIDGE_SECRET = os.getenv("AGENT_BRIDGE_SECRET", "").encode()
 
 
-def signed_text(room: str, sender: str, payload: str, seen: dict[str, int]) -> str | None:
+def signed_text(room: str, sender: str, payload: str, seen: dict[str, int], scope=None) -> str | None:
     """Verify and consume a read-back in this room's agent session."""
     if not BRIDGE_SECRET:
         return None
@@ -90,7 +78,14 @@ def signed_text(room: str, sender: str, payload: str, seen: dict[str, int]) -> s
             or not isinstance(sig, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", sig)):
         return None
     try:
-        message = f"ichido-say/2\n{room}\n{sender}\n{issued}\n{nonce}\n{text}".encode()
+        version = "2"
+        if scope is not None:
+            seq = msg.get("seq")
+            if (type(seq) is not int or seq <= 0 or msg.get("lang") != scope["lang"]
+                    or type(msg.get("epoch")) is not int or msg["epoch"] != scope["epoch"]):
+                return None
+            version = f"3\n{seq}\n{scope['lang']}\n{scope['epoch']}"
+        message = f"ichido-say/{version}\n{room}\n{sender}\n{issued}\n{nonce}\n{text}".encode()
     except UnicodeEncodeError:
         return None
     expected = base64.urlsafe_b64encode(hmac.digest(BRIDGE_SECRET, message, "sha256")).rstrip(b"=").decode()
@@ -102,6 +97,68 @@ def signed_text(room: str, sender: str, payload: str, seen: dict[str, int]) -> s
         return None
     seen[nonce] = issued + SAY_WINDOW_S
     return text
+
+
+class FrontlineAgent(Agent):
+    def __init__(self, scope, request):
+        super().__init__(instructions="Use the committed catalogue turn.")
+        self.scope = scope
+        self.request = request
+        self.seen = {}
+        self.pending_speech = None
+        self.playback = None
+        self.interruptions = 0
+        self.submitting = False
+
+    async def on_user_turn_completed(self, turn_ctx, new_message):
+        # The SDK skips the default reply pipeline without an LLM. Invoke our server node on the final only.
+        turn_ctx.items.append(new_message)
+        self.submitting = True
+        try:
+            await self.llm_node(turn_ctx, [], None)
+        finally:
+            self.submitting = False
+
+    async def llm_node(self, chat_ctx, tools, model_settings):
+        message = chat_ctx.items[-1]
+        request_id = str(uuid.uuid5(uuid.NAMESPACE_URL, self.scope["job"] + "/" + message.id))
+        generation = self.interruptions
+        try:
+            result = await self.request("turn", request_id=request_id, text=message.text_content)
+            if generation == self.interruptions:
+                await self.play(result.get("say"))
+        except (aiohttp.ClientError, TimeoutError):
+            await self.request("failure")
+
+    def interrupt(self):
+        self.interruptions += 1
+        if self.pending_speech is not None:
+            self.session.interrupt(force=True)
+
+    async def play(self, envelope):
+        if not envelope or self.pending_speech is not None:
+            return
+        room = "case-" + self.scope["generation"]
+        text = signed_text(room, "c-" + self.scope["uid"], json.dumps(envelope), self.seen, self.scope)
+        if not text:
+            return
+        seq = envelope["seq"]
+        self.pending_speech = seq
+        generation = self.interruptions
+        try:
+            await self.request("play", seq=seq)
+            if generation != self.interruptions or int(time.time()) >= envelope["issued"] + SAY_WINDOW_S:
+                await self.request("partial", seq=seq)
+                return
+            self.playback = None
+            handle = self.session.say(text, allow_interruptions=True, add_to_chat_ctx=False)
+            await handle.wait_for_playout()
+            played = self.playback
+            full = (played and played.playback_position > 0 and not played.interrupted and not handle.interrupted
+                    and handle.exception() is None and generation == self.interruptions)
+            await self.request("full" if full else "partial", seq=seq)
+        finally:
+            self.pending_speech = None
 
 
 async def read_bounded(reader: rtc.TextStreamReader) -> str | None:
@@ -176,7 +233,9 @@ async def intake(ctx: JobContext) -> None:
     if not BRIDGE_SECRET:
         raise RuntimeError("AGENT_BRIDGE_SECRET is not set: the agent would have nothing it may speak")
     meta = json.loads(ctx.job.metadata or "{}")
-    locale = meta.get("locale") if meta.get("locale") in VOICES else "bn-BD"
+    locale = meta.get("locale", "bn-BD")
+    if locale not in VOICES:
+        raise ValueError("Unsupported voice language")
     room = ctx.room.name
     if not re.fullmatch(r"case-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", room):
         raise ValueError("Invalid intake room")
@@ -189,13 +248,13 @@ async def intake(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(on_end)
     try:
-        await run_intake(ctx, room, locale)
+        await run_intake(ctx, room, locale, meta.get("scope"))
     except Exception as e:
         log.error("job_failed", extra={"event": "job_failed", "room": room, "error": type(e).__name__})
         raise RuntimeError("Voice intake failed") from None
 
 
-async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
+async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> None:
     await ctx.connect()
 
     turn_model = use_turn_model(locale, ctx.proc.userdata.get("turn_model_ready", False))
@@ -204,7 +263,7 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
                                    "turn_detection": "multilingual" if turn_model else "vad", "noise_cancellation": nc is not None})
 
     session = AgentSession(
-        turn_handling={"turn_detection": MultilingualModel() if turn_model else "vad"},
+        turn_handling={"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": False},
         stt=make_stt(locale),
         tts=make_tts(locale),
         vad=ctx.proc.userdata["vad"],
@@ -243,7 +302,61 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
         pending.add(task)
         task.add_done_callback(pending.discard)
 
-    ctx.room.register_text_stream_handler("ichido.say", on_say)
+    front = None
+    if scope is None:
+        ctx.room.register_text_stream_handler("ichido.say", on_say)
+    else:
+        if scope["lang"] != LANGS[locale] or room != "case-" + scope["generation"]:
+            raise ValueError("Invalid voice scope")
+        scope = {**scope, "job": ctx.job.id}
+        endpoint = os.environ["FRONTLINE_URL"]
+        http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12))
+
+        async def request(action, **fields):
+            raw = json.dumps({"scope": scope, "action": action, **fields}, separators=(",", ":")).encode()
+            issued = str(int(time.time()))
+            sig = hmac.digest(BRIDGE_SECRET, b"ichido-job/1\n" + issued.encode() + b"\n" + raw, "sha256").hex()
+            async with http.post(endpoint, data=raw, allow_redirects=False, headers={
+                "Content-Type": "application/json", "x-issued": issued, "x-job-signature": sig,
+            }) as response:
+                response.raise_for_status()
+                return await response.json()
+
+        front = FrontlineAgent(scope, request)
+
+        @session.on("user_state_changed")
+        def on_user_state(ev):
+            if ev.new_state == "speaking":
+                front.interrupt()
+
+        async def watch():
+            try:
+                while True:
+                    state = await request("state")
+                    if front.pending_speech and state["seq"] != front.pending_speech:
+                        front.interrupt()
+                    if state.get("say") and not front.pending_speech and not front.submitting:
+                        task = asyncio.create_task(front.play(state["say"]))
+                        pending.add(task)
+                        task.add_done_callback(played)
+                    await asyncio.sleep(0.4 if front.pending_speech else 0.8)
+            except (aiohttp.ClientError, TimeoutError):
+                front.interrupt()
+                ctx.shutdown("voice grant ended")
+
+        def played(task):
+            pending.discard(task)
+            if not task.cancelled() and task.exception() is not None:
+                front.interrupt()
+                ctx.shutdown("delivery ended")
+
+        async def cleanup():
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*list(pending), return_exceptions=True)
+            await http.close()
+
+        ctx.add_shutdown_callback(cleanup)
 
     @session.on("metrics_collected")
     def on_metrics(ev: MetricsCollectedEvent) -> None:
@@ -258,16 +371,28 @@ async def run_intake(ctx: JobContext, room: str, locale: str) -> None:
 
     @session.on("error")
     def on_error(ev: ErrorEvent) -> None:
+        if front and isinstance(ev.source, soniox.STT):
+            task = asyncio.create_task(request("failure"))
+            pending.add(task)
+            task.add_done_callback(played)
+        if front and isinstance(ev.source, elevenlabs.TTS):
+            front.interrupt()
         # Type names only: provider error messages can echo request content.
         log.error("session_error", extra={"event": "session_error", "room": room, "source": type(ev.source).__name__,
                                           "error": type(ev.error).__name__, "recoverable": bool(getattr(ev.error, "recoverable", False))})
 
     await session.start(
-        Agent(instructions="Transcribe the caller. Do not reply on your own."),
+        front or Agent(instructions="Transcribe the caller. Do not reply on your own."),
         room=ctx.room,
-        room_options=room_io.RoomOptions(text_input=False, audio_input=room_io.AudioInputOptions(noise_cancellation=nc)),
+        room_options=room_io.RoomOptions(text_input=False, text_output=front is None,
+            **({"participant_identity": "c-" + scope["uid"]} if scope else {}),
+            audio_input=room_io.AudioInputOptions(noise_cancellation=nc)),
         record={"audio": False, "traces": False, "logs": False, "transcript": False, "redaction": True},
     )
+    if front:
+        session.output.audio.on("playback_finished", lambda ev: setattr(front, "playback", ev))
+        await ctx.wait_for_participant(identity="c-" + scope["uid"])
+        pending.add(asyncio.create_task(watch()))
 
 
 def ship_logs_to_betterstack() -> None:

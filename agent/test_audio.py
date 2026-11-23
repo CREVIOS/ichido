@@ -101,3 +101,34 @@ class NeverRepliesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class FrontlinePlaybackTest(unittest.IsolatedAsyncioTestCase):
+    def agent(self):
+        self.request = mock.AsyncMock(return_value={})
+        self.front = app.FrontlineAgent({"uid":"u","generation":"g","job":"job","lang":"en","epoch":2}, self.request)
+        self.session = mock.Mock()
+        self.enterContext(mock.patch.object(app.FrontlineAgent, "session", new_callable=mock.PropertyMock, return_value=self.session))
+        self.enterContext(mock.patch.object(app, "signed_text", return_value="Approved"))
+        return self.front
+
+    async def test_barge_in_stops_playout_and_records_partial(self):
+        front = self.agent()
+        handle = self.session.say.return_value
+        handle.wait_for_playout = mock.AsyncMock(side_effect=front.interrupt)
+        await front.play({"seq":1,"issued":int(app.time.time())})
+        self.session.interrupt.assert_called_once_with(force=True)
+        self.request.assert_awaited_with("partial",seq=1)
+
+    async def test_revoked_before_synthesis(self):
+        front = self.agent()
+        self.request.side_effect = app.aiohttp.ClientError()
+        with self.assertRaises(app.aiohttp.ClientError):
+            await front.play({"seq":1,"issued":int(app.time.time())})
+        self.session.say.assert_not_called()
+
+    async def test_duplicate_final_keeps_request_id(self):
+        front = self.agent()
+        ctx = mock.Mock(items=[mock.Mock(id="final-1",text_content="My question")])
+        await front.llm_node(ctx, [], None)
+        await front.llm_node(ctx, [], None)
+        self.assertEqual(self.request.await_args_list[0],self.request.await_args_list[1])
