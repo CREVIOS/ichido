@@ -12,6 +12,7 @@ import { CaseAlerts } from "./alerts";
 import { BotReminders } from "./bot";
 import { MassBanner, PromiseAlerts, incidentOrder } from "./ops";
 import { CaseView } from "./case";
+import { DisasterProposals } from "@/components/disaster-proposals";
 import { Peers, Queue, useClock, useQueueKeys } from "./queue";
 import type { Desk, OpenDesk, Run, Station, Targets } from "./types";
 
@@ -132,6 +133,7 @@ function Console({ me }: { me: Me }) {
       </>}
     >
       <MassBanner open={open} />
+      <DisasterProposals label={label} />
       {failed && <Notice tone="warn">{CASES.loadError}</Notice>}
       {current
         ? <CaseView key={current.id} d={current} me={me} run={run} />

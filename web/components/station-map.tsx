@@ -1,7 +1,7 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useMemo, useState } from "react";
-import Map, { Marker, NavigationControl, Popup } from "react-map-gl/maplibre";
+import Map, { Layer, Marker, NavigationControl, Popup, Source } from "react-map-gl/maplibre";
 import { setWorkerUrl } from "maplibre-gl";
 import { Truck } from "lucide-react";
 import { Pill } from "@/components/charts";
@@ -26,9 +26,19 @@ const DOT = { online: "bg-[oklch(0.62_0.13_155)]", stale: "bg-[oklch(0.78_0_0)] 
 const DISASTER_DOT = "bg-[oklch(0.55_0.2_27)] ring-4 ring-[oklch(0.6_0.2_27/0.25)]";
 const MOBILE_DOT = "bg-[oklch(0.5_0.12_255)]";
 
+// GSI designated evacuation sites (public.shelter_site), drawn as one native circle layer (hundreds of points).
+export type MapShelter = { id: string; name: string; lat: number; lng: number; hazards: string[]; designated_shelter: boolean };
+const SHELTER_COLOUR = "oklch(0.55 0.13 165)";
+const SHELTER_LAYER = "shelter-sites";
+
 // onToggle: clicking a marker adds or removes the station from the selection (disaster area); otherwise it opens a popup.
-export function StationMap({ stations, onToggle }: { stations: MapStation[]; onToggle?: (id: string) => void }) {
+export function StationMap({ stations, onToggle, shelters }: { stations: MapStation[]; onToggle?: (id: string) => void; shelters?: MapShelter[] }) {
   const [sel, setSel] = useState<string | null>(null);
+  const [site, setSite] = useState<MapShelter | null>(null);
+  const sites = useMemo(() => ({
+    type: "FeatureCollection" as const,
+    features: (shelters ?? []).map((s) => ({ type: "Feature" as const, properties: { id: s.id }, geometry: { type: "Point" as const, coordinates: [s.lng, s.lat] } })),
+  }), [shelters]);
   const view = useMemo(() => {
     if (!stations.length) return { latitude: 32.75, longitude: 129.87, zoom: 11 };
     const lat = stations.reduce((a, s) => a + s.lat, 0) / stations.length;
@@ -38,8 +48,25 @@ export function StationMap({ stations, onToggle }: { stations: MapStation[]; onT
   const picked = stations.find((s) => s.id === sel);
   return (
     <div className="relative h-[340px] w-full overflow-hidden border-b">
-      <Map initialViewState={view} mapStyle={MAP_STYLE} attributionControl={{ compact: true }} style={{ width: "100%", height: "100%" }}>
+      <Map initialViewState={view} mapStyle={MAP_STYLE} attributionControl={{ compact: true }} style={{ width: "100%", height: "100%" }}
+        interactiveLayerIds={shelters?.length ? [SHELTER_LAYER] : undefined}
+        onClick={(e) => { const id = e.features?.[0]?.properties?.id; setSite(shelters?.find((s) => s.id === id) ?? null); }}>
         <NavigationControl position="top-right" showCompass={false} />
+        {shelters?.length ? (
+          <Source id={SHELTER_LAYER} type="geojson" data={sites} attribution={DISASTER_STAFF.shelterSource}>
+            <Layer id={SHELTER_LAYER} type="circle" paint={{ "circle-radius": 4.5, "circle-color": SHELTER_COLOUR, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 }} />
+          </Source>
+        ) : null}
+        {site && (
+          <Popup latitude={site.lat} longitude={site.lng} anchor="bottom" offset={8} onClose={() => setSite(null)} closeButton={false} className="[&_.maplibregl-popup-content]:rounded-lg [&_.maplibregl-popup-content]:p-3 [&_.maplibregl-popup-content]:shadow-md">
+            <div className="flex max-w-60 flex-col gap-1.5 text-[13px]">
+              <span className="text-foreground">{site.name}</span>
+              <span className="text-[12px]">{DISASTER_STAFF.shelterPopup(site.hazards.map((h) => DISASTER_STAFF.hazard[h] ?? h).join("・"))}</span>
+              {site.designated_shelter && <Pill tone="guided" className="self-start">{DISASTER_STAFF.shelterStay}</Pill>}
+              <span className="text-[12px] text-muted-foreground">{DISASTER_STAFF.shelterNote}</span>
+            </div>
+          </Popup>
+        )}
         {stations.map((s) => (
           <Marker key={s.id} latitude={s.lat} longitude={s.lng} anchor="center" onClick={(e) => { e.originalEvent.stopPropagation(); setSel(s.id); onToggle?.(s.id); }}>
             <button type="button" aria-label={s.label} aria-pressed={onToggle ? Boolean(s.selected) : undefined} className="relative grid place-items-center">
@@ -67,6 +94,7 @@ export function StationMap({ stations, onToggle }: { stations: MapStation[]; onT
         {([["online", DOT.online], ["offline", DOT.stale], ["disaster", DISASTER_DOT], ["mobile", MOBILE_DOT]] as const).map(([k, c]) => (
           <span key={k} className="inline-flex items-center gap-1.5"><span className={cn("size-2.5 rounded-full", c)} />{DISASTER_STAFF.legend[k]}</span>
         ))}
+        {shelters?.length ? <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full" style={{ background: SHELTER_COLOUR }} />{DISASTER_STAFF.legend.shelter}</span> : null}
       </div>
     </div>
   );

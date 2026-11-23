@@ -13,8 +13,9 @@ import { cn } from "@/lib/utils";
 import { can } from "@/lib/rbac";
 import { DISASTER_STAFF, PACKS, PACK_DESK, PACK_IDS, STATIONS, packOfKind, type L10n, type PackId } from "@/content/catalogue";
 import { PACK_ICON } from "@/components/pack-icon";
-import type { MapStation } from "@/components/station-map";
+import type { MapShelter, MapStation } from "@/components/station-map";
 import { DisasterPanel } from "./disaster";
+import { DisasterProposals } from "@/components/disaster-proposals";
 
 // MapLibre needs the browser; load it only there.
 const StationMap = dynamic(() => import("@/components/station-map").then((m) => m.StationMap), { ssr: false, loading: () => <div className="h-[340px] border-b bg-secondary" /> });
@@ -43,6 +44,7 @@ function Board({ me }: { me: Me }) {
   const [pack, setPack] = useState<PackId | "all">("all");
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const now = useNow(10_000);
+  const sites = useShelterSites(stations);
   const load = useCallback(async () => {
     const db = sb();
     const [s, h, d] = await Promise.all([
@@ -64,8 +66,13 @@ function Board({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={STATIONS.title}>
       <p className="border-b px-5 py-3 text-[13px] text-muted-foreground lg:px-6">{PACK_DESK.stationsLead}</p>
-      <PackFilter value={pack} onChange={setPack} counts={stations.reduce<Record<string, number>>((a, s) => ({ ...a, [packOfKind(s.kind)]: (a[packOfKind(s.kind)] ?? 0) + 1 }), {})} />
-      <StationMap onToggle={toggle} stations={shown.filter((s) => s.lat != null && s.lng != null).map((s): MapStation => {
+      <PackFilter value={pack} onChange={setPack} counts={stations.reduce<Record<string, number>>((a, s) => ({ ...a, [packOfKind(s.kind)]: (a[packOfKind(s.kind)] ?? 0) + 1 }), {})}>
+        <label className="ml-auto inline-flex items-center gap-2 text-[13px] text-muted-foreground">
+          <input type="checkbox" checked={sites.on} onChange={(e) => sites.set(e.target.checked)} className="size-4 accent-foreground" />{DISASTER_STAFF.shelters}
+        </label>
+      </PackFilter>
+      <DisasterProposals label={Object.fromEntries(stations.map((s) => [s.id, s.label.ja]))} />
+      <StationMap onToggle={toggle} shelters={sites.on ? sites.rows : undefined} stations={shown.filter((s) => s.lat != null && s.lng != null).map((s): MapStation => {
         const h = health[s.id];
         const age = h ? Math.round((now - Date.parse(h.last_seen)) / 1000) : null;
         return {
@@ -112,7 +119,7 @@ function Board({ me }: { me: Me }) {
 }
 
 // Station types (scenario packs): filter the map and the list to one.
-function PackFilter({ value, onChange, counts }: { value: PackId | "all"; onChange: (v: PackId | "all") => void; counts: Record<string, number> }) {
+function PackFilter({ value, onChange, counts, children }: { value: PackId | "all"; onChange: (v: PackId | "all") => void; counts: Record<string, number>; children?: React.ReactNode }) {
   const chip = (on: boolean) => cn("inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[13px] transition-colors", on ? "border-foreground/30 bg-card text-foreground" : "text-muted-foreground hover:bg-accent");
   return (
     <div className="flex flex-wrap items-center gap-2 border-b px-5 py-2.5 lg:px-6" role="radiogroup" aria-label={PACK_DESK.pack}>
@@ -125,8 +132,26 @@ function PackFilter({ value, onChange, counts }: { value: PackId | "all"; onChan
           </button>
         );
       })}
+      {children}
     </div>
   );
+}
+
+// GSI designated evacuation sites around the stations, loaded once the layer is switched on (staff read them by RLS).
+const MARGIN_DEG = 0.1;
+function useShelterSites(stations: Station[]) {
+  const [on, set] = useState(false);
+  const [rows, setRows] = useState<MapShelter[]>([]);
+  const placed = stations.filter((s) => s.lat != null && s.lng != null);
+  const box = placed.length ? [Math.min(...placed.map((s) => s.lat!)), Math.max(...placed.map((s) => s.lat!)), Math.min(...placed.map((s) => s.lng!)), Math.max(...placed.map((s) => s.lng!))].join(",") : "";
+  useEffect(() => {
+    if (!on || !box) return;
+    const [s, n, w, e] = box.split(",").map(Number);
+    void sb().from("shelter_site").select("id, name, lat, lng, hazards, designated_shelter")
+      .gte("lat", s - MARGIN_DEG).lte("lat", n + MARGIN_DEG).gte("lng", w - MARGIN_DEG).lte("lng", e + MARGIN_DEG).limit(1000)
+      .then(({ data }) => setRows((data ?? []) as MapShelter[]));
+  }, [on, box]);
+  return { on, set, rows };
 }
 
 function PackBadge({ pack }: { pack: PackId }) {

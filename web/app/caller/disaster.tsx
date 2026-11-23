@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
-import { MapPin, Truck, TriangleAlert } from "lucide-react";
+import { MapPin, Mountain, Truck, TriangleAlert } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { DISASTER, DISASTER_NOTICES, km, pick, type L10n, type Lang } from "@/content/catalogue";
 
 type Nearby = { id: string; label: L10n; kind: string; hours: L10n | null; distance_m: number };
-type Info = { notice: string | null; nearby: Nearby[] };
+type Site = { name: string; address: string | null; distance_m: number };
+type Info = { notice: string | null; nearby: Nearby[]; sites: Site[] };
 
 // The bank's approved emergency notice while this caller's station is in a disaster area, and where to go instead.
 // The station row (readable by its paired caller) says whether; the server works out the nearest working Help Points,
@@ -20,7 +21,10 @@ export function DisasterNotice({ station, lang }: { station: string; lang: Lang 
     const stamp = key && `${key}:${Math.floor(Date.now() / 60_000)}`;
     if (stamp === asked.current) return;
     asked.current = stamp;
-    setInfo(key ? await cmd<Info>("disaster_info").catch(() => null) : null);
+    if (!key) return setInfo(null);
+    // Designated evacuation sites for this station's hazard, only through caller_shelters() (never the table).
+    const [info, sites] = await Promise.all([cmd<Info>("disaster_info").catch(() => null), sb().rpc("caller_shelters", { p_limit: 3 })]);
+    setInfo(info && { ...info, sites: (sites.data ?? []) as Site[] });
   }, [station]);
   useLive(["station"], load, true, { station });
   const notice = info?.notice ? DISASTER_NOTICES[info.notice] : undefined;
@@ -47,6 +51,19 @@ export function DisasterNotice({ station, lang }: { station: string; lang: Lang 
           })}
         </ul>
       ) : <p className="text-[14px]">{DISASTER.none[lang]}</p>}
+      {info.sites.length > 0 && <>
+        <span className="pt-1 text-[13px] text-muted-foreground">{DISASTER.shelters[lang]}</span>
+        <ul className="flex flex-col gap-1.5">
+          {info.sites.map((s) => (
+            <li key={`${s.name}:${s.distance_m}`} className="surface flex items-start gap-2.5 p-3">
+              <Mountain className="mt-0.5 size-4 shrink-0 stroke-[1.5]" />
+              <span lang="ja" className="min-w-0 flex-1 text-[15px] text-foreground">{s.name}</span>
+              <span className="num shrink-0 text-[13px] text-muted-foreground">{km(s.distance_m)}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[13px] leading-5 text-muted-foreground">{DISASTER.sheltersNote[lang]} {DISASTER.sheltersSource[lang]}</p>
+      </>}
     </section>
   );
 }

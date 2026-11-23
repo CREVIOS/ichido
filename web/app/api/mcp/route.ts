@@ -5,6 +5,7 @@ import { actorFrom, reply } from "@/lib/server";
 import { can } from "@/lib/rbac";
 import { eligibleReplies } from "@/lib/case-tools";
 import { suggest } from "@/lib/decide";
+import { nearestShelters } from "@/lib/nearest";
 import { boundedText, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 
@@ -59,6 +60,25 @@ const handler = createMcpHandler((server) => {
       const dev = (h.data ?? []).find((y) => y.station === x.id);
       return { station: x.id, label: x.label, device: dev ? { ...dev, seconds_since_heartbeat: Math.round((Date.now() - Date.parse(dev.last_seen)) / 1000) } : null, open_cases: (d.data ?? []).filter((y) => y.station === x.id).length };
     }));
+  });
+
+  server.registerTool("nearest_shelters", {
+    title: "Nearest designated evacuation sites",
+    description: "GSI designated evacuation sites (指定緊急避難場所) supporting a hazard, nearest a point or a station first. Designated, not necessarily open: opening is announced by the city and shelter staff.",
+    inputSchema: z.object({
+      hazard: z.enum(["flood", "landslide", "storm_surge", "earthquake", "tsunami", "fire", "inland_flood", "volcano"]),
+      station: z.string().max(64).optional().describe("Station id; its location is used"),
+      lat: z.number().min(-90).max(90).optional(), lng: z.number().min(-180).max(180).optional(),
+      limit: z.number().int().min(1).max(10).default(5),
+    }), annotations: READ,
+  }, async ({ hazard, station, lat, lng, limit }, ctx) => {
+    const db = asUser(who(ctx.http?.authInfo?.extra).token);
+    const here = station ? (await db.from("station").select("lat, lng").eq("id", station).maybeSingle()).data : lat != null && lng != null ? { lat, lng } : null;
+    if (here?.lat == null || here.lng == null) throw new Error("bad_request: give a located station or lat and lng");
+    const { data, error } = await db.from("shelter_site").select("id, name, address, municipality, lat, lng, hazards, designated_shelter, source, source_date")
+      .contains("hazards", [hazard]).gte("lat", here.lat - 0.1).lte("lat", here.lat + 0.1).gte("lng", here.lng - 0.12).lte("lng", here.lng + 0.12).limit(1000);
+    if (error) throw new Error(error.code ?? "query_failed");
+    return json(nearestShelters(here.lat, here.lng, hazard, data ?? [], limit));
   });
 
   server.registerTool("insights", {
