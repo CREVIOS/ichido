@@ -31,7 +31,7 @@ function Queue({ me }: { me: Me }) {
     // Each open case carries its claim time and whether a reply exists, for the response-time targets.
     const [o, h, s, t] = await Promise.all([
       db.from("desk").select("*, reply(id), case_event(at)").is("finished_at", null)
-        .eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
+        .eq("reply.author", "human").eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
         .limit(1, { referencedTable: "case_event" }).limit(1, { referencedTable: "reply" }).order("created_at"),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY),
       db.from("station").select("id, label").order("id"),

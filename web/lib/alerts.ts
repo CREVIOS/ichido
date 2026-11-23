@@ -1,5 +1,6 @@
 import "server-only";
 import { generateRequestDetails } from "web-push";
+import { onlineOperators, preferredDesk, serviceMatch } from "./frontline-routing";
 import { PUSH, PUSH_UNKNOWN_PLACE } from "@/content/catalogue";
 import { admin, fail, rpc, type Actor } from "@/lib/server";
 import { entry, errorFields, ship } from "@/lib/log";
@@ -73,6 +74,18 @@ async function sendExpo(batch: { s: Sub; m: Message }[]): Promise<string[]> {
   return (out?.data ?? []).flatMap((t, i) => (t?.details?.error === "DeviceNotRegistered" && batch[i] ? [batch[i].s.id] : []));
 }
 
+async function serviceDesk(o: Outbox, subs: Sub[]) {
+  if (o.kind !== "new_case" || !o.incident || subs.length === 0) return subs;
+  const { data: desk } = await admin.from("desk").select("handler, fault, lang").eq("id", o.incident).maybeSingle().throwOnError();
+  if (desk?.handler !== "queued") return subs;
+  const { data: staff } = await admin.schema("ichido").from("staff").select("uid, service_packs, service_languages")
+    .eq("role", "operator").in("uid", [...new Set(subs.map((s) => s.uid))]).throwOnError();
+  const scored = staff.map((s) => ({ uid: s.uid, score: serviceMatch(s, desk.fault, desk.lang) })).filter((s) => s.score > 0);
+  if (!scored.length) return subs;
+  const preferred = preferredDesk(scored, await onlineOperators());
+  return preferred.size ? subs.filter((s) => preferred.has(s.uid)) : subs;
+}
+
 async function deliver(rows: Outbox[]) {
   const ids = [...new Set(rows.map((o) => o.station).filter(Boolean))] as string[];
   const { data: stations } = ids.length ? await admin.from("station").select("id, label").in("id", ids) : { data: [] };
@@ -84,8 +97,12 @@ async function deliver(rows: Outbox[]) {
     try {
       const { uids, roles } = recipients(o);
       if (!uids.length && !roles.length) continue;
-      const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
-      if (!subs.length) continue;
+      const active = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
+      if (!active.length) continue;
+      const subs = await serviceDesk(o, active).catch(async (error) => {
+        await ship([entry("warn", "frontline_route_failed", errorFields(error))]);
+        return active;
+      });
       const { data: staffRoles } = await admin.schema("ichido").from("staff").select("uid, role").in("uid", [...new Set(subs.map((s) => s.uid))]);
       const roleOf = new Map((staffRoles ?? []).map((r) => [r.uid as string, r.role as string]));
       const expo: { s: Sub; m: Message }[] = [];

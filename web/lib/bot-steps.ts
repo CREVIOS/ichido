@@ -29,7 +29,6 @@ const share = () => {
   return x > 0 && x < 1 ? x : 0.75;
 };
 const dueAfter = (start: string, targetS: number) => Date.parse(start) + Math.round(targetS * share() * 1000);
-const PRESENCE_WAIT_MS = 2000;
 
 async function log(step: string, incident: string, started: number, code: string, extra: Fields = {}, level: "info" | "warn" = "info") {
   const { ship, entry } = await lib();
@@ -61,21 +60,6 @@ export async function begin(incident: string) {
   if (error) throw error;
 }
 
-// Operators shown online in the console (Supabase Realtime presence, keyed by uid); null when presence is unavailable.
-async function onlineOperators(): Promise<Set<string> | null> {
-  const { admin } = await lib();
-  const ch = admin.channel("ichido:operator-presence", { config: { private: true } });
-  try {
-    return await new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), PRESENCE_WAIT_MS);
-      ch.on("presence", { event: "sync" }, () => { clearTimeout(timer); resolve(new Set(Object.keys(ch.presenceState()))); });
-      ch.subscribe((status) => { if (status !== "SUBSCRIBED") { clearTimeout(timer); resolve(null); } });
-    });
-  } finally {
-    await admin.removeChannel(ch);
-  }
-}
-
 // Suggest the operator with the fewest open claimed cases, preferring those online. Never claims on their behalf.
 export async function route(incident: string) {
   "use step";
@@ -87,6 +71,7 @@ export async function route(incident: string) {
     await setStep(incident, "route", "skipped", d?.operator_id ? "claimed" : "closed");
     return log("route", incident, t0, "skipped");
   }
+  const { onlineOperators, serviceMatch } = await import("@/lib/frontline-routing");
   const [ops, open, online] = await Promise.all([
     priv().from("staff").select("uid, display_name, service_packs, service_languages").eq("role", "operator").order("display_name"),
     admin.from("desk").select("operator_id").is("finished_at", null).not("operator_id", "is", null),
@@ -97,10 +82,8 @@ export async function route(incident: string) {
   const load = (uid: string) => (open.data ?? []).filter((x) => x.operator_id === uid).length;
   const here = (ops.data ?? []).filter((o) => online?.has(o.uid));
   const pool = here.length ? here : ops.data ?? [];
-  const { packOfFault } = await import("@/content/catalogue");
-  const pack = packOfFault(d.fault);
   const pick = pool.map((o) => ({ ...o, open: load(o.uid),
-    match: Number(o.service_packs.includes(pack)) * 2 + Number(d.lang && o.service_languages.includes(d.lang)),
+    match: serviceMatch(o, d.fault, d.lang),
   })).sort((a, b) => b.match - a.match || a.open - b.open)[0];
   if (!pick) {
     await setStep(incident, "route", "skipped", "no_operator");

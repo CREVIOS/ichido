@@ -33,7 +33,8 @@ export async function caseBot(incident: string) {
       await prepare(incident, prepared);
     }
 
-    const dues: number[] = [];
+    // Recheck DB-triggered transfers even when no client command wakes the hook.
+    const dues: number[] = s.handler === "ai" ? [s.now + 90_000] : [];
     if (reply !== "settled" && s.replyDue != null) {
       if (s.replied) {
         reply = "settled";

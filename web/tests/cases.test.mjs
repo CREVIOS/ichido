@@ -36,6 +36,7 @@ test("history export continues past full batches using both timestamp and ID", a
   let requests = 0;
   const db = createClient("http://localhost", "test", { global: { fetch: async (url) => {
     const params = new URL(url).searchParams;
+    assert.equal(params.get("reply.author"), "eq.human");
     assert.equal(params.get("reply.order"), "sent_at.asc");
     assert.equal(params.get("reply.limit"), "1");
     assert.equal(params.get("case_event.kind"), "eq.claimed");
