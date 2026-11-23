@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils";
 // Compact pane chrome for the review inbox and the sequence view: a 40px title bar, hairline 0.5px borders,
 // 22px bordered controls.
 
-export function TitleBar({ icon: Icon, title, children, className }: { icon: LucideIcon; title: ReactNode; children?: ReactNode; className?: string }) {
+export function TitleBar({ icon: Icon, title, children, className, as: Heading = "h1" }: { icon: LucideIcon; title: ReactNode; as?: "h1" | "h2"; children?: ReactNode; className?: string }) {
   return (
     <header className={cn("flex h-10 shrink-0 items-center gap-2 pr-2 pl-3.5", className)}>
       <Icon className="size-4 shrink-0 stroke-[1.5] text-foreground" aria-hidden />
-      <h1 className="min-w-0 truncate text-[13px] font-medium tracking-normal text-foreground">{title}</h1>
+      <Heading className="min-w-0 truncate text-sm font-medium tracking-normal text-foreground">{title}</Heading>
       {children}
     </header>
   );

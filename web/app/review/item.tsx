@@ -49,7 +49,7 @@ export function Detail({ item, pos, busy, move, decide, dismiss, primaryRef }: {
 
   return (
     <>
-      <TitleBar icon={Icon} title={`${item.station_label ?? item.station} · ${fault(item.fault)}`}>
+      <TitleBar as="h2" icon={Icon} title={`${item.station_label ?? item.station} · ${fault(item.fault)}`}>
         <span className="ml-auto flex items-center gap-1">
           <PaneButton aria-label={REVIEW.prev} title={REVIEW.prev} disabled={pos.at <= 0} onClick={() => move(-1)}><ChevronUp /></PaneButton>
           <PaneButton aria-label={REVIEW.next} title={REVIEW.next} disabled={pos.at >= pos.of - 1} onClick={() => move(1)}><ChevronDown /></PaneButton>

@@ -1,12 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Check, ListFilter, ScanText } from "lucide-react";
+import { Check, ListFilter } from "lucide-react";
 import { cmd } from "@/lib/supabase";
 import { REVIEW_KINDS, itemKey, useReviewQueue, type ReviewItem, type ReviewKind } from "@/lib/review";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Dot, Notice } from "@/components/kit";
-import { TitleBar } from "@/components/pane";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { CASES, REVIEW, staffError } from "@/content/catalogue";
@@ -95,25 +94,24 @@ function Inbox({ me }: { me: Me }) {
   const [phoneDetail,setPhoneDetail] = useState(false);
   const count = (items ?? []).filter((i) => !gone.has(itemKey(i))).length;
   return (
-    <AppShell bare nav={navFor(me.role)} footer={<MeFooter me={me} />} title={REVIEW.title}>
-      <div className="grid bg-pane lg:h-[calc(100dvh-1rem-2px)] lg:grid-cols-[280px_minmax(0,1fr)] lg:overflow-hidden lg:rounded-xl">
-        <aside hidden={phoneDetail && !!current} className="flex min-h-0 lg:!flex flex-col border-b-[0.5px] border-black/6 lg:border-r-[0.5px] lg:border-b-0">
-          <TitleBar icon={ScanText} title={REVIEW.title}>
-            <span className="num text-[11px] text-muted-foreground">{items ? count : "—"}</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="ml-auto grid size-[22px] place-items-center rounded-[5px] text-foreground hover:bg-black/4 aria-expanded:bg-black/4" aria-label={REVIEW.menu}>
-                <ListFilter className={cn("size-4 stroke-[1.5]", filter && "text-brand-strong")} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                {[null, ...REVIEW_KINDS].map((k) => (
-                  <DropdownMenuItem key={k ?? "all"} onClick={() => setFilter(k)}>
-                    <span className="flex-1">{k ? REVIEW.groups[k] : CASES.all}</span>{filter === k && <Check className="stroke-[1.5]" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TitleBar>
-          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 ">
+    <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={REVIEW.title} actions={<>
+      <span className="num text-sm text-muted-foreground">{items ? count : "—"}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="ml-auto grid size-11 place-items-center rounded-[5px] text-foreground hover:bg-black/4 aria-expanded:bg-black/4" aria-label={REVIEW.menu}>
+          <ListFilter className={cn("size-4 stroke-[1.5]", filter && "text-brand-strong")} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-44">
+          {[null, ...REVIEW_KINDS].map((k) => (
+            <DropdownMenuItem key={k ?? "all"} onClick={() => setFilter(k)}>
+              <span className="flex-1">{k ? REVIEW.groups[k] : CASES.all}</span>{filter === k && <Check className="stroke-[1.5]" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>}>
+      <div className="grid bg-pane lg:h-[calc(100dvh-4rem-2px)] lg:grid-cols-[280px_minmax(0,1fr)] lg:overflow-hidden lg:rounded-b-xl">
+        <aside hidden={phoneDetail && !!current} className="flex min-h-0 lg:!flex flex-col lg:border-r lg:border-border">
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-3">
             {failed && <div className="p-2"><Notice tone="warn">{REVIEW.loadError}</Notice></div>}
             {items?.length === 0 && <p className="px-2 py-3 text-[12px] leading-5 text-muted-foreground">{REVIEW.empty}</p>}
             {REVIEW_KINDS.map((k) => {
@@ -121,7 +119,7 @@ function Inbox({ me }: { me: Me }) {
               if (!rows.length) return null;
               return (
                 <section key={k} className="mb-2">
-                  <h2 className="flex h-7 items-center px-2 text-[12px] tracking-normal text-muted-foreground">{REVIEW.groups[k]}</h2>
+                  <h2 className="flex h-7 items-center px-2 text-sm tracking-normal text-muted-foreground">{REVIEW.groups[k]}</h2>
                   <div className="flex flex-col gap-0.5">
                     {rows.map((i) => <Row key={itemKey(i)} item={i} on={i === current} unread={!seen.has(itemKey(i))} now={now} onPick={() => {setSel(itemKey(i));setPhoneDetail(true);}} />)}
                   </div>
@@ -130,12 +128,12 @@ function Inbox({ me }: { me: Me }) {
             })}
           </div>
         </aside>
-        <main className={cn("min-w-0 flex-col lg:flex",phoneDetail && current ? "flex" : "hidden")}>
+        <section className={cn("min-w-0 flex-col lg:flex",phoneDetail && current ? "flex" : "hidden")}>
           <button type="button" className="min-h-11 self-start px-4 lg:hidden" onClick={() => setPhoneDetail(false)}>‹ {REVIEW.title}</button>
           {current
             ? <Detail key={itemKey(current)} item={current} pos={{ at, of: keys.length }} busy={busy} move={move} decide={decide} dismiss={dismiss} primaryRef={primaryRef} />
             : items && <div className="grid flex-1 place-items-center p-8"><p className="max-w-sm text-center text-[13px] text-muted-foreground">{list.length ? REVIEW.pick : REVIEW.empty}</p></div>}
-        </main>
+        </section>
       </div>
     </AppShell>
   );
@@ -149,13 +147,13 @@ function Row({ item, on, unread, now, onPick }: { item: ReviewItem; on: boolean;
       <Icon className="size-4 shrink-0 stroke-[1.5] text-foreground" aria-hidden />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-3">
-          <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{item.station_label ?? item.station}</span>
-          <span className={cn("num flex shrink-0 items-center gap-1.5 text-[11px] font-medium", unread ? "text-brand-strong" : "text-muted-foreground")}>
+          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.station_label ?? item.station}</span>
+          <span className={cn("num flex shrink-0 items-center gap-1.5 text-[13px] font-medium", unread ? "text-foreground" : "text-muted-foreground")}>
             {unread && <span className="size-1.5 rounded-full bg-brand" aria-hidden />}
             {REVIEW.ago(now - Date.parse(item.at))}
           </span>
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground">
           <Dot s={item.status} />
           <span className="truncate">{subtitle(item)}</span>
         </span>
