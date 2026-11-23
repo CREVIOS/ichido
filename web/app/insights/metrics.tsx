@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId, type ShiftCounts } from "@/content/catalogue";
 
-export type Insights = {
+export type Insights = ShiftCounts & {
   since: string;
   funnel: Record<string, number>;
   dispatched: number;

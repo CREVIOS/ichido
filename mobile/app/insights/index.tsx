@@ -6,7 +6,7 @@ import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Icon, IconButton, Notice, Screen, Segments, T } from "@/components/ui";
 import { DEFAULT_DAYS, METRICS, METRIC_KEYS, PERIODS, useInsights } from "@/components/metrics";
 import { color, radius, shadow, space } from "@/theme";
-import { INSIGHTS, STAFF } from "@content/catalogue";
+import { shiftCaption, shiftOutcomes, INSIGHTS, STAFF } from "@content/catalogue";
 
 export default function InsightsScreen() {
   return <StaffGate need="insights:read" title={INSIGHTS.title}>{(me) => <Board me={me} />}</StaffGate>;
@@ -15,11 +15,13 @@ export default function InsightsScreen() {
 // The metric-card list of the web Insights page; each card opens its chart.
 function Board({ me }: { me: Me }) {
   const [days, setDays] = useState(DEFAULT_DAYS);
-  const { data, error, load } = useInsights(days);
+  const { data, last, error, load } = useInsights(days);
   return (
     <Screen back eyebrow={<Brand />} title={INSIGHTS.title} onRefresh={load}
       right={me.role === "manager" ? <IconButton icon={LogOut} label={STAFF.signOut} onPress={me.signOut} /> : undefined}>
       <Segments value={days} options={PERIODS.map((p) => ({ key: p, label: INSIGHTS.period(p) }))} onChange={setDays} />
+      {last && <T v="small">{shiftCaption(last)}</T>}
+      {data && <T v="small">{shiftOutcomes(data)}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
       <View style={{ gap: 10 }}>
         {METRIC_KEYS.map((k) => (

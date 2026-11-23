@@ -1,14 +1,14 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { sb } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Bars, Donut, Lines } from "@/components/charts";
 import { T } from "@/components/ui";
 import { chart, color, tier } from "@/theme";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, staffError, type Lang, type PackId } from "@content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, staffError, type Lang, type PackId, type ShiftCounts } from "@content/catalogue";
 
 // Mirrors web/app/insights/metrics.tsx: the same metrics, copy and RPCs, drawn with react-native-gifted-charts.
-export type Insights = {
+export type Insights = ShiftCounts & {
   since: string;
   funnel: Record<string, number>;
   dispatched: number;
@@ -23,27 +23,23 @@ export type Insights = {
   packs: Partial<Record<PackId, { received: number; guided: number }>>;   // insights_packs(): per station type
 };
 
-export const PERIODS = [7, 14, 30];
-export const DEFAULT_DAYS = PERIODS[1];
+export const PERIODS = [0, 7, 14, 30];
+export const DEFAULT_DAYS = PERIODS[0];
 
 // Counts only: insights() and insights_ratings() return no words and no identities.
 export function useInsights(days: number) {
   const [data, setData] = useState<Insights | null>(null);
   const [error, setError] = useState("");
+  const version = useRef(0);
   const load = useCallback(async () => {
-    const [main, ratings, t, packs] = await Promise.all([
-      sb().rpc("insights", { p_days: days }),
-      sb().rpc("insights_ratings", { p_days: days }),
-      sb().schema("ichido").from("sla_target").select("reason, seconds"), // operators only; managers see no target line
-      sb().rpc("insights_packs", { p_days: days }),
-    ]);
-    const e = main.error ?? ratings.error ?? packs.error;
-    const targets = Object.fromEntries(((t.data ?? []) as { reason: string; seconds: number }[]).map((r) => [r.reason, r.seconds]));
-    if (e) setError(staffError(e.message));
-    else { setError(""); setData({ ...(main.data as Insights), ratings: ratings.data ?? {}, targets, packs: packs.data ?? {} }); }
+    const current = ++version.current;
+    const r = await sb().rpc("shift_insights",{ p_days:days });
+    if (current !== version.current) return;
+    setError(r.error ? staffError(r.error.message) : "");
+    if (r.data) setData({ ...r.data,targets:{ no_reply:r.data.target } });
   }, [days]);
-  useLive(["desk"], load);
-  return { data, error, load };
+  useLive(["desk","reply","caller_card","case_event","field_job","partner_work"],load);
+  return { data:data?.period === days ? data : null, last:data, error, load };
 }
 
 const HOURS_PER_SLOT = 2;

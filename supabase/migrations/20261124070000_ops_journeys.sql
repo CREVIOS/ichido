@@ -388,3 +388,171 @@ language sql stable security definer set search_path='' as $$
 $$;
 revoke all on function public.blocked_work_replies(uuid) from public,anon,authenticated;
 grant execute on function public.blocked_work_replies(uuid) to authenticated,service_role;
+
+-- p_days=0 selects the last completed Monday-Sunday cohort in Tokyo. Outcomes are as of the query time.
+create or replace function ichido.report_bounds(p_days int) returns table(start_at timestamptz,end_at timestamptz)
+language sql stable set search_path='' as $$
+  with t as (select now() at time zone 'Asia/Tokyo' as local_now)
+  select (case when p_days=0 then date_trunc('week',local_now)-interval '7 days' else date_trunc('day',local_now)-make_interval(days=>p_days-1) end) at time zone 'Asia/Tokyo',
+         (case when p_days=0 then date_trunc('week',local_now) else date_trunc('day',local_now)+interval '1 day' end) at time zone 'Asia/Tokyo' from t
+$$;
+revoke all on function ichido.report_bounds(int) from public,anon,authenticated;
+
+create or replace function public.insights(p_days int default 14)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  tz constant text := 'Asia/Tokyo';
+  since timestamptz; until_at timestamptz;
+begin
+  if not (ichido.has_role('operator') or ichido.has_role('manager')) then perform ichido.fail('forbidden'); end if;
+  if p_days is null or p_days not in (0, 7, 14, 30) then perform ichido.fail('bad_request'); end if;
+  select start_at,end_at into since,until_at from ichido.report_bounds(p_days);
+  return (
+    with c as (
+      select d.*,
+        (select min(e.at) from public.case_event e where e.incident=d.id and e.kind='claimed') as claim_at,
+        exists (select 1 from public.case_event e where e.incident = d.id and e.kind = 'claimed') as claimed,
+        exists (select 1 from public.reply r where r.incident = d.id) as replied,
+        exists (select 1 from public.field_job f where f.incident = d.id) as dispatched
+      from public.desk d where d.created_at >= since and d.created_at < until_at
+    )
+    select jsonb_build_object(
+      'since', since, 'until',until_at, 'as_of',now(), 'period',p_days,
+      'unanswered',count(*) filter(where not replied),
+      'rated',(select count(*) from public.caller_card cc join c on c.id=cc.id where cc.rating is not null),
+      'rating_eligible',count(*) filter(where status='guided' and not abandoned),
+      'field_done',(select count(*) from public.field_job j join c on c.id=j.incident where j.state='done'),
+      'partner_accepted',(select count(distinct w.incident) from public.partner_work w join c on c.id=w.incident where w.accepted_at is not null),
+      'target',(select seconds from ichido.sla_target where reason='no_reply'),
+      'funnel', jsonb_build_object(
+        'received', count(*),
+        'claimed', count(*) filter (where claimed),
+        'confirmed', count(*) filter (where claimed and confirmed_rev is not null),
+        'replied', count(*) filter (where claimed and confirmed_rev is not null and replied),
+        'guided', count(*) filter (where claimed and confirmed_rev is not null and replied and status = 'guided')),
+      'dispatched', count(*) filter (where dispatched),
+      'abandoned', count(*) filter (where abandoned),
+      'per_day', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+          'day', g::date,
+          'n', (select count(*) from c where (c.created_at at time zone tz)::date = g::date),
+          'guided', (select count(*) from c where (c.created_at at time zone tz)::date = g::date and c.status = 'guided'),
+          'first_reply_s', (select percentile_cont(0.5) within group (order by extract(epoch from r.first - c.claim_at))
+             from c join (select incident, min(sent_at) as first from public.reply group by incident) r on r.incident = c.id
+             where (c.created_at at time zone tz)::date = g::date)
+        ) order by g), '[]')
+        from generate_series((since at time zone tz)::date, (until_at at time zone tz)::date - 1, interval '1 day') g),
+      'per_hour', (
+        select jsonb_agg(jsonb_build_object('hour', h, 'n',
+          (select count(*) from c where extract(hour from c.created_at at time zone tz) = h)) order by h)
+        from generate_series(0, 23) h),
+      'languages', (
+        select coalesce(jsonb_object_agg(lang, n), '{}')
+        from (select coalesce(lang, 'none') as lang, count(*) as n from c group by 1) x),
+      'median_first_reply_s', (
+        select percentile_cont(0.5) within group (order by extract(epoch from r.first - c.claim_at))
+        from c join (select incident, min(sent_at) as first from public.reply group by incident) r on r.incident = c.id),
+      'choices', (
+        select coalesce(jsonb_object_agg(choice, n), '{}')
+        from (select cc.choice, count(*) as n from public.caller_card cc join c on c.id = cc.id
+              where cc.choice is not null group by 1) x)
+    ) from c
+  );
+end $$;
+
+create or replace function public.insights_ratings(p_days int default 14)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  tz constant text := 'Asia/Tokyo';
+  since timestamptz; until_at timestamptz;
+begin
+  if not (ichido.has_role('operator') or ichido.has_role('manager')) then perform ichido.fail('forbidden'); end if;
+  if p_days is null or p_days not in (0, 7, 14, 30) then perform ichido.fail('bad_request'); end if;
+  select start_at,end_at into since,until_at from ichido.report_bounds(p_days);
+  return (
+    select coalesce(jsonb_object_agg(rating, n), '{}')
+    from (select cc.rating, count(*) as n from public.caller_card cc join public.desk d on d.id = cc.id
+          where d.created_at >= since and d.created_at < until_at and cc.rating is not null group by 1) x
+  );
+end $$;
+
+create or replace function public.insights_bot(p_days int default 14) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  tz constant text := 'Asia/Tokyo';
+  since timestamptz; until_at timestamptz;
+begin
+  if not (ichido.has_role('operator') or ichido.has_role('manager')) then perform ichido.fail('forbidden'); end if;
+  if p_days is null or p_days not in (0, 7, 14, 30) then perform ichido.fail('bad_request'); end if;
+  select start_at,end_at into since,until_at from ichido.report_bounds(p_days);
+  return (
+    select jsonb_build_object(
+      'records', count(*),
+      'claim_s', percentile_cont(0.5) within group (order by r.claim_s),
+      'first_reply_s', percentile_cont(0.5) within group (order by r.first_reply_s),
+      'guard_arrival_s', percentile_cont(0.5) within group (order by r.guard_arrival_s),
+      'total_s', percentile_cont(0.5) within group (order by r.total_s))
+    from public.case_record r join public.desk d on d.id = r.incident where d.created_at >= since and d.created_at < until_at
+  );
+end $$;
+
+create or replace function public.insights_ops(p_days int default 14) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  tz constant text := 'Asia/Tokyo';
+  since timestamptz; until_at timestamptz;
+begin
+  if not (ichido.has_role('operator') or ichido.has_role('manager')) then perform ichido.fail('forbidden'); end if;
+  if p_days is null or p_days not in (0, 7, 14, 30) then perform ichido.fail('bad_request'); end if;
+  select start_at,end_at into since,until_at from ichido.report_bounds(p_days);
+  return (
+    with c as (
+      select d.*, d.fault = 'card_retained' as captured,
+        d.fault = 'card_retained' and d.status = 'guided' and d.finished_at is not null
+          and (d.finished_at at time zone tz)::date = (d.created_at at time zone tz)::date as same_day
+      from public.desk d where d.created_at >= since and d.created_at < until_at
+    ), e as (
+      select e.kind from public.case_event e join c on c.id = e.incident where e.kind in ('takeover', 'broadcast')
+    ), p as (
+      select p.outcome from public.promise p join c on c.id = p.incident
+    )
+    select jsonb_build_object(
+      'fraud', (select count(*) from c where exists (select from public.case_event ev where ev.incident=c.id and ev.kind='fraud')),
+      'abusive', (select count(*) from c where abusive_at is not null),
+      'takeovers', (select count(*) from e where kind = 'takeover'),
+      'mass_incidents', (select count(distinct mass_incident) from c),
+      'broadcasts', (select count(*) from e where kind = 'broadcast'),
+      'promises', (select count(*) from p),
+      'promises_expired', (select count(*) from p where outcome = 'expired'),
+      'captured', (select count(*) from c where captured),
+      'resolved_same_day', (select count(*) from c where same_day),
+      'per_day', (
+        select coalesce(jsonb_agg(jsonb_build_object('day', g::date,
+          'captured', (select count(*) from c where captured and (c.created_at at time zone tz)::date = g::date),
+          'resolved', (select count(*) from c where same_day and (c.created_at at time zone tz)::date = g::date)) order by g), '[]')
+        from generate_series((since at time zone tz)::date, (until_at at time zone tz)::date - 1, interval '1 day') g)
+    )
+  );
+end $$;
+
+create or replace function public.insights_packs(p_days int default 14) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare tz constant text := 'Asia/Tokyo'; since timestamptz; until_at timestamptz;
+begin
+  if not (ichido.has_role('operator') or ichido.has_role('manager')) then perform ichido.fail('forbidden'); end if;
+  if p_days is null or p_days not in (0, 7, 14, 30) then perform ichido.fail('bad_request'); end if;
+  select start_at,end_at into since,until_at from ichido.report_bounds(p_days);
+  return (
+    select coalesce(jsonb_object_agg(pack, jsonb_build_object('received', n, 'guided', g)), '{}')
+    from (select ichido.pack_of(st.kind) as pack, count(*) as n, count(*) filter (where d.status = 'guided') as g
+          from public.desk d join public.station st on st.id = d.station
+          where d.created_at >= since and d.created_at < until_at group by 1) x
+  );
+end $$;
+
+create or replace function public.shift_insights(p_days int) returns jsonb language sql stable security invoker set search_path='' as $$
+ select public.insights(p_days) || jsonb_build_object('ratings',public.insights_ratings(p_days),'bot',public.insights_bot(p_days),
+   'ops',public.insights_ops(p_days),'packs',public.insights_packs(p_days))
+$$;
+revoke all on function public.shift_insights(int) from public,anon,authenticated;
+grant execute on function public.shift_insights(int) to authenticated;

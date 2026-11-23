@@ -197,3 +197,11 @@ export const PARTNER = {
     consult_desk: "通訳の相談を受け付ける", railway: "忘れ物の照会を受け付ける", disaster_hq: "避難所の支援を調整する", health_team: "保健師による支援を確認する",
   } as Record<string,string>,
 };
+
+export type ShiftCounts = { period: number; since: string; until: string; as_of: string; unanswered: number; rated: number;
+  rating_eligible: number; field_done: number; partner_accepted: number; funnel: Record<string,number> };
+export const jstDay = (s: string) => new Date(s).toLocaleDateString("ja-JP",{ timeZone:"Asia/Tokyo" });
+export const shiftCaption = (d: ShiftCounts) =>
+  `${jstDay(d.since)}–${jstDay(new Date(Date.parse(d.until)-1).toISOString())} JST · ${new Date(d.as_of).toLocaleString("ja-JP",{ timeZone:"Asia/Tokyo" })} 集計 · 受付 ${d.funnel.received}件・未返答 ${d.unanswered}件`;
+export const shiftOutcomes = (d: ShiftCounts) =>
+  `案内理解 ${d.funnel.guided}件 · 現場完了 ${d.field_done}件 · 外部受諾 ${d.partner_accepted}件 · 評価回答 ${d.rated} / 対象 ${d.rating_eligible}件`;

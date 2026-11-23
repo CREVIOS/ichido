@@ -5,7 +5,7 @@ import { CalendarDays, Code } from "lucide-react-native";
 import { StaffGate } from "@/components/StaffGate";
 import { Card, Crumb, Hairline, Icon, Notice, Screen, Segments, T } from "@/components/ui";
 import { DEFAULT_DAYS, METRICS, PERIODS, isMetric, useInsights, type MetricKey } from "@/components/metrics";
-import { INSIGHTS } from "@content/catalogue";
+import { shiftCaption, shiftOutcomes, INSIGHTS } from "@content/catalogue";
 
 export default function MetricScreen() {
   const { metric, days } = useLocalSearchParams<{ metric: string; days?: string }>();
@@ -21,7 +21,7 @@ export default function MetricScreen() {
 // One metric: its definition, the period, and the chart (web Insights detail pane).
 function Detail({ k, initialDays }: { k: MetricKey; initialDays: number }) {
   const [days, setDays] = useState(initialDays);
-  const { data, error, load } = useInsights(days);
+  const { data, last, error, load } = useInsights(days);
   const m = INSIGHTS.metrics[k];
   return (
     <Screen back eyebrow={<Crumb parts={[INSIGHTS.title, m.title]} />} title={m.title} onRefresh={load}>
@@ -39,6 +39,8 @@ function Detail({ k, initialDays }: { k: MetricKey; initialDays: number }) {
         </View>
         <Segments value={days} options={PERIODS.map((p) => ({ key: p, label: INSIGHTS.period(p) }))} onChange={setDays} />
       </View>
+      {last && <T v="small">{shiftCaption(last)}</T>}
+      {data && <T v="small">{shiftOutcomes(data)}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
       <Card>{data ? METRICS[k].detail(data) : <View style={{ height: 220 }} />}</Card>
       <T v="small">{INSIGHTS.privacy}</T>
