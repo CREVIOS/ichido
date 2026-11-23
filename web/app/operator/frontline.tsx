@@ -37,6 +37,7 @@ export function FrontlineMonitor({ desk }: { desk: Desk }) {
     {desk.transfer_reason && <p>{FRONT_DESK.transfer} · P{desk.priority} · {FRONT_DESK.reasons[desk.transfer_reason]}</p>}
     {error && <Notice tone="warn">{error}</Notice>}
     <ol className="grid gap-3">{turns.map((t) => {
+      if (t.wording === "start") return <li key={t.seq} className="text-sm text-muted-foreground">{FRONT_DESK.event} · {FRONT_DESK.consent}</li>;
       const read = t.facts.triage;
       return <li key={t.seq} className="border-l-2 pl-3">
         <span className="text-xs text-muted-foreground">{t.speaker === "caller" ? FRONT_DESK.submitted : t.speaker === "ai" ? FRONT_DESK.aiSpeaker : FRONT_DESK.joined} · {t.locale}</span>

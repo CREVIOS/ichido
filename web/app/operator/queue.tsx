@@ -63,10 +63,10 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
   return (
     <div className="flex flex-col gap-4">
       {[
-        { title: FRONT_DESK.queued, rows: open.filter((c) => c.handler === "queued") },
-        { title: FRONT_DESK.ai, rows: open.filter((c) => c.handler === "ai") },
-        { title: DESK.queue, rows: open.filter((c) => c.handler === "human" || c.handler === "legacy") },
-      ].map(({ title, rows }) => <QueueGroup key={title} title={title} empty={DESK.empty}>
+        { title: FRONT_DESK.queued, empty: FRONT_DESK.emptyQueued, rows: open.filter((c) => c.handler === "queued") },
+        { title: FRONT_DESK.ai, empty: FRONT_DESK.emptyAI, rows: open.filter((c) => c.handler === "ai") },
+        { title: DESK.queue, empty: DESK.empty, rows: open.filter((c) => c.handler === "human" || c.handler === "legacy") },
+      ].map(({ title, empty, rows }) => <QueueGroup key={title} title={title} empty={empty}>
         {rows.map((c) => (
           <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
             title={label[c.station] ?? c.station} meta={ago(c.queued_at ?? c.created_at)}

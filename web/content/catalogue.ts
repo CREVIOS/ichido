@@ -296,10 +296,7 @@ export const UI = {
     vi: "Hãy kể điều đã xảy ra, bằng lời của bạn", id: "Ceritakan apa yang terjadi, dengan kata-kata Anda sendiri", ne: "के भयो, आफ्नै शब्दमा लेख्नुहोस्",
   },
   understood: { bn: "আমি যা বুঝেছি", en: "What I understood", ja: "わかったこと", vi: "Những gì tôi hiểu", id: "Yang saya pahami", ne: "मैले बुझेको कुरा" },
-  confirm: {
-    bn: "হ্যাঁ, ঠিক আছে — পাঠান", en: "Yes, that's right — send", ja: "はい、これで おくる",
-    vi: "Đúng rồi — gửi đi", id: "Ya, sudah benar — kirim", ne: "हो, ठीक छ — पठाउनुहोस्",
-  },
+  confirm: { bn: "কর্মীর কাছে পাঠান", en: "Send to the operator", ja: "係の 人に おくる", vi: "Gửi cho nhân viên", id: "Kirim ke petugas", ne: "कर्मचारीलाई पठाउनुहोस्" },
   unsure: {
     bn: "আমি ঠিক বুঝতে পারিনি। নিচের প্রশ্নগুলোর উত্তর বেছে নিন।",
     en: "I wasn't sure what you meant. Please choose the answers below.",
@@ -317,10 +314,7 @@ export const UI = {
     id: "Itu tampak seperti nomor, jadi tidak dikirim. Silakan coba lagi tanpa angka.",
     ne: "यसमा नम्बर जस्तो देखियो, त्यसैले पठाइएन। नम्बर नराखी फेरि लेख्नुहोस्।",
   },
-  approved: {
-    bn: "অপারেটর · ব্যাংকের অনুমোদিত বার্তা", en: "Operator · the bank's approved message", ja: "係の 人からの おしらせ（銀行が きめた 文）",
-    vi: "Nhân viên · tin nhắn đã được ngân hàng duyệt", id: "Petugas · pesan resmi dari bank", ne: "कर्मचारी · बैंकले स्वीकृत गरेको सन्देश",
-  },
+  approved: { bn: "সহায়তা কেন্দ্রের অনুমোদিত বার্তা", en: "Approved message from the desk", ja: "まどぐちが きめた おしらせ", vi: "Thông báo đã duyệt của quầy", id: "Pesan resmi dari meja layanan", ne: "सहायता केन्द्रको स्वीकृत सन्देश" },
   listen: { bn: "শুনুন", en: "Listen", ja: "きく", vi: "Nghe", id: "Dengarkan", ne: "सुन्नुहोस्" },
   waitOrLeave: { bn: "আপনি কী করবেন?", en: "What would you like to do?", ja: "どうしますか？", vi: "Bạn muốn làm gì?", id: "Apa yang ingin Anda lakukan?", ne: "तपाईं के गर्न चाहनुहुन्छ?" },
   wait: { bn: "অপেক্ষা করব", en: "I'll wait", ja: "まつ", vi: "Tôi sẽ chờ", id: "Saya akan menunggu", ne: "म पर्खन्छु" },
@@ -337,10 +331,7 @@ export const UI = {
     bn: "যে অংশটি বুঝতে অসুবিধা হয়েছে, সেটি কর্মীকে আবার জিজ্ঞেস করতে পারেন।", en: "You can ask the operator again about anything that is unclear.", ja: "わからない ところは 係の 人に もう一度 きけます。",
     vi: "Bạn có thể hỏi lại nhân viên về bất cứ điều gì chưa rõ.", id: "Anda bisa bertanya lagi kepada petugas tentang hal yang belum jelas.", ne: "नबुझेको कुरा कर्मचारीलाई फेरि सोध्न सक्नुहुन्छ।",
   },
-  human: {
-    bn: "এখনই একজন মানুষের সাথে কথা বলুন", en: "Talk to a person now", ja: "人と はなす",
-    vi: "Nói chuyện với nhân viên ngay", id: "Bicara dengan petugas sekarang", ne: "अहिले नै मानिससँग कुरा गर्नुहोस्",
-  },
+  human: { bn: "একজন কর্মীর সাহায্য চাই", en: "Ask for a person", ja: "係の 人に たのむ", vi: "Yêu cầu nhân viên hỗ trợ", id: "Minta bantuan petugas", ne: "कर्मचारीको सहायता माग्ने" },
   humanAsked: {
     bn: `অপারেটরকে জানানো হয়েছে। এখনই কথা বলতে চাইলে ${HANDSET_HINT.bn}`,
     en: `The operator has been told. To talk now, ${HANDSET_HINT.en}`,
@@ -390,6 +381,7 @@ export const UI = {
 } satisfies Record<string, L10n>;
 
 export * from "./frontline.ts";
+export * from "./caller-journey.ts";
 export * from "./staff.ts";
 export * from "./review.ts";
 export * from "./numbers.ts";

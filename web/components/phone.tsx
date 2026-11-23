@@ -7,7 +7,7 @@ import type { Lang } from "@/content/catalogue";
 export function Phone({ lang, right, children, center, large }: { lang?: Lang; right?: ReactNode; children: ReactNode; center?: boolean; large?: boolean }) {
   return (
     <main lang={lang} style={large ? { zoom: 1.3 } : undefined} className="mx-auto flex min-h-dvh w-full max-w-[460px] flex-col gap-6 px-4 pt-4 pb-8">
-      <header className="flex h-9 items-center justify-between"><Logo />{right}</header>
+      <header className="flex min-h-12 items-center justify-between"><Logo />{right}</header>
       <div className={center ? "my-auto flex flex-col gap-6" : "flex flex-1 flex-col gap-6"}>{children}</div>
     </main>
   );

@@ -39,6 +39,7 @@ export const FRONTLINE = {
 } satisfies Record<string, L10n>;
 
 export const FRONT_DESK = {
+  consent: "送信済みメッセージの共有に同意", event: "操作記録", emptyAI: "現在、AIが対応している相談はありません。", emptyQueued: "現在、担当者を待っている相談はありません。",
   ai: "AI対応中", queued: "担当者待ち", monitor: "送信済みの会話", submitted: "相談者", aiSpeaker: "AI",
   translation: "機械翻訳", transfer: "引き継ぎ", joined: "担当者が参加", takeover: "担当する",
   reasons: { human_request: "本人の希望", suspected_risk: "危険の可能性", staff_needed: "職員による確認", staffed_entry: "職員による受付", limit: "対応上限", unclear: "再確認が必要", provider: "自動応答が利用できません", withheld: "番号を非表示" } as Record<string,string>,
