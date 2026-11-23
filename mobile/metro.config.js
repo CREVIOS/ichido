@@ -3,6 +3,6 @@ const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
-config.watchFolders = [path.resolve(__dirname, "../web/content"), path.resolve(__dirname, "../web/lib/rbac.ts")];
+config.watchFolders = [path.resolve(__dirname, "../web/content"), path.resolve(__dirname, "../web/lib")];
 
 module.exports = config;
