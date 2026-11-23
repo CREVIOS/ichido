@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
@@ -8,14 +8,14 @@ import { AppShell, Chip, Dot, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BOT, DESK, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
+import { BOT, DESK, nextFieldStep, SHIFT, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
-type Job = { incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
+type Job = { acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
 type Site = { label: string; company: string };
 const UNKNOWN_ETA = "";
 const STEPS = ["on_way", "arrived", "done"] as const;
-const NEXT: Partial<Record<FieldState, (typeof STEPS)[number]>> = { requested: "on_way", on_way: "arrived", arrived: "done" };
-const LABEL: Record<(typeof STEPS)[number], string> = { on_way: FIELD.onWay, arrived: FIELD.arrived, done: FIELD.done };
+
+const LABEL: Record<string, string> = { accept: SHIFT.accept, on_way: FIELD.onWay, arrived: FIELD.arrived, done: FIELD.done };
 
 export default function FieldPage() {
   return <StaffGate need="field:act" title={FIELD.title}>{(me) => <Jobs me={me} />}</StaffGate>;
@@ -35,6 +35,10 @@ function Jobs({ me }: { me: Me }) {
     setSites(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n; security_company: string }[]).map((x) => [x.id, { label: x.label.ja, company: x.security_company }])));
   }, []);
   useLive(["field_job"], load);
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("job");
+    if (id) document.getElementById(id)?.scrollIntoView();
+  }, [jobs]);
 
   return (
     <AppShell nav={navFor(me.role, { "/field": jobs.length })} footer={<MeFooter me={me} />} title={FIELD.title}>
@@ -49,11 +53,13 @@ function Jobs({ me }: { me: Me }) {
 function JobCard({ j, label, company }: { j: Job; label: string; company?: string }) {
   // The estimate starts unknown; only the guard's own pick is ever sent.
   const [eta, setEta] = useState(UNKNOWN_ETA);
+  const next = nextFieldStep(j.state, j.acknowledged_at);
+  const [correct, setCorrect] = useState(false);
   const act = (state: string) =>
     cmd("field", { incident: j.incident, generation: j.generation, state, eta: state === "on_way" ? eta : undefined })
       .catch((e: Error) => toast.error(e.message === "forbidden" ? FIELD.changed : FIELD.failed));
   return (
-    <section className="surface flex flex-col gap-4 p-5">
+    <section id={j.incident} className="surface flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
         <span className="mono text-muted-foreground">{j.station} · {PACKS[packOfFault(j.fault)].name.staff}</span>
         <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{(packStaffField(packOfFault(j.fault)) ?? STAFF_JA.field)[j.state]}</span>
@@ -75,11 +81,16 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
           </Select>
         </div>
       )}
-      {/* The next step is the big button; the others stay one tap away (re-sending "on the way" updates the estimate). */}
-      <Button size="lg" className="h-11" onClick={() => act(NEXT[j.state] ?? "done")}>{LABEL[NEXT[j.state] ?? "done"]}</Button>
-      <div className="grid grid-cols-2 gap-2">
-        {STEPS.filter((x) => x !== (NEXT[j.state] ?? "done")).map((x) => <Button key={x} variant="secondary" className="h-10" onClick={() => act(x)}>{LABEL[x]}</Button>)}
-      </div>
+      {j.declined_at ? <Notice>{SHIFT.declined}</Notice> : <>
+        {next && <Button size="lg" onClick={() => act(next)}>{LABEL[next]}</Button>}
+        <div className="flex flex-wrap gap-2">
+          {j.state === "requested" && <Button variant="secondary" onClick={() => act("decline")}>{SHIFT.decline}</Button>}
+          {j.state === "on_way" && <Button variant="secondary" onClick={() => act("on_way")}>{SHIFT.eta}</Button>}
+          <Button variant="secondary" onClick={() => act("help")}>{SHIFT.help}</Button>
+          <Button variant="ghost" onClick={() => setCorrect(!correct)}>{SHIFT.correct}</Button>
+        </div>
+        {correct && <div className="flex gap-2">{STEPS.map((s) => <Button variant="secondary" key={s} onClick={() => { setCorrect(false); void act(`correct_${s}`); }}>{LABEL[s]}</Button>)}</div>}
+      </>}
       <p className="text-[12px] leading-5 text-muted-foreground">{packOfFault(j.fault) === "atm" ? FIELD.note : PACK_DESK.fieldNote(PACKS[packOfFault(j.fault)].responder.staff)}</p>
     </section>
   );

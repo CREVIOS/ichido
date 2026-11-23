@@ -168,3 +168,20 @@ export function opsEventText(kind: string, d: Record<string, string | undefined>
     default: return null;
   }
 }
+
+export const SHIFT = {
+  accept: "依頼を引き受ける", decline: "対応できません", help: "応援を依頼", eta: "到着目安を更新",
+  correct: "進行状況を訂正", accepted: "担当者が受諾", declined: "辞退・再割当が必要",
+  unack: "担当者の応答待ち", provider: "通知サービス受付済み", helpNeeded: "応援要請あり",
+  reassigned: "他の担当者に再割当されました", duty: "担当拠点・職務", available: "受付可", off: "受付停止",
+  pushReady: "端末通知：登録済み", pushDenied: "端末通知：許可されていません",
+  pushMissing: "端末通知：未設定", pushFailed: "端末通知：登録失敗", pushWait: "端末通知：確認中",
+  noWorker: "この拠点・職務で出動できる担当者はいません。",
+};
+
+export function nextFieldStep(state: string, acknowledged: string | null) {
+  if (state === "requested") return acknowledged ? "on_way" : "accept";
+  if (state === "on_way") return "arrived";
+  if (state === "arrived") return "done";
+  return null;
+}

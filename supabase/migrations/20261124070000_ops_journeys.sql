@@ -164,3 +164,130 @@ end $$;
 revoke all on function public.cmd_fraud_safe(uuid,text,uuid) from public, anon, authenticated;
 grant execute on function public.cmd_fraud_safe(uuid,text,uuid) to service_role;
 
+
+-- Coverage is explicitly set by the shift lead. Existing accounts have no coverage until assigned.
+alter table ichido.staff add column if not exists duty_station text references public.station(id),
+  add column if not exists duty_function text check (duty_function in ('atm','hospital','city_office','transit','shelter')),
+  add column if not exists available boolean not null default true;
+alter table public.field_job add column if not exists acknowledged_at timestamptz,
+  add column if not exists declined_at timestamptz, add column if not exists help_at timestamptz,
+  add column if not exists provider_at timestamptz;
+update ichido.staff s set duty_station='TABLE-A', duty_function='atm' from auth_ba."user" u
+  where s.uid=u.id and u.email in ('guard1@ichido.demo','guard2@ichido.demo') and s.duty_station is null
+    and exists (select from public.station where id='TABLE-A');
+
+create or replace function public.available_responders(p_incident uuid) returns table(uid uuid,display_name text)
+language sql stable security definer set search_path='' as $$
+  select s.uid,s.display_name from public.desk d join public.station st on st.id=d.station
+    join ichido.staff s on s.duty_station=d.station and s.duty_function=ichido.pack_of(st.kind)
+    join auth_ba."user" u on u.id=s.uid
+    where d.id=p_incident and s.available and not u.banned and s.role='field'
+      and (auth.role()='service_role' or ichido.has_role('operator'))
+      and not exists (select from public.field_job j where j.assignee=s.uid and j.incident<>d.id
+        and not j.case_closed and j.state<>'done' and j.declined_at is null)
+$$;
+revoke all on function public.available_responders(uuid) from public,anon,authenticated;
+grant execute on function public.available_responders(uuid) to authenticated,service_role;
+
+create or replace function public.cmd_assign(p_uid uuid, p_name text, p_incident uuid, p_assignee uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare d public.desk; guard text; prev public.field_job; company text;
+begin
+  d := ichido.owned_case(p_uid, p_incident);
+  perform 1 from ichido.staff where uid=p_assignee for update;
+  select display_name into guard from public.available_responders(p_incident) where uid=p_assignee;
+  if guard is null then perform ichido.fail('bad_request'); end if;
+  select * into prev from public.field_job where incident = d.id for update;
+  if found and prev.assignee = p_assignee and not prev.case_closed and prev.declined_at is null then return; end if;
+  select security_company into company from public.station where id = d.station;
+  insert into public.field_job (incident, station, fault, assignee, generation, state, eta, case_closed, updated_at)
+    values (d.id, d.station, d.fault, p_assignee, coalesce(prev.generation, 0) + 1, 'requested', null, false, now())
+    on conflict (incident) do update set assignee = excluded.assignee, generation = excluded.generation,
+      state = 'requested', acknowledged_at=null, declined_at=null, provider_at=null, help_at=null, reestimate_gen=null, assigned_at=now(), fault=excluded.fault, eta = null, case_closed = false, updated_at = now();
+  update public.desk set status = 'field' where id = d.id;
+  update public.caller_card set status = 'field', field_state = 'requested', eta = null where id = d.id;
+  perform ichido.set_light(d.station, d.id, 'field');
+  perform ichido.event(d.id, 'operator', case when prev.incident is null then 'dispatch' else 'redispatch' end,
+                       jsonb_build_object('assignee', guard, 'company', company), p_name);
+end $$;
+
+create or replace function public.cmd_field(p_uid uuid, p_name text, p_incident uuid, p_generation int, p_state text, p_eta text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare finished boolean; job public.field_job;
+begin
+
+  select d.finished_at is not null into finished from public.desk d
+    join public.field_job j on j.incident = d.id join ichido.staff s on s.uid = j.assignee
+    where d.id = p_incident and s.uid = p_uid and s.role = 'field' and j.generation = p_generation and not j.case_closed
+    for update of d;
+  if not found then perform ichido.fail('forbidden'); end if;
+  select * into strict job from public.field_job where incident=p_incident for update;
+  if job.declined_at is not null then perform ichido.fail('conflict'); end if;
+  if p_state in ('accept','decline','help') then
+    if p_state<>'help' and job.state<>'requested' then perform ichido.fail('conflict'); end if;
+    update public.field_job set acknowledged_at=coalesce(acknowledged_at,now()),
+      declined_at=case when p_state='decline' then now() end,
+      help_at=case when p_state='help' then now() else help_at end where incident=p_incident;
+    if p_state='decline' then update public.caller_card set field_state='none',eta=null where id=p_incident; end if;
+    perform ichido.event(p_incident,'field','field_' || p_state,jsonb_build_object('generation',p_generation),p_name);
+    return;
+  end if;
+  if p_state like 'correct_%' then
+    p_state:=substr(p_state,9);
+  elsif not ((p_state='on_way' and job.state in ('requested','on_way')) or
+             (p_state='arrived' and job.state='on_way') or (p_state='done' and job.state='arrived')) then
+    perform ichido.fail('conflict');
+  end if;
+  if p_state is null or p_state not in ('on_way','arrived','done') then perform ichido.fail('bad_request'); end if;
+  update public.field_job set acknowledged_at=coalesce(acknowledged_at,now()), state = p_state, eta = case when p_state = 'on_way' then p_eta end, updated_at = now(),
+         case_closed = p_state = 'done' and finished
+    where incident = p_incident and assignee = p_uid and generation = p_generation and not case_closed;
+  if not found then perform ichido.fail('forbidden'); end if;
+  update public.caller_card set field_state = p_state, eta = case when p_state = 'on_way' then p_eta end where id = p_incident;
+  perform ichido.event(p_incident, 'field', 'field',
+    jsonb_strip_nulls(jsonb_build_object('state', p_state, 'eta', case when p_state = 'on_way' then p_eta end)), p_name);
+end $$;
+
+alter table ichido.alert_outbox add column if not exists lease uuid,
+  add column if not exists available_at timestamptz not null default now(),
+  add column if not exists attempts int not null default 0,
+  add column if not exists delivered uuid[] not null default '{}',
+  add column if not exists generation int;
+create or replace function public.alert_take(p_limit int) returns setof ichido.alert_outbox
+language sql security definer set search_path='' as $$
+  update ichido.alert_outbox set lease=gen_random_uuid(), attempts=attempts+1, available_at=now()+interval '2 minutes'
+    where id in (select id from ichido.alert_outbox where available_at<=now() order by id
+      for update skip locked limit greatest(1, least(p_limit,200))) returning *
+$$;
+create or replace function ichido.alert_field_job() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+  if tg_op='INSERT' or new.generation<>old.generation or new.assignee<>old.assignee then
+    insert into ichido.alert_outbox(kind,incident,station,target,generation)
+      values ('field_job',new.incident,new.station,new.assignee,new.generation);
+  end if;
+  return null;
+end $$;
+create or replace function public.alert_settle(p_id bigint,p_lease uuid,p_accepted uuid[],p_retry boolean) returns void
+language plpgsql security definer set search_path='' as $$
+declare o ichido.alert_outbox;
+begin
+  select * into o from ichido.alert_outbox where id=p_id and lease=p_lease for update;
+  if not found then return; end if;
+  if o.kind='field_job' and cardinality(p_accepted)>0 then
+    update public.field_job set provider_at=coalesce(provider_at,now())
+      where incident=o.incident and assignee=o.target and generation=o.generation;
+  end if;
+  if p_retry then
+    update ichido.alert_outbox set lease=null, delivered=delivered || p_accepted,
+      available_at=now()+make_interval(secs=>least(300,5*(2^least(attempts,6))::int)) where id=o.id;
+  else delete from ichido.alert_outbox where id=o.id; end if;
+end $$;
+revoke all on function public.alert_settle(bigint,uuid,uuid[],boolean) from public, anon, authenticated;
+grant execute on function public.alert_settle(bigint,uuid,uuid[],boolean) to service_role;
+
+drop trigger if exists live_update on ichido.staff;
+create trigger live_update after update on ichido.staff referencing new table as new_rows for each statement execute function ichido.live_send();
+drop policy if exists live_roster_read on realtime.messages;
+create policy live_roster_read on realtime.messages for select to authenticated
+  using (extension='broadcast' and realtime.topic()='live:staff' and ichido.has_role('operator'));

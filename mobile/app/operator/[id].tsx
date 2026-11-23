@@ -8,7 +8,7 @@ import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, T
 import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
-  OPS, FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
+  SHIFT, OPS, FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
   eventText, summaryDraft, pick, replyOf, replyBlock, FAULT_DESK,
   type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
@@ -21,7 +21,7 @@ type CallerCard = {
 };
 type Event = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
-type Job = { assignee: string; state: FieldState; eta: string | null };
+type Job = { acknowledged_at?: string | null; declined_at?: string | null; provider_at?: string | null; help_at?: string | null; assignee: string; state: FieldState; eta: string | null };
 type Guard = { uid: string; display_name: string };
 
 export default function CaseScreen() {
@@ -47,7 +47,7 @@ function CaseView({ me }: { me: Me }) {
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
-      db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
+      db.from("field_job").select("assignee, state, eta, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
     ]);
     const desk = k.data as Desk | null;
     setD(desk); setCard(c.data as CallerCard); setEvents((e.data ?? []) as Event[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
@@ -57,7 +57,11 @@ function CaseView({ me }: { me: Me }) {
     }
   }, [id]);
   useLive(["desk", "caller_card", "case_event", "reply", "field_job"], load);
-  useEffect(() => { cmd<{ field: Guard[] }>("staff_list").then((r) => setGuards(r.field)).catch(() => setGuards([])); }, []);
+  const roster = useCallback(async () => {
+    const r = await cmd<{ field: Guard[] }>("staff_list", { incident: id }).catch(() => null);
+    setGuards(r?.field ?? []);
+  }, [id]);
+  useLive(["field_job", "staff"], roster);
 
   const run: Run = (name, body = {}) =>
     cmd(name, body).then((r) => { setError(""); load(); return r; }).catch((e: Error) => { setError(errorJa(e.message)); load(); });
@@ -111,6 +115,7 @@ function CaseView({ me }: { me: Me }) {
           {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
           <SuggestCard d={d} run={run} />
           <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
+          {job && <Notice>{job.declined_at ? SHIFT.declined : job.acknowledged_at ? SHIFT.accepted : SHIFT.unack}{job.provider_at && ` · ${SHIFT.provider}`}{job.help_at && ` · ${SHIFT.helpNeeded}`}</Notice>}
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
       )}

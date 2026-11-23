@@ -11,8 +11,8 @@ import { Button, Input, Mark, Notice, Screen, T } from "@/components/ui";
 import { AUTH, STAFF, authError } from "@content/catalogue";
 
 export type { Role };
-export type Me = { uid: string; role: Role; name: string; signOut: () => Promise<void> };
-type Who = { uid: string; role: Role; name: string };
+export type Me = { uid: string; role: Role; name: string; push?: string; signOut: () => Promise<void> };
+type Who = { push?: string; uid: string; role: Role; name: string };
 type Status = { at: "out" } | { at: "aal1" } | { at: "in"; who: Who };
 type ApiError = { code?: string; status?: number } | null | undefined;
 
@@ -23,8 +23,8 @@ async function resolve(): Promise<Status> {
   enterStaffSession();
   const r = await cmd<{ role: string; name?: string }>("me").catch(() => null);
   if (!r || !isRole(r.role)) return { at: "out" };
-  void registerPush(r.role);
-  return { at: "in", who: { uid: data.user.id, role: r.role, name: r.name ?? "" } };
+  const push = await registerPush(r.role);
+  return { at: "in", who: { push, uid: data.user.id, role: r.role, name: r.name ?? "" } };
 }
 
 // Mirrors web/components/StaffGate.tsx: password, then the authenticator code (or a backup code); on first sign-in

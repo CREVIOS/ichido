@@ -125,7 +125,7 @@ test("finishing an in-progress guard assignment after abandonment retires its re
   const update = (state) => cmd(guard, "field", { incident, generation: job.data.generation, state });
   await ok(update("on_way"));
   await ok(cmd(op, "abandon", { incident }));
-  await ok(update("done"));
+  await ok(update("correct_done"));
   assert.deepEqual((await guard.c.from("field_job").select("incident").eq("incident", incident).throwOnError()).data, []);
   assert.deepEqual((await guard.c.from("station").select("id").eq("id", station).throwOnError()).data, []);
 });

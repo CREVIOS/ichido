@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DESK, DEVICE_FAULT, FAULT_DESK, LANG_NAME, MANUAL_VERSION, PACKS, PACK_DESK, REPLIES, callerPack, intentsOf, packOfFault, packStaffField, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
+import { SHIFT, DESK, DEVICE_FAULT, FAULT_DESK, LANG_NAME, MANUAL_VERSION, PACKS, PACK_DESK, REPLIES, callerPack, intentsOf, packOfFault, packStaffField, replyBlock, replyOf, staffError, type Lang, STAFF_JA } from "@/content/catalogue";
 import type { CallerCard, Desk, Guard, Job, Reply, Run } from "./types";
 import { DispatchChain } from "./ops";
 
@@ -63,7 +63,6 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
     : practice || !block ? "" : block === "held" ? DESK.reply.mismatch : FAULT_DESK.blocked[block];
   const dim = (k: string) => !practice && ![null, "awaiting"].includes(blockOf(k));
   const send = () => run("send", { incident: d.id, intent }).then((ok) => { if (ok) toast.success(DESK.reply.toast); });
-  // One step for the common case: the approved reply, then a site check by the first available guard.
   const sendAndDispatch = async (g: Guard) => {
     if (!(await run("send", { incident: d.id, intent }))) return;
     if (await run("assign", { incident: d.id, assignee: g.uid })) toast.success(DESK.reply.bundleToast(g.display_name));
@@ -114,6 +113,9 @@ export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: 
             {guards.find((g) => g.uid === job.assignee)?.display_name ?? DESK.dispatch.guard}
             <Chip>{staffField[job.state]}</Chip>
           </span>
+          <span>{job.declined_at ? SHIFT.declined : job.acknowledged_at ? SHIFT.accepted : SHIFT.unack}</span>
+          {job.provider_at && <span>{SHIFT.provider}</span>}
+          {job.help_at && <Notice tone="warn">{SHIFT.helpNeeded}</Notice>}
           <span className="text-[13px]">{job.eta ? DESK.dispatch.eta(job.eta) : DESK.dispatch.etaUnknown}</span>
         </div>
       ) : (
@@ -123,7 +125,7 @@ export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: 
         <div className="flex flex-wrap gap-2">
           {others.map((g) => <Button key={g.uid} variant="secondary" onClick={() => run("assign", { incident: d.id, assignee: g.uid })}>{DESK.dispatch.assign(g.display_name, Boolean(job))}</Button>)}
         </div>
-      ) : !job && <Notice>{DESK.dispatch.noGuards}</Notice>}
+      ) : (!job || job.declined_at) && <Notice>{SHIFT.noWorker}</Notice>}
       {card && card.field_state !== "none" && <span className="text-[12px] text-muted-foreground">{DESK.dispatch.callerSees(caller.field(card.field_state, lang))}</span>}
     </Panel>
   );

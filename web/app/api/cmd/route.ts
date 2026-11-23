@@ -139,8 +139,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return decision === "reissued" ? createHandoff(incident, h!.recipient, op) : {};
   },
 
-  async staff_list(a) {
+  async staff_list(a, b) {
     staff(a, "operator");
+    if (b.incident) return { field: await rpc("available_responders", { p_incident: str(b, "incident") }) };
     const { data, error } = await priv().from("staff").select("uid, display_name").eq("role", "field").order("display_name");
     if (error) throw error;
     return { field: data };
@@ -302,7 +303,8 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const eta = typeof b.eta === "string" && b.eta && ETA_OPTIONS.includes(b.eta) ? b.eta : null;
     if (typeof b.generation !== "number") fail(400, "bad_request");
     await rpc("cmd_field", { p_uid: f.uid, p_name: f.name, p_incident: str(b, "incident"), p_generation: b.generation, p_state: str(b, "state"), p_eta: eta });
-    await fieldPromise(str(b, "incident"), b.generation as number, str(b, "state"), eta);
+    const state = str(b, "state").replace(/^correct_/, "");
+    if (["on_way", "arrived", "done"].includes(state)) await fieldPromise(str(b, "incident"), b.generation as number, state, eta);
     return {};
   },
 

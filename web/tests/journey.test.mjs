@@ -80,6 +80,7 @@ test("typed journey: alert → corrected report → approved reply → guard →
   // After closure: the caller cannot change anything, and the guard still on the way keeps the job until done.
   assert.equal((await cmd(a, "choose", { choice: "wait" })).status, 409);
   assert.equal((await g2.c.from("field_job").select("incident")).data.length, 1);
+  await ok(cmd(g2, "field", { incident, generation: j2.generation, state: "arrived" }));
   await ok(cmd(g2, "field", { incident, generation: j2.generation, state: "done" }));
   assert.equal((await g2.c.from("field_job").select("incident")).data.length, 0);
 

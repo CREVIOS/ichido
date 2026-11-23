@@ -51,6 +51,7 @@ async function seed() {
       await db.query(`delete from auth_ba."twoFactor" where "userId" = $1`, [u.id]);
       await db.query(`insert into auth_ba."twoFactor" (secret, "backupCodes", "userId", verified) values ($1, $2, $3, true)`,
         [await symmetricEncrypt({ key, data: totpSecret(email) }), await symmetricEncrypt({ key, data: JSON.stringify(codes) }), u.id]);
+      if (role === "field") await db.query("update ichido.staff set duty_station='TABLE-A', duty_function='atm' where uid=$1 and duty_station is null", [u.id]);
       console.log(`ok  ${role.padEnd(8)} ${email}`);
     }
     await db.query("commit");

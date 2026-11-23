@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { router, type Href } from "expo-router";
+import { SHIFT } from "@content/catalogue";
 import { cmd } from "./supabase";
 
 // Staff alerts in the app (web/lib/alerts.ts sends them through Expo's push service): new case, target passed,
@@ -19,21 +20,22 @@ const projectId = () => Constants.easConfig?.projectId ?? (Constants.expoConfig?
 
 // After sign-in with a second factor. Asks once; a refusal, a simulator or Expo Go without a project id just means
 // no notifications on this device.
-export async function registerPush(role: string): Promise<void> {
-  if (!RECEIVES.has(role) || Platform.OS === "web") return;
+export async function registerPush(role: string): Promise<string> {
+  if (!RECEIVES.has(role) || Platform.OS === "web" || !projectId()) return SHIFT.pushMissing;
   try {
     if (Platform.OS === "android") await Notifications.setNotificationChannelAsync("alerts", { name: "Ichido", importance: Notifications.AndroidImportance.HIGH });
     const { granted } = await Notifications.requestPermissionsAsync();
-    if (!granted) return;
+    if (!granted) return SHIFT.pushDenied;
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId: projectId() });
     await cmd("push_subscribe", { platform: "expo", endpoint: data });
-  } catch (e) {
-    console.warn("push registration skipped", e instanceof Error ? e.message : e);
+    return SHIFT.pushReady;
+  } catch {
+    return SHIFT.pushFailed;
   }
 }
 
 // Opening a notification goes to its screen (/operator/<id>, /field, /insights), including from a cold start.
-const ROUTE = /^\/(operator\/[0-9a-f-]{36}|field|insights|operator)$/;
+const ROUTE = /^\/(operator\/[0-9a-f-]{36}|field(?:\?job=[0-9a-f-]{36})?|insights|operator)$/;
 const open = (r: Notifications.NotificationResponse | null) => {
   const path = r?.notification.request.content.data?.path;
   if (typeof path === "string" && ROUTE.test(path)) router.push(path as Href);

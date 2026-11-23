@@ -1,6 +1,6 @@
 import "server-only";
 import { CALLER_FLAGS, FRAUD_FAULT, REPLIES, REPLY_RULES, STAFF_JA, contentPack, packOfFault, replyBlock, type Fact } from "@/content/catalogue";
-import { admin, priv } from "@/lib/server";
+import { admin } from "@/lib/server";
 
 // Read-only tools over one case, shared by Gemini's function calling. They read facts the operator can already see;
 // never the caller's words or draft.
@@ -59,11 +59,9 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
       return eligibleReplies(d, c?.flags ?? []);
     }
     case "list_guards": {
-      const [{ data: g }, { data: jobs }] = await Promise.all([
-        ctx.db ? db.rpc("mcp_field_staff") : priv().from("staff").select("uid, display_name").eq("role", "field"),
-        db.from("field_job").select("assignee").neq("state", "done"),
-      ]);
-      return (g ?? []).map((x: { uid: string; display_name: string }) => ({ uid: x.uid, name: x.display_name, open_jobs: (jobs ?? []).filter((j) => j.assignee === x.uid).length }));
+      const { data, error } = await db.rpc("available_responders", { p_incident: ctx.incident });
+      if (error) throw error;
+      return (data ?? []).map((g: { uid: string; display_name: string }) => ({ uid: g.uid, name: g.display_name, open_jobs: 0 }));
     }
     case "get_pack_rules": {
       const p = contentPack(d.fault);

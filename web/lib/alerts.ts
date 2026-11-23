@@ -8,7 +8,7 @@ import { entry, errorFields, ship } from "@/lib/log";
 // triggers fill (supabase/migrations/20261124030000_alerts.sql). flushAlerts() runs after commands, device calls and
 // the Ichido Bot's steps; never from a browser. Every payload is a code, a station label and a link: no caller text.
 
-type Outbox = { id: number; kind: string; incident: string | null; station: string | null; target: string | null };
+type Outbox = { lease: string; generation: number | null; delivered: string[]; id: number; kind: string; incident: string | null; station: string | null; target: string | null };
 type Sub = { id: string; uid: string; platform: "web" | "expo"; endpoint: string; p256dh: string | null; auth: string | null };
 export type Message = { title: string; body: string; url: string; path: string; tag: string };
 
@@ -44,8 +44,8 @@ export function message(o: Outbox, place: string, role: string): Message | null 
   const p = PUSH[o.kind];
   if (!p || !o.incident) return null;
   const field = o.kind === "field_job";
-  const url = field ? "/field" : role === "manager" ? "/insights" : `/operator#${o.incident}`;
-  const path = field ? "/field" : role === "manager" ? "/insights" : `/operator/${o.incident}`;
+  const url = field ? `/field?job=${o.incident}` : role === "manager" ? "/insights" : `/operator#${o.incident}`;
+  const path = field ? `/field?job=${o.incident}` : role === "manager" ? "/insights" : `/operator/${o.incident}`;
   return { title: p.title, body: p.body(place), url, path, tag: `${o.kind}:${o.incident}` };
 }
 
@@ -59,62 +59,54 @@ async function sendWeb(s: Sub, m: Message): Promise<"ok" | "gone" | "failed"> {
   return res.ok ? "ok" : res.status === 404 || res.status === 410 ? "gone" : "failed";
 }
 
-// Expo's push API: one request for a batch of tokens; a DeviceNotRegistered ticket means the app is gone.
-async function sendExpo(batch: { s: Sub; m: Message }[]): Promise<string[]> {
-  if (!batch.length) return [];
+async function sendExpo(s: Sub, m: Message): Promise<"ok" | "gone" | "failed"> {
   const token = process.env.EXPO_ACCESS_TOKEN;
   const res = await fetch(EXPO_PUSH_URL(), {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { "content-type": "application/json", accept: "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(batch.map(({ s, m }) => ({ to: s.endpoint, title: m.title, body: m.body, data: { path: m.path }, sound: "default", priority: "high", ttl: 600 }))),
+    headers: { "content-type": "application/json", ...(token && { authorization: `Bearer ${token}` }) },
+    body: JSON.stringify([{ to: s.endpoint, title: m.title, body: m.body, data: { path: m.path }, sound: "default", priority: "high", ttl: 600 }]),
   });
-  if (!res.ok) throw new Error(`expo push ${res.status}`);
-  const out = (await res.json().catch(() => null)) as { data?: { status?: string; details?: { error?: string } }[] } | null;
-  return (out?.data ?? []).flatMap((t, i) => (t?.details?.error === "DeviceNotRegistered" && batch[i] ? [batch[i].s.id] : []));
+  if (!res.ok) return "failed";
+  const ticket = (await res.json()).data?.[0];
+  if (ticket?.status === "ok") return "ok";
+  return ticket?.details?.error === "DeviceNotRegistered" ? "gone" : "failed";
 }
 
-async function deliver(rows: Outbox[]) {
-  const ids = [...new Set(rows.map((o) => o.station).filter(Boolean))] as string[];
-  const { data: stations } = ids.length ? await admin.from("station").select("id, label").in("id", ids) : { data: [] };
-  const labels = new Map((stations ?? []).map((s) => [s.id as string, (s.label as { ja?: string })?.ja ?? PUSH_UNKNOWN_PLACE]));
-  const place = (id: string | null) => (id && labels.get(id)) || PUSH_UNKNOWN_PLACE;
-  const gone: string[] = [];
-  let sent = 0;
-  for (const o of rows) {
-    try {
-      const { uids, roles } = recipients(o);
-      if (!uids.length && !roles.length) continue;
-      const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
-      if (!subs.length) continue;
-      const { data: staffRoles } = await admin.schema("ichido").from("staff").select("uid, role").in("uid", [...new Set(subs.map((s) => s.uid))]);
-      const roleOf = new Map((staffRoles ?? []).map((r) => [r.uid as string, r.role as string]));
-      const expo: { s: Sub; m: Message }[] = [];
-      await Promise.all(subs.map(async (s) => {
-        const m = message(o, place(o.station), roleOf.get(s.uid) ?? "");
-        if (!m) return;
-        if (s.platform === "expo") return void expo.push({ s, m });
-        const r = await sendWeb(s, m).catch(() => "failed" as const);
-        if (r === "gone") gone.push(s.id);
-        if (r === "ok") sent++;
-      }));
-      gone.push(...await sendExpo(expo));
-      sent += expo.length;
-    } catch (e) {
-      await ship([entry("warn", "alert_failed", { code: o.kind, incident: o.incident ?? undefined, ...errorFields(e) })]);
-    }
+async function deliver(o: Outbox) {
+  const accepted: string[] = [];
+  const settle = (retry: boolean) => rpc("alert_settle", { p_id: o.id, p_lease: o.lease, p_accepted: accepted, p_retry: retry });
+  if (o.kind === "field_job") {
+    const { data } = await admin.from("field_job").select("generation").eq("incident", o.incident)
+      .eq("assignee", o.target).eq("case_closed", false).is("acknowledged_at", null).maybeSingle().throwOnError();
+    if (!data || (o.generation != null && o.generation !== data.generation)) return settle(false);
   }
-  if (gone.length) await admin.from("push_subscription").delete().in("id", gone);
-  await ship([entry("info", "alerts", { code: "delivered", count: sent })]);
+  const { uids, roles } = recipients(o);
+  const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
+  const pending = subs.filter((s) => !o.delivered.includes(s.id));
+  if (!pending.length) return settle(false);
+  const [{ data: station }, { data: staff }] = await Promise.all([
+    admin.from("station").select("label").eq("id", o.station).maybeSingle().throwOnError(),
+    admin.schema("ichido").from("staff").select("uid,role").in("uid", pending.map((s) => s.uid)).throwOnError(),
+  ]);
+  const results = await Promise.allSettled(pending.map(async (s) => {
+    const m = message(o, station?.label?.ja ?? PUSH_UNKNOWN_PLACE, staff?.find((u) => u.uid === s.uid)?.role ?? "");
+    if (!m) return;
+    const result = await (s.platform === "web" ? sendWeb(s, m) : sendExpo(s, m));
+    if (result === "gone") await admin.from("push_subscription").delete().eq("id", s.id).eq("endpoint", s.endpoint).throwOnError();
+    if (result === "ok") accepted.push(s.id);
+    if (result === "failed") throw new Error("provider_refused");
+  }));
+  await settle(results.some((r) => r.status === "rejected"));
 }
 
 // Drain the outbox. Never throws: an alert is a convenience on top of the console, which is the source of truth.
 export async function flushAlerts(): Promise<void> {
   try {
     for (let round = 0; round < 5; round++) {
-      const rows = await rpc<Outbox[]>("alert_take", { p_limit: 50 });
+      const rows = await rpc<Outbox[]>("alert_take", { p_limit: 10 });
       if (!rows.length) return;
-      await deliver(rows);
-      if (rows.length < 50) return;
+      await Promise.all(rows.map(deliver));
+      if (rows.length < 10) return;
     }
   } catch (e) {
     await ship([entry("warn", "alert_failed", { code: "flush", ...errorFields(e) })]);

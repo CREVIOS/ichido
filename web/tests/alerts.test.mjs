@@ -126,9 +126,9 @@ test("a new case goes to operators on duty only, a field job only to its guard, 
 
   await ok(cmd(op, "assign", { incident, assignee: g1.uid }));
   const job = await until("field job push", () => g1b.received().find((m) => m.tag === `field_job:${incident}`));
-  assert.equal(job.url, "/field");
+  assert.equal(job.url, `/field?job=${incident}`);
   const expo = await until("expo push", () => seen.filter((r) => r.path === "/expo/push").map((r) => JSON.parse(r.body.toString())).flat().find((m) => m.to === g1Expo));
-  assert.deepEqual(expo.data, { path: "/field" });
+  assert.deepEqual(expo.data, { path: `/field?job=${incident}` });
   assert.equal(seen.find((r) => r.path === "/expo/push").headers["content-type"], "application/json");
 
   await flush();

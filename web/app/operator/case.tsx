@@ -40,7 +40,7 @@ function useCase(id: string) {
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
-      db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
+      db.from("field_job").select("assignee, state, eta, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
       db.from("bot_step").select("step, status, code, due_at, data, at").eq("incident", id),
       db.from("escalation").select("reason").eq("incident", id),
       db.from("bot_suggestion").select("rev, suggestion").eq("incident", id).maybeSingle(),
@@ -57,7 +57,11 @@ function useCase(id: string) {
 export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const { card, events, replies, job, bot } = useCase(d.id);
   const [guards, setGuards] = useState<Guard[]>([]);
-  useEffect(() => { cmd<{ field: Guard[] }>("staff_list").then((r) => setGuards(r.field)).catch(() => setGuards([])); }, []);
+  const roster = useCallback(async () => {
+    const r = await cmd<{ field: Guard[] }>("staff_list", { incident: d.id }).catch(() => null);
+    setGuards(r?.field ?? []);
+  }, [d.id]);
+  useLive(["field_job", "staff"], roster);
 
   const mine = d.operator_id === me.uid;
   const closed = Boolean(d.finished_at);
@@ -113,7 +117,7 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
       {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <FaultCard d={d} flags={card?.flags ?? []} run={run} />
-      <ReplyCard d={d} lang={lang} replies={replies} run={run} bundleTo={job ? undefined : guards[0]} flags={card?.flags ?? []} />
+      <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />
       <Separator />
