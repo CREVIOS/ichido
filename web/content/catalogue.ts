@@ -5,6 +5,7 @@
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
 import { EXCLUSIVE_GROUPS, PACKS, contentPack, isUrgentTap, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
+import { FRONT_DESK } from "./frontline.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
@@ -219,6 +220,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>, f
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
+    case "frontline_transfer": return `${FRONT_DESK.transfer} · P${d.priority} · ${FRONT_DESK.reasons[d.reason ?? ""] ?? ""}`;
     default: return accessEventText(kind, d) ?? faultEventText(kind, d) ?? REVIEW.events[kind] ?? opsEventText(kind, d) ?? kind;
   }
 }

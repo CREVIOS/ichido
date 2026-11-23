@@ -12,7 +12,7 @@ export async function caseBot(incident: string) {
   let signal = signals.next();   // kept until it resolves, so no signal is lost to a timer winning the race
 
   await begin(incident);
-  await route(incident);
+  let routed = false;
   let claimed = false;
   let prepared: number | null = null;
   let reply: "open" | "scheduled" | "settled" = "open";
@@ -23,6 +23,7 @@ export async function caseBot(incident: string) {
     const s = await observe(incident);
     if (s.gone) return;
     if (s.closed) break;
+    if (!routed && s.handler !== "ai") { await route(incident); routed = true; }
     if (s.claimed && !claimed) {
       claimed = true;
       await mark(incident, "claim", "done", null);

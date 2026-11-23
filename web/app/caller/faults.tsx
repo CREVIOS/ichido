@@ -75,7 +75,7 @@ export function FollowUp({ f, prefs, onPrefs }: { f: FollowUpCase; prefs: Prefs;
   const told = f.reply && replyOf(f.reply.intent)?.text(f.reply.slots)[lang];
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={setLang} />}>
-      <Human lang={lang} open={false} />
+      <Human lang={lang} />
       <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</span>

@@ -1,3 +1,4 @@
+import { Human } from "./Human";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -92,6 +93,7 @@ export function FollowUp({ f, prefs, onPrefs, onRefresh }: { f: FollowUpCase; pr
     <TextScale.Provider value={textScale(prefs)}>
       <Screen eyebrow={<Brand />} onRefresh={onRefresh}>
         <LangPicker lang={lang} onChange={setLang} />
+        <Human lang={lang} />
         <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
         <T v="label" tone="muted">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</T>
         <T v="h1">{FAULT_UI.followTitle[lang]}</T>

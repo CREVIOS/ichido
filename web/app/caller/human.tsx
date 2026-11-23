@@ -3,13 +3,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/kit";
 import { cmd } from "@/lib/supabase";
-import { FRONTLINE, UI, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, FRONTLINE, UI, errorText, type Lang } from "@/content/catalogue";
 
 export function Human({ lang, open = true }: { lang: Lang; open?: boolean }) {
   const [note, setNote] = useState("");
   async function request() {
     if (!open) return setNote(FRONTLINE.inPerson[lang]);
-    try { await cmd("human"); setNote(FRONTLINE.queued[lang]); }
+    try { await cmd("human"); setNote(ACCESS.humanAsked[lang]); }
     catch (error) { setNote(errorText((error as Error).message, lang)); }
   }
   return <div className="sticky top-1 z-10 grid gap-1 bg-background py-1">

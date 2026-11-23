@@ -362,7 +362,11 @@ export async function POST(req: Request): Promise<Response> {
       if (desk.handler === "ai") fail(409, "conflict");
     }
     const out = await commands[name](actor, body);
-    if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
+    if (incident && BOT_SIGNALS.has(name)) {
+      const id = incident;
+      if (name === "human" || name === "frontline_turn" || name === "takeover") after(() => signalBot(id,name));
+      else await signalBot(id,name);
+    }
     after(flushAlerts);   // whatever this command made the database enqueue (lib/alerts.ts)
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
     return reply(200, out);

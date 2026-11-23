@@ -16,7 +16,6 @@ import { PrefsBar, speechRate, usePrefs } from "./prefs";
 import { CallerNotice, FraudScreen } from "./ops";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
-const openCase = (card: CallerCase) => card.status !== "guided";
 const noop = () => () => {};
 
 export default function CallerPage() {
@@ -58,15 +57,15 @@ export default function CallerPage() {
   if (card.fraud) return <FraudScreen lang={lang} />;
   // The current guidance only: a reply withdrawn after a fault-type change no longer shows.
   const latest = replies.find((r) => r.id === card.reply_id);
-  const frontline = card.handler !== "legacy" && openCase(card);
-  const confirmed = card.confirmed_rev != null || replies.length > 0;
   const open = card.status !== "guided";
+  const frontline = card.handler !== "legacy" && open;
+  const confirmed = card.confirmed_rev != null || replies.length > 0;
   // A non-ATM pack's caller answers with taps inside the intake; the ATM's taps sit below the read-back.
   const P = callerPack(card.fault);
 
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={(l) => cmd("set_lang", { lang: l }).then(load).catch(() => undefined)} />}>
-      <Human lang={lang} open={open} />
+      <Human lang={lang} />
       <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>

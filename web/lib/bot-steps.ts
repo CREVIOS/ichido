@@ -17,7 +17,7 @@ export type Signal = { cmd: string };
 export type Job = { generation: number; state: string; due: number | null };
 export type Snapshot = {
   now: number; gone: boolean; closed: boolean; claimed: boolean; confirmedRev: number | null;
-  replied: boolean; replyDue: number | null; job: Job | null;
+  handler: string; replied: boolean; replyDue: number | null; job: Job | null;
 };
 
 export const botToken = (incident: string) => `ichido-bot:${incident}`;
@@ -81,14 +81,14 @@ export async function route(incident: string) {
   "use step";
   const t0 = performance.now();
   const { admin, priv, event } = await lib();
-  const { data: d, error } = await admin.from("desk").select("operator_id, finished_at").eq("id", incident).maybeSingle();
+  const { data: d, error } = await admin.from("desk").select("operator_id, finished_at, lang, fault").eq("id", incident).maybeSingle();
   if (error) throw error;
   if (!d || d.operator_id || d.finished_at) {
     await setStep(incident, "route", "skipped", d?.operator_id ? "claimed" : "closed");
     return log("route", incident, t0, "skipped");
   }
   const [ops, open, online] = await Promise.all([
-    priv().from("staff").select("uid, display_name").eq("role", "operator").order("display_name"),
+    priv().from("staff").select("uid, display_name, service_packs, service_languages").eq("role", "operator").order("display_name"),
     admin.from("desk").select("operator_id").is("finished_at", null).not("operator_id", "is", null),
     onlineOperators(),
   ]);
@@ -97,7 +97,11 @@ export async function route(incident: string) {
   const load = (uid: string) => (open.data ?? []).filter((x) => x.operator_id === uid).length;
   const here = (ops.data ?? []).filter((o) => online?.has(o.uid));
   const pool = here.length ? here : ops.data ?? [];
-  const pick = pool.map((o) => ({ ...o, open: load(o.uid) })).sort((a, b) => a.open - b.open)[0];
+  const { packOfFault } = await import("@/content/catalogue");
+  const pack = packOfFault(d.fault);
+  const pick = pool.map((o) => ({ ...o, open: load(o.uid),
+    match: Number(o.service_packs.includes(pack)) * 2 + Number(d.lang && o.service_languages.includes(d.lang)),
+  })).sort((a, b) => b.match - a.match || a.open - b.open)[0];
   if (!pick) {
     await setStep(incident, "route", "skipped", "no_operator");
     return log("route", incident, t0, "no_operator");
@@ -113,23 +117,25 @@ export async function observe(incident: string): Promise<Snapshot> {
   "use step";
   const { admin, priv } = await lib();
   const [d, claim, replies, job, targets] = await Promise.all([
-    admin.from("desk").select("finished_at, confirmed_rev").eq("id", incident).maybeSingle(),
+    admin.from("desk").select("finished_at, confirmed_rev, handler, queued_at").eq("id", incident).maybeSingle(),
     admin.from("case_event").select("at").eq("incident", incident).eq("kind", "claimed").order("id").limit(1).maybeSingle(),
-    admin.from("reply").select("id", { count: "exact", head: true }).eq("incident", incident),
+    admin.from("reply").select("id", { count: "exact", head: true }).eq("incident", incident).eq("author", "human"),
     admin.from("field_job").select("generation, state, updated_at, case_closed").eq("incident", incident).maybeSingle(),
     priv().from("sla_target").select("reason, seconds"),
   ]);
   for (const r of [d, claim, replies, job, targets]) if (r.error) throw r.error;
   const target = Object.fromEntries((targets.data ?? []).map((t) => [t.reason, t.seconds as number]));
+  const start = d.data?.queued_at ?? claim.data?.at;
   const j = job.data;
   return {
     now: Date.now(),
     gone: !d.data,
     closed: Boolean(d.data?.finished_at),
     claimed: Boolean(claim.data),
-    confirmedRev: d.data?.confirmed_rev ?? null,
+    handler: d.data?.handler ?? "legacy",
+    confirmedRev: d.data?.handler === "ai" ? null : d.data?.confirmed_rev ?? null,
     replied: (replies.count ?? 0) > 0,
-    replyDue: claim.data && target.no_reply ? dueAfter(claim.data.at, target.no_reply) : null,
+    replyDue: start && target.no_reply ? dueAfter(start, target.no_reply) : null,
     job: j && !j.case_closed ? { generation: j.generation, state: j.state, due: target.guard_late ? dueAfter(j.updated_at, target.guard_late) : null } : null,
   };
 }

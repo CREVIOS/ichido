@@ -7,6 +7,7 @@ import { Check, CircleCheck, Frown, Meh, OctagonAlert, Smile, Volume2 } from "lu
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
+import { Human } from "@/components/Human";
 import { hasVoice } from "@/lib/voice";
 import { Brand, Button, Card, Icon, Input, LangPicker, Notice, Pill, Screen, T, Tag, TextScale, Toggle } from "@/components/ui";
 import { BankStatus, CallerFlags, FollowUp, PrefsBar, speechRate, textScale, usePrefs, type FollowUpCase } from "@/components/CallerFaults";
@@ -20,7 +21,7 @@ type CallerCard = {
   id: string; station: string; fault: string; lang: Lang | null; confirmed_rev: number | null; status: Status;
   field_state: FieldState; eta: string | null; choice: string | null; teachback: string | null; teachback_result: string | null; needs_human: boolean; rating: number | null;
   reply_id: string | null; flags: string[]; bank_status: string | null; bank_due: string | null;
-  fraud?: boolean; notice?: string | null;
+  text_only: boolean; fraud?: boolean; notice?: string | null;
 };
 type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -73,6 +74,7 @@ export default function CallerScreen() {
     <TextScale.Provider value={textScale(prefs)}>
       <Screen eyebrow={<Brand />} onRefresh={load}>
         <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => undefined); }} />
+        <Human lang={lang} />
         <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
         <View style={{ gap: 6 }}>
           <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
@@ -100,7 +102,7 @@ export default function CallerScreen() {
 // An ATM caller confirms the read-back of two facts; any other pack's caller confirms their own taps (content/packs).
 function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerCard }) {
   const P = callerPack(card.fault);
-  const needsHuman = card.needs_human;
+
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,7 +127,7 @@ function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerC
       <Notice>{P.neverAsk[lang]}</Notice>
       {P.scope ? <Notice>{P.scope[lang]}</Notice> : null}
       {!P.atm && <CallerFlags fault={card.fault} flags={card.flags} lang={lang} />}
-      {hasVoice && VOICE_LANGS.includes(lang) ? <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} /> : <T v="small">{VOICE.unavailable[lang]}</T>}
+      {!card.text_only && hasVoice && VOICE_LANGS.includes(lang) ? <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} /> : <T v="small">{VOICE.unavailable[lang]}</T>}
       <Card>
         <Input label={UI.whatHappened[lang]} value={text} onChangeText={setText} multiline maxLength={MAX_TEXT} />
         <View style={{ alignItems: "flex-end" }}>
@@ -154,8 +156,7 @@ function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: CallerC
         ))}
       </Card> : draft.words ? <T v="label">“{draft.words}”</T> : null}
       <Button label={UI.confirm[lang]} block disabled={busy || !ready} onPress={() => cmd("confirm", { rev: draft.rev }).catch(fail)} />
-      {needsHuman ? <Notice>{P.humanAsked(lang)}</Notice>
-        : <Button kind="ghost" label={UI.human[lang]} onPress={() => cmd("human").catch(fail)} />}
+
     </>
   );
 }
@@ -261,6 +262,7 @@ function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onN
 function FraudScreen({ lang }: { lang: Lang }) {
   return (
     <SafeAreaView accessibilityRole="alert" style={{ flex: 1, justifyContent: "center", gap: space.xl, padding: space.xxl, backgroundColor: color.alert }}>
+      <Human lang={lang} />
       <OctagonAlert size={56} strokeWidth={1.5} color={color.onPrimary} />
       <T v="h1" tone="onPrimary" weight={500} style={{ fontSize: 44, lineHeight: 48 }}>{OPS_CALLER.fraud.title[lang]}</T>
       <T v="h1" tone="onPrimary">{OPS_CALLER.fraud.body[lang]}</T>
@@ -274,6 +276,7 @@ function NotConnected({ staff }: { staff: boolean }) {
   return (
     <Screen back eyebrow={<Brand />}>
       <LangPicker lang={lang} onChange={setLang} />
+      <Human lang={lang} connected={false} />
       <T v="h1">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</T>
       <Button kind="secondary" label={MOBILE.back[lang]} onPress={() => router.replace("/")} />
     </Screen>

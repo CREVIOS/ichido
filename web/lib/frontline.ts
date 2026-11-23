@@ -42,7 +42,7 @@ async function read(s: Submitted, text: string) {
   const pack = contentPack(s.fault);
   const [risk, patch, taps] = await Promise.all([
     modelRisk(text, s.locale),
-    pack ? null : extract(text, s.locale, s),
+    pack ? null : extract(text, s.locale, { card_back: s.card_back, cash_received: s.cash_received }),
     pack ? triage(text, s.locale, pack) : null,
   ]);
   const facts: Partial<Record<"card_back" | "cash_received", Fact>> = {};

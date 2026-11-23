@@ -5,6 +5,7 @@ alter table public.desk
   add column if not exists priority smallint check (priority between 0 and 2),
   add column if not exists transfer_reason text,
   add column if not exists queued_at timestamptz,
+  add column if not exists ai_work_ms integer not null default 0,
   add column if not exists human_connected_at timestamptz,
   add column if not exists resolved_by text check (resolved_by in ('ai','human'));
 alter table public.caller_card add column if not exists handler text not null default 'legacy';
@@ -46,6 +47,8 @@ begin
       and (priority is null or severity < priority);
   if found then
     update public.caller_card set needs_human = true where id = i;
+    insert into ichido.alert_outbox(kind,incident,station,target)
+      select case when operator_id is null then 'new_case' else 'remind' end,id,station,operator_id from public.desk where id=i;
     perform ichido.event(i, 'system', 'frontline_transfer', jsonb_build_object('priority',severity,'reason',reason));
   end if;
 end $$;
@@ -78,15 +81,26 @@ create or replace function public.frontline_pair(p_uid uuid,p_station text,p_dig
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare i uuid;
 begin
+  perform set_config('ichido.frontline_client',case when p_frontline then '1' else '0' end,true);
   i := public.redeem_pair(p_uid,p_station,p_digest,p_lang);
-  if not p_frontline then perform ichido.queue_frontline(i,1,'staffed_entry'); end if;
   return i;
 end $$;
 
 create or replace function public.cmd_human(p_uid uuid) returns void
 language plpgsql security definer set search_path = '' as $$
-declare d public.desk;
+declare d public.desk; old_station text; old_fault text;
 begin
+  perform pg_advisory_xact_lock(1,hashtext(p_uid::text));
+  select s.station,s.fault into old_station,old_fault from ichido.follow_up f join public.desk s on s.id=f.incident
+    where f.uid=p_uid and f.expires>now() and not exists (
+      select from ichido.binding b join public.desk current_case on current_case.id=b.incident
+      where b.uid=p_uid and b.expires>now() and current_case.finished_at is null)
+    order by f.expires desc limit 1;
+  if found then
+    delete from ichido.binding b using public.desk c where b.uid=p_uid and c.id=b.incident and c.finished_at is not null;
+    perform public.cmd_silent_alert(p_uid,old_station,old_fault);
+    return;
+  end if;
   d := ichido.caller_case(p_uid);
   perform ichido.queue_frontline(d.id,1,'human_request');
   update public.caller_card set needs_human = true where id = d.id and not needs_human;
@@ -189,6 +203,14 @@ create policy frontline_caller on public.frontline_turn for select to authentica
 create or replace function ichido.frontline_greeting() returns trigger
 language plpgsql set search_path = '' as $$
 begin
+  if current_setting('ichido.frontline_client',true) is distinct from '1' then
+    -- Older clients have no monitoring disclosure or AI-turn command.
+    update public.desk set handler='legacy' where id=new.incident and handler='ai';
+    if found then
+      insert into ichido.alert_outbox(kind,incident,station) select 'new_case',id,station from public.desk where id=new.incident;
+    end if;
+    return null;
+  end if;
   insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,rev,epoch)
     select d.id,new.voice_room,gen_random_uuid(),'ai',new.lang,'greeting',dr.rev,d.handler_epoch
     from public.desk d join public.draft dr on dr.incident=d.id where d.id=new.incident and d.handler='ai';
@@ -284,6 +306,9 @@ begin
   if p_priority is not null then perform ichido.queue_frontline(d.id,p_priority,p_reason); return false; end if;
   select * into dr from public.draft where incident=d.id;
   if d.handler <> 'ai' or d.handler_epoch <> t.epoch or dr.rev <> t.rev or d.lang <> t.locale then return false; end if;
+  update public.desk set ai_work_ms=ai_work_ms+least(90000,greatest(0,extract(epoch from clock_timestamp()-t.at)*1000))::int
+    where id=d.id returning * into d;
+  if d.ai_work_ms >= 90000 then perform ichido.queue_frontline(d.id,2,'limit'); return false; end if;
   if p_wording not in ('readback','SHELTER_INFO','withheld') then perform ichido.fail('bad_request'); end if;
   if p_wording='SHELTER_INFO' then
     if t.wording <> 'confirm' or d.confirmed_rev is distinct from t.rev then perform ichido.fail('conflict'); end if;
@@ -375,5 +400,111 @@ drop policy if exists frontline_staff_topic on realtime.messages;
 create policy frontline_staff_topic on realtime.messages for select to authenticated
   using (extension='broadcast' and realtime.topic() in ('live:frontline_turn','live:frontline_translation') and ichido.has_role('operator'));
 
+alter table ichido.staff add column if not exists service_packs text[] not null default '{}',
+  add column if not exists service_languages text[] not null default '{}';
+create or replace function ichido.escalate_due() returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  d record;
+begin
+  -- Only a submitted request with no committed answer can time out. Idle typing has no timer.
+  for d in select q.id from public.desk q where q.handler='ai' and q.finished_at is null and exists (
+    select from public.frontline_turn t join ichido.binding b on b.incident=t.incident and b.voice_room=t.generation
+      join public.draft dr on dr.incident=t.incident where t.incident=q.id and t.epoch=q.handler_epoch and t.rev=dr.rev
+      and t.locale=b.lang and t.speaker='caller' and t.wording <> 'start' and t.at < now()-interval '90 seconds'
+      and not exists(select from public.frontline_turn a where a.incident=t.incident and a.generation=t.generation
+        and a.request_id=t.request_id and a.speaker='ai')) for no key update skip locked
+  loop
+    perform ichido.queue_frontline(d.id,2,'limit');
+  end loop;
+  -- Claims, replies and closure lock the desk. A busy case can wait for the next tick.
+  for d in select id, operator_id, created_at, queued_at, handler from public.desk
+           where finished_at is null and handler <> 'ai' order by id for no key update skip locked
+  loop
+    with timers(reason, started) as (
+      select 'unclaimed', coalesce(d.queued_at,d.created_at) where d.operator_id is null
+      union all
+      select 'no_reply', min(e.at) from public.case_event e
+        where d.handler='legacy' and d.operator_id is not null and e.incident = d.id and e.kind = 'claimed'
+          and not exists (select 1 from public.reply r where r.incident = d.id)
+      union all
+      select 'no_reply', d.queued_at where d.handler in ('queued','human') and not exists (
+        select from public.reply where incident=d.id and author='human' and sent_at>=d.queued_at)
+      union all
+      select 'guard_late', job.updated_at from (
+        select updated_at from public.field_job where incident = d.id
+          and state = 'requested' and not case_closed for share skip locked
+      ) job
+    ), added as (
+      insert into public.escalation (incident, reason)
+        select d.id, reason from timers join ichido.sla_target using (reason)
+        where started < now() - make_interval(secs => seconds)
+        on conflict (incident, reason) do nothing
+        returning incident, level, reason
+    )
+    insert into public.case_event (incident, actor, kind, data)
+      select incident, 'system', 'escalated', jsonb_build_object('level', level, 'reason', reason)
+      from added;
+  end loop;
+end $$;
+create or replace function public.bot_remind(p_incident uuid, p_reason text, p_gen int default null) returns text
+language plpgsql security definer set search_path = '' as $$
+declare d public.desk; j public.field_job; target int;
+begin
+  select * into d from public.desk where id = p_incident for update;
+  if not found or d.finished_at is not null then return 'closed'; end if;
+  select seconds into target from ichido.sla_target where reason = p_reason;
+  if p_reason = 'no_reply' then
+    if d.handler = 'ai' then return 'ai'; end if;
+    if exists (select 1 from public.reply where incident = d.id and author='human' and (d.queued_at is null or sent_at >= d.queued_at)) then
+      perform public.bot_mark(d.id, 'remind_reply', 'skipped', 'replied');
+      return 'replied';
+    end if;
+    perform ichido.event(d.id, 'bot', 'bot_remind', jsonb_build_object('reason', p_reason, 'target_s', target));
+    perform public.bot_mark(d.id, 'remind_reply', 'done', 'reminded', jsonb_build_object('target_s', target));
+    return 'reminded';
+  elsif p_reason = 'guard_late' then
+    select * into j from public.field_job where incident = d.id for update;
+    if not found or j.generation <> p_gen then return 'moved'; end if;   -- a newer dispatch has its own schedule
+    if j.state <> 'requested' or j.case_closed then
+      perform public.bot_mark(d.id, 'remind_guard', 'skipped', 'moved', jsonb_build_object('generation', p_gen));
+      return 'moved';
+    end if;
+    update public.field_job set reminded_gen = p_gen where incident = d.id;
+    perform ichido.event(d.id, 'bot', 'bot_remind', jsonb_build_object('reason', p_reason, 'target_s', target,
+      'assignee', (select display_name from ichido.staff where uid = j.assignee)));
+    perform public.bot_mark(d.id, 'remind_guard', 'done', 'reminded', jsonb_build_object('generation', p_gen, 'target_s', target));
+    return 'reminded';
+  end if;
+  perform ichido.fail('bad_request');
+end $$;
+create or replace function public.bot_close(p_incident uuid, p_summary text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare d public.desk; r public.case_record; secs jsonb;
+begin
+  select * into d from public.desk where id = p_incident for update;
+  if not found or d.finished_at is null then perform ichido.fail('conflict'); end if;
+  insert into public.case_record (incident, summary, claim_s, first_reply_s, guard_arrival_s, total_s)
+  select d.id, case when d.status = 'guided' then p_summary end,
+    (select extract(epoch from min(at) - coalesce(d.queued_at,d.created_at))::int from public.case_event where incident = d.id and kind = 'claimed'),
+    (select extract(epoch from min(sent_at) - coalesce(d.queued_at,d.created_at))::int from public.reply where incident = d.id and author='human'),
+    (select extract(epoch from min(a.at) - min(s.at))::int
+       from public.case_event a, public.case_event s
+       where a.incident = d.id and a.kind = 'field' and a.data->>'state' = 'arrived'
+         and s.incident = d.id and s.kind = 'dispatch'),
+    extract(epoch from d.finished_at - d.created_at)::int
+  on conflict (incident) do nothing
+  returning * into r;
+  if r.incident is null then select * into r from public.case_record where incident = d.id;
+  else
+    secs := jsonb_strip_nulls(jsonb_build_object('claim_s', r.claim_s, 'first_reply_s', r.first_reply_s,
+      'guard_arrival_s', r.guard_arrival_s, 'total_s', r.total_s));
+    perform ichido.event(d.id, 'bot', 'bot_closed', secs);
+    update public.bot_step set status = 'skipped', code = 'closed', due_at = null, at = now()
+      where incident = d.id and status = 'waiting' and step <> 'record';
+    perform public.bot_mark(d.id, 'record', 'done', null, secs);
+  end if;
+  return to_jsonb(r) - 'summary' - 'incident';
+end $$;
 notify pgrst, 'reload schema';
 commit;
