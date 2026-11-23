@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { callerAuth, cmd, signOut } from "@/lib/supabase";
+import { Human } from "@/components/Human";
 import { Brand, Button, Card, Input, LangPicker, Notice, Screen, T, Tag } from "@/components/ui";
 import { ACCESS, UI, LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
 
@@ -44,7 +45,8 @@ export default function StationScreen() {
   }
 
   return (
-    <Screen back backLabel={MOBILE.back[lang]} eyebrow={<Brand />} title={STATION.title[lang]}>
+    <Screen back backLabel={MOBILE.back[lang]} eyebrow={<Brand />} title={STATION.title[lang]}
+      pinned={staffSession ? <Human lang={lang} connected={false} /> : <Button kind="secondary" label={UI.human[lang]} onPress={() => connect(true)} busy={busy} />}>
       <Tag label="Help Point" value={station} />
       <LangPicker lang={lang} onChange={setLang} />
       {staffSession ? (
@@ -58,7 +60,6 @@ export default function StationScreen() {
             autoCapitalize="characters" autoCorrect={false} autoComplete="off" textContentType="oneTimeCode"
             style={{ fontSize: 30, lineHeight: 38, letterSpacing: 6, textAlign: "center", minHeight: 64 }}
             onSubmitEditing={() => code.length === CODE_LENGTH && connect()} />
-          <Button kind="secondary" label={UI.human[lang]} onPress={() => connect(true)} busy={busy} />
           {alerted && <Notice>{ACCESS.alertSent[lang]}</Notice>}
           {error ? <Notice tone="alert">{error}</Notice> : null}
           <Button label={STATION.go[lang]} onPress={() => connect()} busy={busy} disabled={code.length < CODE_LENGTH} block />

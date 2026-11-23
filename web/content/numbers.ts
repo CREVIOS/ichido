@@ -19,8 +19,9 @@ const NUMBER_WORDS = new Set([
 // Treat even short standalone number fragments as sensitive in a multi-turn conversation.
 export function frontlineNumber(text: string): boolean {
   if (looksLikeNumber(text) || /\p{Nd}|[〇零一二三四五六七八九]{2}/u.test(text)) return true;
+  if (/(?:ぜろ|れい|いち|に|さん|よん|ご|ろく|なな|しち|はち|きゅう){2,}/u.test(text.normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 96)))) return true;
   const words = text.normalize("NFC").toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
-  return words.some((w, i) => NUMBER_WORDS.has(w) && (words.length === 1 || NUMBER_WORDS.has(words[i + 1]) || ID_WORDS.test(text)));
+  return words.some((w) => NUMBER_WORDS.has(w));
 }
 // Words for an ID, insurance, residence-card, My Number, passport or account number in the caller languages: with three
 // or more digits anywhere in the text, the text is withheld even when the digits are split up.

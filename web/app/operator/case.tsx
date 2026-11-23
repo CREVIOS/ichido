@@ -74,7 +74,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         {d.text_only && !closed && <TextOnlyBanner />}
         {!closed && <UrgentBanner flags={card?.flags ?? []} />}
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
-        {!closed && d.handler !== "legacy" && <FrontlineMonitor desk={d} />}
+        {!closed && d.handler !== "legacy" && <FrontlineMonitor key={d.id} desk={d} />}
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />

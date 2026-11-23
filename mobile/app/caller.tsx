@@ -60,7 +60,7 @@ export default function CallerScreen() {
   }, []);
   useLive(["caller_card", "draft", "reply"], load, true, { incident: card?.id });
 
-  if (card === undefined) return null;
+  if (card === undefined) return <Screen><Human lang="bn" /></Screen>;
   if (card === null) return follow ? <FollowUp f={follow} prefs={prefs} onPrefs={setPrefs} onRefresh={load} /> : <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
@@ -72,9 +72,8 @@ export default function CallerScreen() {
 
   return (
     <TextScale.Provider value={textScale(prefs)}>
-      <Screen eyebrow={<Brand />} onRefresh={load}>
+      <Screen eyebrow={<Brand />} pinned={<Human lang={lang} />} onRefresh={load}>
         <LangPicker lang={lang} onChange={(l) => { cmd("set_lang", { lang: l }).then(load).catch(() => undefined); }} />
-        <Human lang={lang} />
         <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
         <View style={{ gap: 6 }}>
           <T v="label" tone="muted">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</T>
@@ -274,9 +273,8 @@ function FraudScreen({ lang }: { lang: Lang }) {
 function NotConnected({ staff }: { staff: boolean }) {
   const [lang, setLang] = useState<Lang>("bn");
   return (
-    <Screen back eyebrow={<Brand />}>
+    <Screen back eyebrow={<Brand />} pinned={<Human lang={lang} connected={false} />}>
       <LangPicker lang={lang} onChange={setLang} />
-      <Human lang={lang} connected={false} />
       <T v="h1">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</T>
       <Button kind="secondary" label={MOBILE.back[lang]} onPress={() => router.replace("/")} />
     </Screen>

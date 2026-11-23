@@ -3,8 +3,8 @@ import { frontlineNumber } from "./numbers.ts";
 
 export type Transfer = { priority: 0 | 1 | 2; reason: string };
 const DANGER = /can't breathe|cannot breathe|hard to breathe|chest pain|heavy bleeding|missing child|child is missing|told me to transfer|coaching me|শ্বাস নিতে|বুকে ব্যথা|রক্তপাত|শিশু নিখোঁজ|বাচ্চা হারিয়ে|টাকা পাঠাতে বল|khó thở|đau ngực|chảy nhiều máu|lạc con|bảo tôi chuyển tiền|sesak napas|sulit bernapas|nyeri dada|anak hilang|disuruh transfer|सास फेर्न|छाती दुख|रगत बग|बच्चा हरायो|पैसा पठाउन भन|息ができ|息が苦し|いきがくるし|胸が痛|子どもがいない|こどもがみつから|振り込め/u;
-const PERSON = /\b(?:human|operator|agent|real person|a person|someone on staff|staff member)\b|মানুষ|কর্মী|অপারেটর|কারো সাথে কথা|কারও সঙ্গে কথা|nhân viên|người thật|petugas|operator|orang sungguhan|कर्मचारी|मान्छे|मानिस|अपरेटर|人と話|人とはな|人に代わ|係の人|担当者|オペレーター/u;
-const NEED = /card.*(?:stuck|kept|retained)|missing cash|cash.*didn.t come|scared|frightened|dispute|can't continue|ভয়|ভয়|কার্ড আটকে|rất sợ|bị giữ thẻ|takut|kartu tertelan|डर लाग|कार्ड अड्क|こわい|怖い|カードが戻ら/u;
+const PERSON = /\b(?:human|operator|agent|real person|a person|someone on staff|talk to someone|speak to someone|staff member)\b|মানুষ|কর্মী|অপারেটর|কারো সাথে কথা|কারও সঙ্গে কথা|nhân viên|người thật|petugas|operator|orang sungguhan|कर्मचारी|मान्छे|मानिस|अपरेटर|人と話|人とはな|人に代わ|係の人|担当者|オペレーター/u;
+const NEED = /card.*(?:stuck|kept|retained|didn't come back|did not come back)|missing cash|cash.*didn.t come|scared|frightened|dispute|can't continue|ভয়|ভয়|কার্ড আটকে|rất sợ|bị giữ thẻ|takut|kartu tertelan|डर लाग|कार्ड अड्क|こわい|怖い|カードが戻ら/u;
 
 export function screenTurn(text: string) {
   const normalized = text.normalize("NFKC").toLowerCase().replace(/[’‘]/g, "'");

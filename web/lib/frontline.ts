@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { CALLER_FLAGS, MANUAL_VERSION, contentPack, exclusiveOff, flagsFor, type Fact, type Lang } from "@/content/catalogue";
+import { CALLER_FLAGS, MANUAL_VERSION, contentPack, exclusiveOff, flagsFor, packTaps, type Fact, type Lang } from "@/content/catalogue";
 import { approvedInfo, conversationText, screenTurn, type Transfer } from "@/content/frontline-policy";
 import { frontlineNumber } from "@/content/numbers";
 import { extract, respond, toJapanese } from "./extract";
@@ -40,18 +40,23 @@ async function translate(seq: number, words: string) {
 
 async function read(s: Submitted, text: string) {
   const pack = contentPack(s.fault);
-  const [risk, patch, taps] = await Promise.all([
+  const [safety, atm, packFacts] = await Promise.allSettled([
     modelRisk(text, s.locale),
     pack ? null : extract(text, s.locale, { card_back: s.card_back, cash_received: s.cash_received }),
     pack ? triage(text, s.locale, pack) : null,
   ]);
+  const patch = atm.status === "fulfilled" ? atm.value : null;
+  const taps = packFacts.status === "fulfilled" ? packFacts.value : null;
+  const failed = [safety, atm, packFacts].find((r) => r.status === "rejected");
+  if (failed) after(() => ship([entry("warn", "frontline_model_failed", errorFields(failed.reason))]));
   const facts: Partial<Record<"card_back" | "cash_received", Fact>> = {};
   if (patch) {
     for (const k of ["card_back","cash_received"] as const) if (patch[k] !== "unchanged") facts[k] = patch[k];
   }
-  let transfer = risk;
+  let transfer = safety.status === "fulfilled" ? safety.value : null;
   if (taps?.ask.length) transfer = { priority: 0, reason: "suspected_risk" };
-  else if (!transfer && (patch?.clarify || taps?.clarify)) transfer = { priority: 2, reason: "unclear" };
+  else if (!transfer && failed) transfer = { priority: 2, reason: "provider" };
+  else if (!transfer && (patch?.clarify || taps?.clarify || (pack && taps && !taps.situation && !taps.taps.length))) transfer = { priority: 2, reason: "unclear" };
   return { facts, taps, transfer };
 }
 
@@ -71,7 +76,9 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
       facts[body.key] = body.value;
     } else {
       const flag = body.flag;
-      if (typeof flag !== "string" || !flagsFor(card.fault,card.flags).includes(flag) || typeof body.on !== "boolean") return fail(400, "bad_request");
+      const pack = contentPack(card.fault);
+      const allowed = pack ? packTaps(pack) : flagsFor(card.fault, card.flags);
+      if (typeof flag !== "string" || !allowed.includes(flag) || typeof body.on !== "boolean") return fail(400, "bad_request");
       Object.assign(facts, { flag, on: body.on, off: body.on ? exclusiveOff(flag, card.flags) : [] });
       if (body.on && CALLER_FLAGS[flag].urgent) transfer = { priority: 0, reason: "suspected_risk" };
     }
@@ -90,15 +97,12 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>) {
     if (approvedInfo("SHELTER_INFO", s.fault, s.flags, true, s.locale)) wording = "SHELTER_INFO";
     else transfer = { priority: 1, reason: "staff_needed" };
   } else if (words) {
-    try {
-      const result = await read(s, words);
-      patch = result.facts; taps = result.taps; transfer = result.transfer;
-    } catch (error) {
-      transfer = { priority: 2, reason: "provider" };
-      after(() => ship([entry("warn","frontline_model_failed", { ...errorFields(error) })]));
-    }
+    const result = await read(s, words);
+    patch = result.facts;
+    taps = result.taps;
+    transfer = result.transfer;
   }
-  if (wording !== "SHELTER_INFO" && !conversationText(checked.withheld ? "withheld" : "readback", s.locale)) transfer = { priority: 2, reason: "unclear" };
+  if (!transfer && wording !== "SHELTER_INFO" && !conversationText(checked.withheld ? "withheld" : "readback", s.locale)?.trim()) transfer = { priority: 2, reason: "unclear" };
   const delivered = await rpc<boolean>("frontline_finish", { ...args, p_wording: wording, p_patch: patch, p_triage: taps,
     p_priority: transfer?.priority ?? null, p_reason: transfer?.reason ?? null, p_manual: MANUAL_VERSION });
   return { delivered, withheld: checked.withheld };

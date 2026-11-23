@@ -279,8 +279,8 @@ export function Menu({ label, items, closeLabel }: { label: string; closeLabel: 
 }
 
 // Page frame: safe area, a hairline top bar (back, eyebrow, actions), a 28px title, scrolling content with pull-to-refresh.
-export function Screen({ title, eyebrow, right, back, backLabel, onRefresh, children }: {
-  title?: string; eyebrow?: ReactNode; right?: ReactNode; back?: boolean; backLabel?: string; onRefresh?: () => void; children: ReactNode;
+export function Screen({ title, eyebrow, right, pinned, back, backLabel, onRefresh, children }: {
+  title?: string; eyebrow?: ReactNode; right?: ReactNode; pinned?: ReactNode; back?: boolean; backLabel?: string; onRefresh?: () => void; children: ReactNode;
 }) {
   const [refreshing, setRefreshing] = useState(false);
   return (
@@ -293,6 +293,7 @@ export function Screen({ title, eyebrow, right, back, backLabel, onRefresh, chil
           </View>
           {right}
         </View>
+        {pinned && <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>{pinned}</View>}
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: 48, gap: space.lg }}

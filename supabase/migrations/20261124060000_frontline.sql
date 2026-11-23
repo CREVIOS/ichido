@@ -8,7 +8,8 @@ alter table public.desk
   add column if not exists ai_work_ms integer not null default 0,
   add column if not exists human_connected_at timestamptz,
   add column if not exists resolved_by text check (resolved_by in ('ai','human'));
-alter table public.caller_card add column if not exists handler text not null default 'legacy';
+alter table public.caller_card add column if not exists handler text not null default 'legacy',
+  add column if not exists transfer_reason text;
 
 create or replace function ichido.frontline_owner() returns trigger
 language plpgsql set search_path = '' as $$
@@ -19,7 +20,8 @@ begin
       new.queued_at := coalesce(old.queued_at, now());
       new.human_connected_at := coalesce(old.human_connected_at, now());
     end if;
-    if new.handler <> old.handler or new.operator_id is distinct from old.operator_id then
+    if new.handler <> old.handler or new.operator_id is distinct from old.operator_id or
+       (old.lang is not null and new.lang is distinct from old.lang) then
       new.handler_epoch := old.handler_epoch + 1;
     end if;
     if new.status = 'guided' and old.status <> 'guided' then new.resolved_by := 'human'; end if;
@@ -32,11 +34,11 @@ for each row execute function ichido.frontline_owner();
 create or replace function ichido.frontline_card() returns trigger
 language plpgsql set search_path = '' as $$
 begin
-  update public.caller_card set handler = new.handler where id = new.id;
+  update public.caller_card set handler = new.handler, transfer_reason = new.transfer_reason where id = new.id;
   return null;
 end $$;
 create or replace trigger frontline_card after update on public.desk for each row
-when (old.handler <> new.handler) execute function ichido.frontline_card();
+when (old.handler <> new.handler or old.transfer_reason is distinct from new.transfer_reason) execute function ichido.frontline_card();
 
 create or replace function ichido.queue_frontline(i uuid, severity integer, reason text) returns void
 language plpgsql set search_path = '' as $$
@@ -122,8 +124,15 @@ begin
     end if;
     if p_epoch is null then perform ichido.fail('conflict'); end if;
   end if;
-  perform public.cmd_takeover(p_uid,p_name,p_incident);
+  if d.finished_at is not null or d.operator_id is null or d.operator_id = p_uid then perform ichido.fail('conflict'); end if;
+  update public.desk set operator_id=p_uid where id=d.id;
+  perform ichido.event(d.id,'operator','takeover',jsonb_build_object(
+    'from',(select display_name from ichido.staff where uid=d.operator_id),'abusive',d.abusive_at is not null),p_name);
 end $$;
+create or replace function public.cmd_takeover(p_uid uuid,p_name text,p_incident uuid) returns void
+language sql security definer set search_path = '' as $$
+  select public.frontline_takeover(p_uid,p_name,p_incident,null)
+$$;
 create or replace function public.cmd_silent_alert(p_uid uuid, p_station text, p_fault text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare i uuid; since timestamptz;
@@ -174,7 +183,7 @@ create table if not exists public.frontline_turn (
   speaker text not null check (speaker in ('caller','ai','human')),
   locale text not null check (locale in ('bn','vi','id','ne','en','ja')),
   channel text not null default 'text' check (channel in ('text','tap','voice')),
-  words text check (length(words) <= 500 and speaker='caller'),
+  words text check (words is null or (length(words) <= 500 and speaker='caller')),
   wording text not null,
   facts jsonb not null default '{}',
   rev integer not null, epoch integer not null,
@@ -205,9 +214,10 @@ language plpgsql set search_path = '' as $$
 begin
   if current_setting('ichido.frontline_client',true) is distinct from '1' then
     -- Older clients have no monitoring disclosure or AI-turn command.
-    update public.desk set handler='legacy' where id=new.incident and handler='ai';
+    update public.desk set handler='legacy' where id=new.incident and handler<>'legacy';
     if found then
-      insert into ichido.alert_outbox(kind,incident,station) select 'new_case',id,station from public.desk where id=new.incident;
+      insert into ichido.alert_outbox(kind,incident,station) select 'new_case',id,station from public.desk
+        where id=new.incident and queued_at is null and operator_id is null;
     end if;
     return null;
   end if;
@@ -243,7 +253,7 @@ begin
     update public.desk set confirmed_rev=null,caller_words=null,caller_words_ja=null,triage=null,card_back='unknown',cash_received='unknown' where id=d.id;
     update public.caller_card set confirmed_rev=null,reply_id=null,teachback=null,teachback_ja=null,teachback_result=null where id=d.id;
   end if;
-  if p_act in ('text','facts','tap','change','unsure') and (d.handler='ai' or d.confirmed_rev is null) then
+  if p_act in ('text','withheld','facts','tap','change','unsure') and (d.handler='ai' or d.confirmed_rev is null) then
     update public.draft set rev=rev+1, words=case when p_act='text' then p_words else words end,
       card_back=coalesce((p_facts->>'card_back')::public.fact,card_back),
       cash_received=coalesce((p_facts->>'cash_received')::public.fact,cash_received),
@@ -294,6 +304,19 @@ begin
 end $$;
 create or replace trigger frontline_eligible before insert on public.reply for each row execute function ichido.autonomous_allowed();
 
+create or replace function ichido.withdraw_frontline_guidance() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.reply_id is not null and (new.confirmed_rev is null or new.fault <> 'shelter_info' or new.flags is distinct from array['need_news'])
+    and exists(select from public.reply where id=new.reply_id and author='ai') then
+    new.reply_id:=null; new.choice:=null; new.teachback:=null; new.teachback_ja:=null; new.teachback_result:=null;
+  end if;
+  return new;
+end $$;
+create or replace trigger frontline_guidance before update of flags,fault,confirmed_rev on public.caller_card
+  for each row execute function ichido.withdraw_frontline_guidance();
+revoke all on function ichido.withdraw_frontline_guidance() from public,anon,authenticated;
+
 create or replace function public.frontline_finish(p_uid uuid,p_generation uuid,p_request uuid,p_wording text,p_patch jsonb,
   p_triage jsonb,p_priority int,p_reason text,p_manual text) returns boolean
 language plpgsql security definer set search_path = '' as $$
@@ -303,9 +326,19 @@ begin
   if not exists(select from ichido.binding where incident=d.id and uid=p_uid and voice_room=p_generation) then perform ichido.fail('forbidden'); end if;
   select * into strict t from public.frontline_turn where incident=d.id and generation=p_generation and request_id=p_request and speaker='caller';
   if exists(select from public.frontline_turn where incident=d.id and generation=p_generation and request_id=p_request and speaker='ai') then return false; end if;
-  if p_priority is not null then perform ichido.queue_frontline(d.id,p_priority,p_reason); return false; end if;
+  -- A credible danger signal survives a correction. Lower-confidence stale candidates cannot seize the case.
   select * into dr from public.draft where incident=d.id;
-  if d.handler <> 'ai' or d.handler_epoch <> t.epoch or dr.rev <> t.rev or d.lang <> t.locale then return false; end if;
+  if d.handler <> 'ai' or d.handler_epoch <> t.epoch or dr.rev <> t.rev or d.lang <> t.locale then
+    if p_priority=0 then perform ichido.queue_frontline(d.id,0,p_reason); end if;
+    return false;
+  end if;
+  if p_priority is not null then
+    insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,facts,rev,epoch)
+      values(d.id,p_generation,p_request,'ai',t.locale,case when p_priority=0 then 'risk' else 'fallback' end,
+        p_patch || jsonb_strip_nulls(jsonb_build_object('triage',p_triage)),dr.rev,t.epoch);
+    perform ichido.queue_frontline(d.id,p_priority,p_reason);
+    return false;
+  end if;
   update public.desk set ai_work_ms=ai_work_ms+least(90000,greatest(0,extract(epoch from clock_timestamp()-t.at)*1000))::int
     where id=d.id returning * into d;
   if d.ai_work_ms >= 90000 then perform ichido.queue_frontline(d.id,2,'limit'); return false; end if;
@@ -360,8 +393,8 @@ begin
   insert into ichido.frontline_monitor(incident,generation,staff_id,session_id) values(p_incident,g,p_uid,p_session)
     on conflict do nothing;
   return (select coalesce(jsonb_agg(jsonb_build_object('seq',t.seq,'speaker',t.speaker,'locale',t.locale,
-    'words',t.words,'ja',j.ja,'wording',t.wording,'facts',t.facts,'rev',t.rev,'at',t.at) order by t.seq),'[]')
-    from public.frontline_turn t left join public.frontline_translation j using(seq)
+    'words',t.words,'ja',j.ja,'slots',r.slots,'wording',t.wording,'facts',t.facts,'rev',t.rev,'at',t.at) order by t.seq),'[]')
+    from public.frontline_turn t left join public.frontline_translation j using(seq) left join public.reply r on r.id=t.reply_id
     where t.incident=p_incident and t.generation=g);
 end $$;
 
@@ -425,10 +458,10 @@ begin
       select 'unclaimed', coalesce(d.queued_at,d.created_at) where d.operator_id is null
       union all
       select 'no_reply', min(e.at) from public.case_event e
-        where d.handler='legacy' and d.operator_id is not null and e.incident = d.id and e.kind = 'claimed'
+        where d.queued_at is null and d.handler='legacy' and d.operator_id is not null and e.incident = d.id and e.kind = 'claimed'
           and not exists (select 1 from public.reply r where r.incident = d.id)
       union all
-      select 'no_reply', d.queued_at where d.handler in ('queued','human') and not exists (
+      select 'no_reply', d.queued_at where d.queued_at is not null and not exists (
         select from public.reply where incident=d.id and author='human' and sent_at>=d.queued_at)
       union all
       select 'guard_late', job.updated_at from (
@@ -505,6 +538,19 @@ begin
     perform public.bot_mark(d.id, 'record', 'done', null, secs);
   end if;
   return to_jsonb(r) - 'summary' - 'incident';
+end $$;
+create or replace function public.create_handoff(p_uid uuid, p_incident uuid, p_hash text, p_recipient text)
+returns table(id uuid, expires_at timestamptz) language plpgsql security definer set search_path = '' as $$
+declare op_name text; d public.desk;
+begin
+  select display_name into op_name from ichido.staff where uid=p_uid and role='operator';
+  if not found then perform ichido.fail('forbidden'); end if;
+  select c.* into d from public.desk c where c.id=p_incident for update;
+  if not found then perform ichido.fail('not_found'); end if;
+  if d.handler <> 'legacy' and d.operator_id is distinct from p_uid then perform ichido.fail('forbidden'); end if;
+  return query insert into ichido.handoff as h (incident,token_hash,recipient,created_by,expires_at)
+    values (p_incident,p_hash,p_recipient,p_uid,clock_timestamp()+interval '24 hours') returning h.id,h.expires_at;
+  perform ichido.event(p_incident,'operator','handoff',jsonb_build_object('recipient',p_recipient),op_name);
 end $$;
 notify pgrst, 'reload schema';
 commit;

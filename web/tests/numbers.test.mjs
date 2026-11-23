@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { looksLikeNumber } from "../content/numbers.ts";
+import { frontlineNumber, looksLikeNumber } from "../content/numbers.ts";
 
 test("withholds digit runs in ASCII, Bengali and full-width digits, with separators", () => {
   for (const s of ["1234", "card 1234-5678", "পিন ১২৩৪", "１２３４", "12 34 56", "০১৭১১-২২৩৩৪৪"]) assert.equal(looksLikeNumber(s), true, s);
@@ -26,4 +26,10 @@ test("Vietnamese, Indonesian and Nepali: digit runs and four number words are wi
     "kartunya tidak keluar, uangnya sudah keluar", "saya sudah coba dua kali",
     "कार्ड बाहिर आएन, पैसा पाएँ", "म दुई पटक प्रयास गरें", "३० मिनेट",
   ]) assert.equal(looksLikeNumber(s), false, s);
+});
+
+test("frontline screens short spoken and typed fragments before they can accumulate", () => {
+  for (const fragment of ["12", "३", "four", "my PIN starts with two", "এক দুই", "một", "satu", "दुई", "いちにさんよん", "イチニサン"]) {
+    assert.ok(frontlineNumber(fragment), fragment);
+  }
 });

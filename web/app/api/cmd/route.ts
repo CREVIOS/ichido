@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { screenTurn } from "@/content/frontline-policy";
+import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
@@ -214,7 +216,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
       admin.from("draft").select("rev, card_back, cash_received").eq("incident", incident).single(),
       admin.from("desk").select("fault,handler").eq("id", incident).single(),
     ]);
-    if (!desk || desk.handler === "ai") fail(409, "conflict");
+    if (!desk || desk.handler !== "legacy") fail(409, "conflict");
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
     if (text && looksLikeNumber(text)) return { withheld: true };
@@ -275,12 +277,20 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async teachback(a, b) {
     const c = caller(a);
     if (!c.incident) return fail(403, "forbidden");
-    const { data: card } = await admin.from("caller_card").select("reply_id, teachback_result").eq("id", c.incident).maybeSingle();
-    if (!card?.reply_id || card.teachback_result === "understood") fail(409, "conflict");
+    const { data: card } = await admin.from("caller_card").select("reply_id, teachback_result, handler").eq("id", c.incident).maybeSingle();
+    if (!card?.reply_id || card.teachback_result === "understood") return fail(409, "conflict");
     const text = str(b, "text").trim().slice(0, MAX_TEXT);
-    if (looksLikeNumber(text)) return { withheld: true };
+    if (card.handler !== "legacy") {
+      const checked = screenTurn(text);
+      if (checked.transfer) {
+        const { data: draft } = await admin.from("draft").select("rev").eq("incident",c.incident).single().throwOnError();
+        await frontlineTurn(c, { act: "text", text, request_id: crypto.randomUUID(), base_rev: draft.rev });
+        return { withheld: checked.withheld };
+      }
+      if (checked.withheld) return { withheld: true };
+    } else if (looksLikeNumber(text)) return { withheld: true };
     const ja = c.lang === "ja" ? text : await toJapanese(text);
-    await rpc("cmd_teachback", { p_uid: c.uid, p_text: text, p_ja: ja });
+    await rpc("cmd_teachback", { p_uid: c.uid, p_text: text, p_ja: ja && card.handler !== "legacy" && frontlineNumber(ja) ? null : ja });
     return {};
   },
 
@@ -359,7 +369,7 @@ export async function POST(req: Request): Promise<Response> {
     authorize(actor, COMMANDS[name]);   // lib/rbac.ts; a command missing there is refused
     if (actor.kind === "caller" && actor.incident && ["confirm", "flag", "teachback"].includes(name)) {
       const { data: desk } = await admin.from("desk").select("handler").eq("id", actor.incident).single().throwOnError();
-      if (desk.handler === "ai") fail(409, "conflict");
+      if (desk.handler !== "legacy" && !(name === "teachback" && desk.handler === "human")) fail(409, "conflict");
     }
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) {

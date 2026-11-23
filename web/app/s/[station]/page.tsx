@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { Human } from "@/app/caller/human";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ const noop = () => () => {};
 
 // Neutral landing behind the Help Point sticker: scanning alone reveals nothing.
 export default function StationPage() {
-  return <Suspense fallback={null}><StationForm /></Suspense>;
+  return <Suspense fallback={<Phone lang="bn"><Human lang="bn" open={false} /></Phone>}><StationForm /></Suspense>;
 }
 
 function StationForm() {
@@ -67,6 +68,7 @@ function StationForm() {
 
   return (
     <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="sticky top-1 z-10" onClick={alertSilently} disabled={busy}>{UI.human[lang]}</Button>}
       <Chip className="self-start">Help Point · <span className="mono">{station}</span></Chip>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (
@@ -84,7 +86,6 @@ function StationForm() {
           </div>
           {error && <Notice tone="warn">{error}</Notice>}
           <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
-          <Button type="button" variant="secondary" onClick={alertSilently} disabled={busy}>{UI.human[lang]}</Button>
           {silent ? <Notice tone="info">{ACCESS.alertSent[lang]}</Notice> : (
             <div className="flex flex-col gap-2">
               <Button type="button" variant="secondary" size="lg" className="h-11" disabled={busy} onClick={alertSilently}><EarOff className="stroke-[1.5]" />{ACCESS.cantHear[lang]}</Button>
