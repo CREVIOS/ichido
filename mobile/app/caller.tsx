@@ -12,10 +12,10 @@ import { VoiceIntake, type SignedSpeech } from "@/components/VoiceIntake";
 import { Human } from "@/components/Human";
 import { hasVoice } from "@/lib/voice";
 import { Brand, Button, Card, Icon, Input, LangPicker, LiveText, Notice, Pill, Screen, T, TextScale, Toggle } from "@/components/ui";
-import { BankStatus, CallerFlags, FollowUp, SyncStatus, type Sync, PrefsBar, speechRate, textScale, usePrefs } from "@/components/CallerFaults";
+import { BankStatus, CallerFlags, FollowUp, Receipt, SyncStatus, type Sync, PrefsBar, speechRate, textScale, usePrefs } from "@/components/CallerFaults";
 import { color, radius, shadow, space, tint } from "@/theme";
 import {
-  JOURNEY, CONSULTATION, allergyFacts, receipt, ACCESS, FRONTLINE, CALLER_FLAGS, urgentText, FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, sentText, callerPack, pick, replyOf, errorText,
+  JOURNEY, CONSULTATION, allergyFacts, ACCESS, FRONTLINE, CALLER_FLAGS, urgentText, FACTS, FACT_KEYS, ANSWER, RATING, RATINGS, STATUS, UI, STATION, LANG_LOCALE, FAULTS, MOBILE, OPS_CALLER, VOICE, VOICE_LANGS, sentText, callerPack, pick, replyOf, errorText,
   type Lang, type Fact,
 } from "@content/catalogue";
 
@@ -23,7 +23,6 @@ import type { CallerCase as CallerCard, CallerView, Reply, Draft, Turn } from "@
 const MAX_TEXT = 500;
 
 export default function CallerScreen() {
-  const [receiptOpen,setReceiptOpen] = useState(false);
   const [allergyOpen,setAllergyOpen] = useState(false);
   const [view, setView] = useState<CallerView>();
   const [updated, setUpdated] = useState<Date>();
@@ -77,7 +76,7 @@ export default function CallerScreen() {
         {allergyFacts(card.flags).length>0 && <Card><Button kind="secondary" label={JOURNEY.allergyCard[lang]} onPress={() => setAllergyOpen(!allergyOpen)} />
           {allergyOpen && (["bn","ja"] as const).map(l => <T key={l} accessibilityLanguage={l}>{allergyFacts(card.flags).map(f => CALLER_FLAGS[f].label[l]).join(" · ")}</T>)}</Card>}
         {(card.choice === "leave" || !open) && <Card><T>{JOURNEY.checkHere[lang]}</T><T>{pick(station.branch,lang)} · {pick(station.hours,lang)}</T>
-          <Button label={JOURNEY.receipt[lang]} onPress={() => setReceiptOpen(!receiptOpen)} />{receiptOpen && <T selectable>{receipt(card.station,card.id)}</T>}</Card>}
+          <Receipt station={card.station} id={card.id} lang={lang} /></Card>}
         {confirmed && !card.flags.includes("need_other") && <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
           <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.showStaff[lang]}</T>
           <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>

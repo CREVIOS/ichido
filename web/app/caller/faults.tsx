@@ -9,7 +9,7 @@ import { Phone } from "@/components/phone";
 import { Notice } from "@/components/kit";
 import { LangSelect } from "@/components/lang-select";
 import { cn } from "@/lib/utils";
-import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, sentText, urgentText, type Lang } from "@/content/catalogue";
+import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, receipt, sentText, urgentText, type Lang } from "@/content/catalogue";
 import { PrefsBar, type Prefs } from "./prefs";
 import type { CallerCase } from "./types";
 
@@ -66,6 +66,13 @@ export function BankStatus({ status, due, lang }: { status: string | null; due: 
 }
 
 // After the two-hour pairing has expired: the closed case, what the caller was told, and the bank's status.
+export function Receipt({station,id,lang}: {station:string;id:string;lang:Lang}) {
+  const text = receipt(station,id);
+  return <details className="surface p-4"><summary>{JOURNEY.receipt[lang]}</summary>
+    <p>{text}</p><a download="ichido.txt" href={`data:text/plain;charset=utf-8,${encodeURIComponent(text)}`} className="underline">{JOURNEY.saveReceipt[lang]}</a>
+  </details>;
+}
+
 export type Sync = { offline:boolean; updated?: Date; retry:() => void };
 export function SyncStatus({sync, lang}: {sync:Sync;lang:Lang}) {
   return <>{sync.offline && <div role="status"><Notice>{JOURNEY.offline[lang]}</Notice><Button onClick={sync.retry}>{JOURNEY.retry[lang]}</Button></div>}
@@ -92,10 +99,7 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
           <p className="text-[16px] leading-7 text-foreground">{told}</p>
         </section>
       )}
-      <details className="surface p-4"><summary>{JOURNEY.receipt[lang]}</summary><div>
-        <span className="text-[12px] opacity-60">{UI.caseNo[lang]}</span>
-        <span className="font-mono text-[20px]">{f.id.slice(0, 8)}</span>
-      </div></details>
+      <Receipt station={f.station_id} id={f.id} lang={lang} />
       <p>{pick(f.station?.branch,lang)} · {pick(f.station?.counter_hours,lang)}</p>
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</p>
     </Phone>

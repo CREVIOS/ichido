@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, flagsFor, packTaps, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, flagsFor, packTaps, contentPack, isFault, replyOf, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { screenTurn } from "@/content/frontline-policy";
 import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
@@ -343,7 +343,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
         return { withheld: checked.withheld };
       }
       if (checked.withheld) return { withheld: true };
-    } else if (looksLikeNumber(text)) return { withheld: true };
+    } else if (frontlineNumber(text)) return { withheld: true };
     const ja = c.lang === "ja" ? text : await toJapanese(text);
     await rpc("cmd_teachback", { p_uid: c.uid, p_text: text, p_ja: ja && card.handler !== "legacy" && frontlineNumber(ja) ? null : ja });
     return {};

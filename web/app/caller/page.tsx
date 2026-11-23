@@ -6,12 +6,12 @@ import { useLive } from "@/lib/live";
 import { Phone } from "@/components/phone";
 import { Notice, StatusLabel } from "@/components/kit";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, JOURNEY, CONSULTATION, allergyFacts, receipt, CALLER_FLAGS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
+import { ACCESS, JOURNEY, CONSULTATION, allergyFacts, CALLER_FLAGS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
 import { Conversation } from "./conversation";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
 import { DisasterNotice } from "./disaster";
-import { BankStatus, CallerFlags, FollowUp, SyncStatus, type Sync } from "./faults";
+import { BankStatus, CallerFlags, FollowUp, Receipt, SyncStatus, type Sync } from "./faults";
 import { PrefsBar, speechRate, usePrefs } from "./prefs";
 import { CallerNotice, FraudScreen } from "./ops";
 import type { CallerCase, CallerView } from "@/content/caller-session";
@@ -72,7 +72,7 @@ export default function CallerPage() {
       <AllergyCard flags={card.flags} lang={lang} />
       {(card.choice === "leave" || !open) && <section className="grid gap-2 text-foreground"><p>{JOURNEY.checkHere[lang]}</p>
         <p>{pick(station.branch,lang)} · {pick(station.hours,lang)}</p>
-        <details><summary>{JOURNEY.receipt[lang]}</summary><p>{receipt(card.station,card.id)}</p></details></section>}
+        <Receipt station={card.station} id={card.id} lang={lang} /></section>}
       {confirmed && !card.flags.includes("need_other") && <ShowStaff card={card} lang={lang} />}
       <p className="text-[12px] leading-5">{UI.helpDesk[lang]} <a href={`tel:${CONSULTATION.phone}`}>{CONSULTATION.phone}</a> · <a href={`mailto:${CONSULTATION.email}`}>{CONSULTATION.email}</a></p></>}
     </Phone>

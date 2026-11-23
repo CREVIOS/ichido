@@ -90,3 +90,41 @@ begin
   perform public.bank_update(op,'Operator',i,'contact_by',current_date+1,'phone');
   assert (select callback_channel='phone' from public.caller_card where id=i);
 end $$;
+
+-- Actual display, binding, transcript and takeover functions for both browser walkthroughs.
+do $$
+declare
+  l text; phone uuid; op uuid:=gen_random_uuid(); st text; i uuid; generation uuid; request uuid; text_turn jsonb;
+  epoch int; screen jsonb; message text;
+begin
+  insert into auth_ba."user"(id,email,name,role) values(op,op||'@example.invalid','Operator','operator');
+  foreach l in array array['en','ne'] loop
+    st:=gen_random_uuid()::text; phone:=gen_random_uuid(); request:=gen_random_uuid();
+    insert into auth.users(id,is_anonymous) values(phone,true);
+    insert into public.station(id,kind,label,branch,counter_hours,security_company) values(st,'atm','{}','{}','{}','fixture');
+    i:=public.cmd_display_press(st,md5(random()::text),'card_retained','A1B2C3','fixture-digest');
+    assert public.device_display(st)->>'code'='A1B2C3';
+    if l='ne' then perform public.cmd_silent_alert(phone,st,'card_retained'); end if;
+    perform public.frontline_pair(phone,st,'fixture-digest',l,true);
+    screen:=public.caller_screen(phone);
+    generation:=(screen->>'generation')::uuid;
+    if l='en' then
+      assert screen->'turns' @> '[{"wording":"greeting","speaker":"ai","locale":"en"}]';
+    else
+      assert screen->'card'->>'text_only'='true' and screen->'card'->>'handler'='queued';
+    end if;
+    perform public.frontline_submit(phone,generation,gen_random_uuid(),0,'start',null,'{}',null,null);
+    message:=case l when 'en' then 'My card stayed in the machine.' else 'मलाई यहाँ सहयोग चाहिन्छ।' end;
+    text_turn:=public.frontline_submit(phone,generation,request,0,'text',message,'{}',null,null);
+    assert text_turn->>'seq' is not null;
+    assert public.frontline_submit(phone,generation,request,0,'text',message,'{}',null,null)->>'replay'='true';
+    assert (select count(*)=1 from public.frontline_turn where incident=i and words=message);
+    if l='en' then perform public.cmd_human(phone); end if;
+    assert public.caller_screen(phone)->'card'->>'handler'='queued';
+    select handler_epoch into epoch from public.desk where id=i;
+    perform public.frontline_takeover(op,'Operator',i,epoch);
+    screen:=public.caller_screen(phone);
+    assert screen->'card'->>'handler'='human';
+    assert screen->'turns' @> jsonb_build_array(jsonb_build_object('speaker','human','wording','connected','locale',l));
+  end loop;
+end $$;

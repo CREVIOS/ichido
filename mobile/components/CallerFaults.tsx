@@ -1,7 +1,7 @@
 import type { FollowUpCase } from "@content/caller-session";
 import { Human } from "./Human";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Share, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cmd } from "@/lib/supabase";
 import { Brand, Button, Card, LangPicker, LiveText, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
@@ -81,6 +81,18 @@ export function BankStatus({ status, due, lang }: { status: string | null; due: 
 }
 
 // After the two-hour pairing has expired: the closed case, what the caller was told, and the bank's status.
+export function Receipt({station,id,lang}: {station:string;id:string;lang:Lang}) {
+  const [show,setShow] = useState(false);
+  const [error,setError] = useState(false);
+  const text = receipt(station,id);
+  return <><Button label={JOURNEY.receipt[lang]} onPress={() => setShow(!show)} />
+    {show && <><T selectable>{text}</T><Button kind="secondary" label={JOURNEY.saveReceipt[lang]} onPress={async () => {
+      setError(false);
+      try { await Share.share({message:text}); } catch { setError(true); }
+    }} /></>}
+    {error && <LiveText>{errorText("server",lang)}</LiveText>}</>;
+}
+
 export type Sync = { offline:boolean; updated?:Date; retry:() => void };
 export function SyncStatus({sync,lang}: {sync:Sync;lang:Lang}) {
   return <>{sync.offline && <><LiveText>{JOURNEY.offline[lang]}</LiveText><Button label={JOURNEY.retry[lang]} onPress={sync.retry} /></>}
@@ -89,7 +101,6 @@ export function SyncStatus({sync,lang}: {sync:Sync;lang:Lang}) {
 export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCase; prefs: Prefs; onPrefs: (p: Prefs) => void; }) {
   const [chosen, setLang] = useState<Lang | null>(null);
   const lang = chosen ?? f.lang ?? "bn";
-  const [receiptOpen,setReceiptOpen] = useState(false);
   const told = f.reply && (sentText(f.reply, lang) ?? errorText("server",lang));
   return (
     <TextScale.Provider value={textScale(prefs)}>
@@ -102,8 +113,7 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
         <T v="body">{FAULT_UI.followLead[lang]}</T>
         {packOfFault(f.fault) === "atm" ? <BankStatus status={(f.bank_status === "contact_by" || f.bank_status === "contacted") && !f.callback_channel ? null : f.bank_status} due={f.bank_due} lang={lang} /> : null}
         {told ? <View style={{ gap: 6 }}><T v="label" tone="muted">{FAULT_UI.lastReply[lang]}</T><T v="body" tone="ink">{told}</T></View> : null}
-        <Button label={JOURNEY.receipt[lang]} onPress={() => setReceiptOpen(!receiptOpen)} />
-        {receiptOpen && <T selectable>{receipt(f.station_id,f.id)}</T>}
+        <Receipt station={f.station_id} id={f.id} lang={lang} />
         <T>{pick(f.station?.branch,lang)} · {pick(f.station?.counter_hours,lang)}</T>
         <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T>
       </Screen>
