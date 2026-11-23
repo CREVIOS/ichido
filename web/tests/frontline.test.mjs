@@ -5,7 +5,7 @@ import { approvedInfo, conversationText, screenTurn } from "../content/frontline
 import { preferredDesk, serviceMatch } from "../lib/frontline-routing.ts";
 import { FRONTLINE, LANGS } from "../content/catalogue.ts";
 import { caller, cmd, ok, staff, APP } from "./helpers.mjs";
-import { frontlineCase } from "./frontline-fixture.mjs";
+import { enableClosure, shelterAnswer, frontlineCase } from "./frontline-fixture.mjs";
 
 test("catalogue greeting and disclosure in all six caller languages", () => {
   assert.equal(new Set(Object.values(FRONTLINE.disclosure)).size, 6);
@@ -116,4 +116,19 @@ test("AI guidance never satisfies the human SLA that starts at transfer", async 
   await f.admin.from("desk").update({ queued_at: new Date(Date.now()-190000).toISOString() }).eq("id", f.incident).throwOnError();
   await cron();
   assert.ok((await reasons()).includes("no_reply"));
+});
+
+test("explicit acknowledgement needs a current delivered autonomous reply; follow-up belongs to this phone",async t => {
+  await enableClosure(t);
+  const f = await frontlineCase(t,"en","shelter");
+  const b = await shelterAnswer(f);
+  assert.equal((await cmd(f.phone,"resolve_info",b)).status,409);
+  assert.equal((await ok(cmd(f.phone,"info_delivery",b))).ready,true);
+  for (const change of [{ack:false},{rev:b.rev+1},{reply:randomUUID()},{lang:"ja"}]) {
+    assert.ok([400,409].includes((await cmd(f.phone,"resolve_info",{...b,...change})).status));
+  }
+  await ok(cmd(f.phone,"resolve_info",b));
+  assert.equal((await f.desk()).resolved_by,"ai");
+  assert.equal((await ok(cmd(f.phone,"caller_screen"))).follow.id,f.incident);
+  assert.equal((await cmd(await caller(),"recontact",{receipt:f.incident})).status,403);
 });

@@ -29,3 +29,29 @@ export async function frontlineCase(t, lang = "en", kind = "atm", { pair = true 
   const desk = async () => (await op.c.from("desk").select("*").eq("id", incident).single().throwOnError()).data;
   return { admin, op, phone, incident, station, turn, monitor, desk, args };
 }
+
+// HTTP requests use separate transactions. Serialize the local pilot switch and restore the previous value.
+export async function enableClosure(t) {
+  const url = new URL(process.env.DATABASE_URL);
+  assert.ok(["localhost","127.0.0.1","[::1]"].includes(url.hostname));
+  const {Client} = (await import("pg")).default;
+  const db = new Client({connectionString:url.href});
+  await db.connect();
+  let prior;
+  t.after(async () => {
+    try { if (prior!==undefined) await db.query("update ichido.ops_setting set value=$1 where key='ai_closure'",[prior]); }
+    finally { await db.end(); }
+  });
+  await db.query("select pg_advisory_lock(841000)");
+  const {rows} = await db.query("select value from ichido.ops_setting where key='ai_closure'");
+  assert.equal(rows.length,1,"local database needs 20261124100000_voice_resolution.sql");
+  prior = rows[0].value;
+  await db.query("update ichido.ops_setting set value=1 where key='ai_closure'");
+}
+export async function shelterAnswer(f) {
+  await f.turn("start");
+  await f.turn("tap",{flag:"need_news",on:true});
+  await f.turn("confirm");
+  const {screen} = await ok(cmd(f.phone,"caller_screen"));
+  return {reply:screen.reply.id,rev:screen.draft.rev,lang:screen.card.lang,ack:true};
+}

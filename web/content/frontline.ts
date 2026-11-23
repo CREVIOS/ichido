@@ -2,7 +2,7 @@ import type { L10n } from "./catalogue.ts";
 
 // All non-English wording awaits native review. The pilot's only informational answer is in the shelter pack.
 export const FRONTLINE = {
-  voicePrivacy: { en: "Authorized operators can listen when your microphone is on. Completed speech is shared as a message.", ja: "マイクが ついて いる とき、係の 人は 声を きけます。はなし おわると 文を おくります。", bn: "মাইক্রোফোন চালু থাকলে অনুমোদিত কর্মীরা শুনতে পারেন। কথা শেষ হলে তা বার্তা হিসেবে পাঠানো হয়।", vi: "Khi micrô bật, nhân viên có quyền có thể nghe. Khi bạn nói xong, lời nói được gửi dưới dạng tin nhắn.", id: "Saat mikrofon aktif, petugas berwenang dapat mendengarkan. Ucapan yang selesai dikirim sebagai pesan.", ne: "माइक्रोफोन खुला हुँदा अधिकृत कर्मचारीले सुन्न सक्छन्। बोलिसकेपछि कुरा सन्देशका रूपमा पठाइन्छ।" },
+  voicePrivacy: { en: "Authorized operators can listen when your microphone is on. Completed speech is shared as a message.", ja: "声で はなす とき、係の 人は 声を きけます。はなし おわると 文を おくります。", bn: "মাইক্রোফোন চালু থাকলে অনুমোদিত কর্মীরা শুনতে পারেন। কথা শেষ হলে তা বার্তা হিসেবে পাঠানো হয়।", vi: "Khi micrô bật, nhân viên có quyền có thể nghe. Khi bạn nói xong, lời nói được gửi dưới dạng tin nhắn.", id: "Saat mikrofon aktif, petugas berwenang dapat mendengarkan. Ucapan yang selesai dikirim sebagai pesan.", ne: "माइक्रोफोन खुला हुँदा अधिकृत कर्मचारीले सुन्न सक्छन्। बोलिसकेपछि कुरा सन्देशका रूपमा पठाइन्छ।" },
   stillHelp: { en: "Still need help", ja: "まだ たすけが いります", bn: "এখনও সাহায্য চাই", vi: "Tôi vẫn cần giúp đỡ", id: "Masih perlu bantuan", ne: "अझै सहयोग चाहिन्छ" },
   greeting: {
     en: "Hello, I’m Ichido’s AI assistant. What do you need?",
@@ -41,6 +41,11 @@ export const FRONTLINE = {
 } satisfies Record<string, L10n>;
 
 export const FRONT_DESK = {
+  quality: "AIの案内を確認", checked: "確認を記録する", safetyMiss: "見逃した危険を報告", redacted: "自由記述は非表示",
+  qaReason: {closure:"AIが完了", recontact:"もう一度相談", dispute:"回答に不満", safety_miss:"危険の見逃し"} as Record<string,string>,
+  outcomes: "AI受付の結果", resolved: "本人が解決を確認／AI受付", open: "対応中", abandoned: "中断",
+  contact: "人を呼んでから担当者の最初の返信まで（秒）", contacts: "返信した件数",
+  repeat: "24時間以内の再相談／追跡できた件数", coverage: "追跡できた件数／完了から24時間たった件数",
   listen: "相談者の音声を聞く",
   consent: "送信済みメッセージの共有に同意", event: "操作記録", emptyAI: "現在、AIが対応している相談はありません。", emptyQueued: "現在、担当者を待っている相談はありません。",
   ai: "AI対応中", queued: "担当者待ち", monitor: "送信済みの会話", submitted: "相談者", aiSpeaker: "AI",

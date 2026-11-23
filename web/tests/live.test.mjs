@@ -119,3 +119,16 @@ test("frontline sends only invalidations to the operator and bound caller", asyn
     assert.deepEqual(Object.keys(message.payload).sort(), ["id", "table"], "no row data: Realtime's message id and the table");
   }
 });
+
+test("a switched language revokes the voice job while text intake stays available",async t => {
+  const f=await frontlineCase(t);
+  await f.turn("start");
+  const {screen}=await ok(cmd(f.phone,"caller_screen"));
+  const {data:lease}=await f.admin.rpc("voice_begin",{p_uid:f.phone.uid,p_generation:screen.generation,p_lang:"en"}).throwOnError();
+  const scope={...lease,lang:"en",uid:f.phone.uid,generation:screen.generation,incident:f.incident,job:"local-job"};
+  await f.admin.rpc("voice_step",{p_scope:scope,p_action:"state"}).throwOnError();
+  await ok(cmd(f.phone,"set_lang",{lang:"ne"}));
+  assert.equal((await f.admin.rpc("voice_step",{p_scope:scope,p_action:"state"})).error.message,"forbidden");
+  await ok(cmd(f.phone,"human"));
+  assert.equal((await f.desk()).handler,"queued");
+});

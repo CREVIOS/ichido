@@ -1,6 +1,6 @@
 // Concurrency and recovery: the cases Codex's review found could go wrong.
 import test from "node:test";
-import { frontlineCase } from "./frontline-fixture.mjs";
+import { enableClosure, shelterAnswer, frontlineCase } from "./frontline-fixture.mjs";
 import assert from "node:assert/strict";
 import { staff, caller, cmd, ok, device, newKey, openPairedCase, closeOpen } from "./helpers.mjs";
 
@@ -81,4 +81,15 @@ test("retrying a submitted frontline message records it once", async (t) => {
   const body = { act: "text", text: "A human please", request_id: crypto.randomUUID(), base_rev: 0 };
   await Promise.all([ok(cmd(f.phone, "frontline_turn", body)), ok(cmd(f.phone, "frontline_turn", body))]);
   assert.equal((await f.monitor()).filter((r) => r.words === body.text).length, 1);
+});
+
+test("human takeover and affirmative closure serialize on the same incident",async t => {
+  await enableClosure(t);
+  const f=await frontlineCase(t,"en","shelter");
+  const answer=await shelterAnswer(f);
+  await ok(cmd(f.phone,"info_delivery",answer));
+  const results=await Promise.all([cmd(f.phone,"resolve_info",answer),cmd(f.op,"takeover",{incident:f.incident,epoch:(await f.desk()).handler_epoch})]);
+  assert.equal(results.filter(r=>r.status===200).length,1);
+  const d=await f.desk();
+  assert.ok(d.resolved_by==="ai" ? !d.operator_id && !!d.finished_at : d.handler==="human" && !d.finished_at);
 });

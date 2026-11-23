@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { chromium } from "playwright-core";
-import { ACCESS, FRONTLINE, FRONT_DESK, JOURNEY, STATION, UI } from "../content/catalogue.ts";
+import { CALLER_FLAGS, RATING, ACCESS, FRONTLINE, FRONT_DESK, JOURNEY, STATION, UI } from "../content/catalogue.ts";
 import { APP } from "./helpers.mjs";
-import { frontlineCase } from "./frontline-fixture.mjs";
+import { enableClosure, frontlineCase } from "./frontline-fixture.mjs";
 
 test("pairing opens with the code as its first textbox and an unpaired phone has a staff fallback", async t => {
   const browser = await chromium.launch({channel:"chrome",headless:true});
@@ -89,4 +89,27 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
   await operator.getByRole("button",{name:FRONT_DESK.takeover,exact:true}).click();
   await page.getByText(FRONTLINE.connected[lang],{exact:true}).waitFor({timeout:40000});
   assert.deepEqual(documents,[`/s/${station}`,"/caller"]);
+});
+
+test("shelter caller confirms the displayed answer, rates the receipt and asks for more help",async t => {
+  await enableClosure(t);
+  const f = await frontlineCase(t,"en","shelter",{pair:false});
+  const {data:display} = await f.admin.rpc("device_display",{p_station:f.station}).throwOnError();
+  const browser = await chromium.launch({channel:"chrome",headless:true});
+  t.after(() => browser.close());
+  const page = await browser.newPage({locale:"en"});
+  await page.goto(APP+"/s/"+f.station);
+  await page.getByRole("combobox").selectOption("en");
+  await page.getByLabel(STATION.code.en,{exact:true}).fill(display.code);
+  await page.getByRole("button",{name:STATION.go.en,exact:true}).click();
+  await page.getByRole("button",{name:FRONTLINE.start.en}).click();
+  await page.getByRole("button",{name:new RegExp(CALLER_FLAGS.need_news.label.en)}).click();
+  await page.getByRole("button",{name:UI.confirm.en,exact:true}).click();
+  await page.getByRole("button",{name:FRONTLINE.answered.en,exact:true}).click();
+  await page.getByRole("button",{name:RATING[3].en,exact:true}).click();
+  await page.getByText(UI.rateThanks.en).waitFor();
+  await page.reload();
+  await page.getByRole("button",{name:FRONTLINE.stillHelp.en}).click();
+  await page.getByText(FRONTLINE.queued.en,{exact:false}).waitFor();
+  assert.equal((await f.desk()).resolved_by,"ai");
 });

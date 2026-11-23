@@ -24,7 +24,7 @@ export async function closeVoice(incident: string, voiceRoom: string): Promise<v
 export async function revokeAgentAudio(incident:string) {
   const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
   if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) return;
-  const {data:b} = await priv().from("binding").select("voice_room").eq("incident",incident).maybeSingle().throwOnError();
+  const {data:b} = await priv().from("binding").select("voice_room,desk!inner(handler)").eq("desk.handler","human").eq("incident",incident).maybeSingle().throwOnError();
   if (!b) return;
   const room = roomFor(b.voice_room);
   const client = new RoomServiceClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);

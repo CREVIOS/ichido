@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CircleCheck, Frown, Meh, Smile, Volume2 } from "lucide-react";
+import { useLive } from "@/lib/live";
+import { useCallback } from "react";
 import { cmd } from "@/lib/supabase";
 import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { LANG_LOCALE, RATING, RATINGS, STATUS, UI, JOURNEY, sentText, errorText, replyOf, type Lang } from "@/content/catalogue";
+import { FRONTLINE, LANG_LOCALE, RATING, RATINGS, STATUS, UI, JOURNEY, sentText, errorText, replyOf, type Lang } from "@/content/catalogue";
 import type { CallerCase, Reply } from "./types";
 
 // Whether the device has a speech voice for this language (Bengali often has none).
@@ -23,12 +25,25 @@ function useHasVoice(lang: Lang) {
 }
 
 // rate: the caller's read-aloud speed (slower when they asked for it).
-export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: CallerCase; reply: Reply; rate?: number }) {
+export function Guidance({ lang, card, reply, rate = 1, refresh }: { lang: Lang; card: CallerCase; reply: Reply; rate?: number; refresh?: () => Promise<void> }) {
   const r = replyOf(reply.intent);
   const text = sentText(reply,lang) ?? errorText("server", lang);
   const done = card.teachback_result === "understood";
   const [note, setNote] = useState("");
   const act = (name: string, body: Record<string, unknown> = {}) => cmd(name, body).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
+  const [ready,setReady] = useState(false);
+  const rev = card.confirmed_rev;
+  const eligible = card.handler==="ai" && reply.author==="ai" && rev!==null && !!sentText(reply,lang);
+  const delivery = useCallback(async (signal:AbortSignal) => {
+    if (document.visibilityState!=="visible") return;
+    try {
+      const result = await cmd<{ready:boolean}>("info_delivery",{reply:reply.id,rev,lang});
+      if (!signal.aborted) setReady(result.ready);
+    } catch (e) {
+      if (!signal.aborted) { setReady(false); setNote(errorText((e as Error).message,lang)); }
+    }
+  },[reply.id,rev,lang]);
+  useLive(["caller_card"],delivery,eligible,{incident:card.id});
   const hasVoice = useHasVoice(lang);
   const speak = () => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; u.rate = rate; window.speechSynthesis.speak(u); };
 
@@ -37,7 +52,7 @@ export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: Ca
       <div className="flex flex-col gap-3">
         <span className="text-[13px] text-muted-foreground">{UI.approved[lang]}</span>
         <p className="text-[22px] leading-[1.45] tracking-[-0.01em] text-foreground">{text}</p>
-        {hasVoice && !card.text_only && <Button variant="secondary" className="self-start" onClick={speak}><Volume2 className="stroke-[1.5]" />{UI.listen[lang]}</Button>}
+        {hasVoice && lang !== "ne" && !card.text_only && reply.author !== "ai" && <Button variant="secondary" className="self-start" onClick={speak}><Volume2 className="stroke-[1.5]" />{UI.listen[lang]}</Button>}
       </div>
       <div role="status">{note && <Notice tone="warn">{note}</Notice>}</div>
       {r?.offersChoice && (
@@ -53,6 +68,11 @@ export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: Ca
           </div>
         </div>
       )}
+      {eligible && ready && <Button onClick={async () => {
+        setReady(false);
+        await act("resolve_info",{reply:reply.id,rev,lang,ack:true});
+        await refresh?.();
+      }}>{FRONTLINE.answered[lang]}</Button>}
       {(card.handler === "legacy" || card.handler === "human" && reply.author === "human") && <TeachBack lang={lang} card={card} onNote={setNote} />}
     </>
   );
@@ -87,7 +107,7 @@ function TeachBack({ lang, card, onNote }: { lang: Lang; card: CallerCase; onNot
 const FACE = { 3: Smile, 2: Meh, 1: Frown } as const;
 
 // Three faces after a guided close; one tap, no text, counted in insights.
-function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onNote: (n: string) => void }) {
+export function Rate({ lang, rating, onNote, receipt, refresh }: { lang: Lang; rating: number | null; onNote: (n: string) => void; receipt?:string; refresh?:()=>void }) {
   if (rating) return <p className="text-[14px]">{UI.rateThanks[lang]}</p>;
   return (
     <section className="flex flex-col gap-2.5">
@@ -96,7 +116,7 @@ function Rate({ lang, rating, onNote }: { lang: Lang; rating: number | null; onN
         {RATINGS.map((r) => {
           const Icon = FACE[r];
           return (
-            <button key={r} type="button" onClick={() => cmd("rate", { rating: r }).catch((e: Error) => onNote(errorText(e.message, lang)))}
+            <button key={r} type="button" onClick={() => cmd("rate", { rating: r,receipt }).then(refresh).catch((e: Error) => onNote(errorText(e.message, lang)))}
               className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border bg-card text-[14px] text-foreground transition-colors hover:bg-accent">
               <Icon className="size-6 stroke-[1.5]" />{RATING[r][lang]}
             </button>

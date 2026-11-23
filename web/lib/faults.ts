@@ -65,12 +65,14 @@ export async function followup(c: Caller) {
     .order("expires", { ascending: false }).limit(1).maybeSingle().throwOnError();
   if (!f) return { case: null };
   const { data: card, error } = await admin.from("caller_card")
-    .select("id, station, fault, lang, reply_id, bank_status, bank_due, callback_channel, bank_updated_at").eq("id", f.incident).single();
+    .select("id, station, fault, lang, rating, reply_id, bank_status, bank_due, callback_channel, bank_updated_at").eq("id", f.incident).single();
   if (error) throw error;
-  const [{ data: reply }, { data: station }] = await Promise.all([
+  const [{ data: reply }, { data: station }, {data:desk}, {data:repeat}] = await Promise.all([
     card.reply_id ? admin.from("reply").select("intent, slots, manual_version").eq("id", card.reply_id).maybeSingle().throwOnError() : Promise.resolve({ data: null }),
     admin.from("station").select("label,branch,hours:counter_hours,public_contact_url,contact_verified_at").eq("id", card.station).maybeSingle().throwOnError(),
+    admin.from("desk").select("resolved_by").eq("id",f.incident).single().throwOnError(),
+    admin.from("case_event").select("id").eq("incident",f.incident).eq("kind","recontact").limit(1).maybeSingle().throwOnError(),
   ]);
-  return { case: { ...card, station_id:card.station, reply, station:station && { label:station.label,branch:station.branch,hours:station.hours,
+  return { case: { ...card,recontacted:!!repeat,resolved_by:desk.resolved_by, station_id:card.station, reply, station:station && { label:station.label,branch:station.branch,hours:station.hours,
     contact:station.contact_verified_at && Date.parse(station.contact_verified_at)<=Date.now() ? station.public_contact_url : null } } };
 }

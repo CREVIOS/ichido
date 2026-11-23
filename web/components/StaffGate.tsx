@@ -21,6 +21,7 @@ export type Me = { uid: string; role: Role; name: string };
 const NAV_ITEMS: (NavItem & { need: Permission })[] = [
   { href: "/operator", label: NAV.operator, icon: RadioTower, need: "case:act" },
   { href: "/review", label: REVIEW.nav, icon: ScanText, Badge: ReviewBadge, need: "case:act" },
+  { href:"/review", label:REVIEW.nav, icon:ScanText, need:"case:qa" },
   { href: "/cases", label: NAV.cases, icon: Rows3, need: "case:read" },
   { href: "/stations", label: NAV.stations, icon: Router, need: "stations:read" },
   { href: "/insights", label: NAV.insights, icon: ChartNoAxesColumn, need: "insights:read" },
@@ -116,13 +117,13 @@ async function passkeySignIn(): Promise<ApiError> {
 
 // Signs a staff member in (password, then a second factor; or a passkey), enrols a second factor on first sign-in,
 // checks their role may open the page (any staff role without `need`), then renders it. The pine-screen art stays beside every step.
-export function StaffGate({ need, title, children }: { need?: Permission; title: string; children: (me: Me) => ReactNode }) {
+export function StaffGate({ need, title, children }: { need?: Permission | Permission[]; title: string; children: (me: Me) => ReactNode }) {
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const refresh = useCallback(() => resolve().then(setStatus), []);
   useEffect(() => { void refresh(); }, [refresh]);
 
   if (status === undefined) return null;
-  if (status.at === "in" && (!need || can(status.me.role, need))) return <StaffRole.Provider value={status.me.role}>{children(status.me)}</StaffRole.Provider>;
+  if (status.at === "in" && (!need || (Array.isArray(need) ? need : [need]).some(p => can(status.me.role,p)))) return <StaffRole.Provider value={status.me.role}>{children(status.me)}</StaffRole.Provider>;
   if (status.at === "in") {
     return (
       <SignInLayout heading={title} error="">

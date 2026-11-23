@@ -1,5 +1,5 @@
-import { CALLER_FLAGS, FRONTLINE, readBackText, type Fact, type Lang } from "@/content/catalogue";
-import { approvedInfo, conversationText } from "@/content/frontline-policy";
+import { type Lang } from "@/content/catalogue";
+import { approvedInfo, committedReadback, conversationText, type ReadbackFacts } from "@/content/frontline-policy";
 import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
 import { boundedText } from "@/lib/request-security";
@@ -7,14 +7,13 @@ import { HttpError, reply, rpc } from "@/lib/server";
 import { signSpeech, verifyVoiceRequest } from "@/lib/speech";
 
 type State = {rev:number; seq:number|null; pending:boolean; wording:string; confirmed:boolean; fault:string; flags:string[];
-  facts:{card_back:Fact; cash_received:Fact; triage?:{taps:string[]}}};
+  facts:ReadbackFacts};
 function speech(s: State, lang: Lang) {
   if (!s.pending || !s.seq) return null;
   if (s.wording === "SHELTER_INFO") return approvedInfo(s.wording,s.fault,s.flags,s.confirmed,lang);
   if (s.wording === "withheld" || s.wording === "greeting") return conversationText(s.wording,lang);
   if (s.wording !== "readback") return null;
-  const taps = s.facts.triage?.taps ?? [];
-  return [readBackText(lang,s.facts), ...taps.map(t => CALLER_FLAGS[t]?.label[lang]), FRONTLINE.readback[lang]].filter(Boolean).join(" ");
+  return committedReadback(s.facts,lang);
 }
 
 export async function POST(req:Request) {

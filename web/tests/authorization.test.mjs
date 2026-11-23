@@ -153,3 +153,14 @@ test("frontline roles require an operator session for monitoring and reserve cou
   assert.equal((await cmd(phone, "frontline_qa_counts")).status, 403);
   assert.deepEqual(Object.keys((await ok(cmd(manager, "frontline_qa_counts"))).counts).sort(), ["ai", "human", "queued"]);
 });
+
+test("expired worker requests and unsigned finals cannot submit or speak",async () => {
+  const {APP}=await import("./helpers.mjs");
+  const {createHmac}=await import("node:crypto");
+  const raw=JSON.stringify({action:"state",scope:{job:"expired"}});
+  const issued=String(Math.floor(Date.now()/1000)-60);
+  const sig=createHmac("sha256",process.env.AGENT_BRIDGE_SECRET ?? "test").update(`ichido-job/1\n${issued}\n${raw}`).digest("hex");
+  for (const headers of [{},{"x-issued":issued,"x-job-signature":sig}]) {
+    assert.equal((await fetch(APP+"/api/livekit/frontline",{method:"POST",headers,body:raw})).status,403);
+  }
+});

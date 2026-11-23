@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { cmd } from "@/lib/supabase";
 import { FRONTLINE, UI, errorText, type Lang } from "@/content/catalogue";
 
-export function Human({ lang, open = true, state, requested }: { lang: Lang; open?: boolean; state?: string; requested?: boolean }) {
+export function Human({ lang, open = true, state, requested, receipt, refresh }: { lang: Lang; open?: boolean; state?: string; requested?: boolean; receipt?:string; refresh?:()=>void }) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   async function request() {
     if (!open) return setNote(FRONTLINE.inPerson[lang]);
     setBusy(true);
-    try { await cmd("human"); setSent(true); setNote(""); }
+    try { await (receipt ? cmd("recontact",{receipt}) : cmd("human")); refresh?.(); setSent(true); setNote(""); }
     catch (error) { setNote(`${errorText((error as Error).message, lang)} ${FRONTLINE.inPerson[lang]}`); }
     finally { setBusy(false); }
   }

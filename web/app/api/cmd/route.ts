@@ -208,6 +208,16 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const op = staff(a, "operator");
     return { turns: await rpc("frontline_monitor", { p_uid: op.uid, p_session: op.session, p_incident: str(b, "incident") }) };
   },
+  async frontline_qa(a,b) {
+    const m = staff(a,"manager");
+    if (!["list","reviewed","safety_miss"].includes(str(b,"action"))) fail(400,"bad_request");
+    return {rows:await rpc("frontline_qa",{p_uid:m.uid,p_session:m.session,p_action:b.action,p_incident:b.incident ?? null,p_flagged_at:b.flagged_at ?? null})};
+  },
+  async report_safety_miss(a,b) {
+    const op = staff(a,"operator");
+    await rpc("frontline_qa",{p_uid:op.uid,p_session:op.session,p_action:"safety_miss",p_incident:str(b,"incident")});
+    return {};
+  },
   async frontline_qa_counts(a) {
     staff(a, "manager");
     const counts = await Promise.all(["ai", "queued", "human"].map(async (handler) => {
@@ -351,6 +361,23 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return {};
   },
 
+  async info_delivery(a,b) {
+    const c = caller(a);
+    if (!UUID.test(str(b,"reply")) || !Number.isInteger(b.rev)) fail(400,"bad_request");
+    return {ready:await rpc("info_delivery",{p_uid:c.uid,p_reply:b.reply,p_rev:b.rev,p_lang:str(b,"lang"),p_manual:MANUAL_VERSION})};
+  },
+  async resolve_info(a,b) {
+    const c = caller(a);
+    if (!UUID.test(str(b,"reply")) || !Number.isInteger(b.rev) || b.ack!==true) fail(400,"bad_request");
+    const room = await rpc<string>("resolve_info",{p_uid:c.uid,p_reply:b.reply,p_rev:b.rev,p_lang:str(b,"lang"),p_ack:b.ack,p_manual:MANUAL_VERSION});
+    if (c.incident) await closeVoice(c.incident,room);
+    return {};
+  },
+  async recontact(a,b) {
+    if (!UUID.test(str(b,"receipt"))) fail(400,"bad_request");
+    await rpc("recontact",{p_uid:caller(a).uid,p_receipt:b.receipt});
+    return {};
+  },
   async voice_end(a,b) {
     const c = caller(a);
     await rpc("voice_end",{p_uid:c.uid,p_generation:str(b,"generation"),p_session:str(b,"session")});
@@ -363,14 +390,19 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   },
   async human(a) {
     const c = caller(a);
-    await rpc("cmd_human", { p_uid: c.uid });
+    const follow = c.incident ? null : (await faults.followup(c)).case;
+    if (follow?.resolved_by==="ai") await rpc("recontact",{p_uid:c.uid,p_receipt:follow.id});
+    else await rpc("cmd_human", { p_uid: c.uid });
     return {};
   },
 
   async rate(a, b) {
     const c = caller(a);
     if (typeof b.rating !== "number" || !Number.isInteger(b.rating)) fail(400, "bad_request");
-    await rpc("cmd_rate", { p_uid: c.uid, p_rating: b.rating });
+    if (b.receipt !== undefined) {
+      if (!UUID.test(str(b,"receipt"))) fail(400,"bad_request");
+      await rpc("followup_rate",{p_uid:c.uid,p_receipt:b.receipt,p_rating:b.rating});
+    } else await rpc("cmd_rate", { p_uid: c.uid, p_rating: b.rating });
     return {};
   },
 
@@ -442,7 +474,7 @@ export async function POST(req: Request): Promise<Response> {
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) {
       const id = incident;
-      if (name === "human" || name === "frontline_turn" || name === "takeover") after(() => signalBot(id,name));
+      if (name === "resolve_info" || name === "human" || name === "frontline_turn" || name === "takeover") after(() => signalBot(id,name));
       else await signalBot(id,name);
     }
     after(flushAlerts);   // whatever this command made the database enqueue (lib/alerts.ts)

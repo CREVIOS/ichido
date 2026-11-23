@@ -1,5 +1,6 @@
 "use client";
 import type { FollowUpCase } from "@/content/caller-session";
+import { Rate } from "./guidance";
 import { Human } from "./human";
 import { Fragment, useState } from "react";
 import { Check } from "lucide-react";
@@ -9,7 +10,7 @@ import { Phone } from "@/components/phone";
 import { Notice } from "@/components/kit";
 import { LangSelect } from "@/components/lang-select";
 import { cn } from "@/lib/utils";
-import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, receipt, sentText, urgentText, type Lang } from "@/content/catalogue";
+import { FRONTLINE, CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, receipt, sentText, urgentText, type Lang } from "@/content/catalogue";
 import { PrefsBar, type Prefs } from "./prefs";
 import type { CallerCase } from "./types";
 
@@ -81,10 +82,12 @@ export function SyncStatus({sync, lang}: {sync:Sync;lang:Lang}) {
 export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCase; prefs: Prefs; onPrefs: (p: Prefs) => void }) {
   const [chosen, setLang] = useState<Lang | null>(null);
   const lang = chosen ?? f.lang ?? "bn";
+  const [note,setNote] = useState("");
+  const resolved = f.resolved_by==="ai";
   const told = f.reply && (sentText(f.reply, lang) ?? errorText("server",lang));
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={setLang} />}>
-      <Human lang={lang} />
+      <Human requested={f.recontacted} lang={lang} receipt={resolved ? f.id : undefined} refresh={sync.retry} />
       <SyncStatus sync={sync} lang={lang} />
       <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
@@ -100,6 +103,11 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
         </section>
       )}
       {f.station?.contact && <a className="underline" href={f.station.contact}>{f.station.contact}</a>}
+      {resolved && <>
+        <Rate lang={lang} receipt={f.id} rating={f.rating ?? null} onNote={setNote} refresh={sync.retry} />
+        <Button disabled={f.recontacted} onClick={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch(e => setNote(errorText(e.message,lang)))}>{FRONTLINE.stillHelp[lang]}</Button>
+        <p role="status">{note}</p>
+      </>}
       <Receipt station={f.station_id} id={f.id} lang={lang} />
       <p>{pick(f.station?.branch,lang)} · {pick(f.station?.hours,lang)}</p>
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</p>

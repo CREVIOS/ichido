@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { shiftCaption, shiftOutcomes, ASSISTANT, INSIGHTS, shiftReadError, staffError } from "@/content/catalogue";
-import { METRICS, type Insights, type MetricKey } from "./metrics";
+import { FrontlineMetrics, METRICS, type Insights, type MetricKey } from "./metrics";
 
 const PERIODS = [0, 7, 14, 30];
 
@@ -61,7 +61,7 @@ function Board({ me }: { me: Me }) {
 
           </div>
           {data && <p>{shiftCaption(data)}</p>}
-          {data?.period === days && <><p>{shiftOutcomes(data)}</p>{m.detail(data)}</>}
+          {data?.period === days && <><p>{shiftOutcomes(data)}</p>{m.detail(data)}{data.frontline && <FrontlineMetrics data={data.frontline} />}</>}
           <p className="mt-auto pt-6 text-[12px] text-muted-foreground">{INSIGHTS.privacy}</p>
         </div>
       </div>

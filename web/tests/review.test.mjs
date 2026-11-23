@@ -2,7 +2,7 @@
 // with a timeline event; guards, callers and other operators cannot act; accepting does only what the operator could do by hand.
 // The prepared suggestion and the machine translations are seeded with the service role (the bot and OpenAI write them in production).
 import test from "node:test";
-import { frontlineCase } from "./frontline-fixture.mjs";
+import { enableClosure, shelterAnswer, frontlineCase } from "./frontline-fixture.mjs";
 import assert from "node:assert/strict";
 import { setTimeout as wait } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
@@ -172,4 +172,21 @@ test("unclaimed AI sessions never enter the operator's private approval queue", 
   await f.turn("start");
   assert.deepEqual(await queue(f.op, f.incident), []);
   assert.equal((await cmd(f.phone, "review", { incident: f.incident, kind: "suggestion", ref: "0", decision: "accepted" })).status, 403);
+});
+
+test("manager reviews a coded closure and repeat contact reopens review",async t => {
+  await enableClosure(t);
+  const f=await frontlineCase(t,"en","shelter");
+  const b=await shelterAnswer(f);
+  await ok(cmd(f.phone,"info_delivery",b));
+  await ok(cmd(f.phone,"resolve_info",b));
+  const manager=await staff("manager@ichido.demo");
+  const item=async ()=>(await ok(cmd(manager,"frontline_qa",{action:"list"}))).rows.find(r=>r.incident===f.incident);
+  const initial=await item();
+  assert.equal(initial.reason,"closure");
+  assert.ok(initial.turns.every(t=>!("words" in t) && !("ja" in t)));
+  assert.equal((await cmd(f.op,"frontline_qa",{action:"list"})).status,403);
+  await ok(cmd(manager,"frontline_qa",{action:"reviewed",incident:f.incident,flagged_at:initial.flagged_at}));
+  await ok(cmd(f.phone,"recontact",{receipt:f.incident}));
+  assert.equal((await item()).reason,"recontact");
 });

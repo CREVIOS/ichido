@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { VoiceIntake } from "@/components/VoiceIntake";
 import { Notice, Panel } from "@/components/kit";
 import { useLive } from "@/lib/live";
@@ -35,6 +36,7 @@ export function FrontlineMonitor({ desk }: { desk: Desk }) {
   },[desk.id]);
   useLive(["frontline_turn","frontline_translation","desk"],load);
   return <Panel title={FRONT_DESK.monitor}>
+    <Button variant="secondary" onClick={() => cmd("report_safety_miss",{incident:desk.id}).catch(e => setError(staffError(e.message)))}>{FRONT_DESK.safetyMiss}</Button>
     {desk.transfer_reason && <p>{FRONT_DESK.transfer} · P{desk.priority} · {FRONT_DESK.reasons[desk.transfer_reason]}</p>}
     {desk.lang && desk.lang !== "ne" && !desk.text_only && turns.some(t => t.wording==="start") && <VoiceIntake key={desk.id + desk.lang} lang="ja" monitor={desk.id} />}
     {error && <Notice tone="warn">{error}</Notice>}

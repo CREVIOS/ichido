@@ -11,7 +11,7 @@ export type Role = (typeof ROLES)[number];
 export const isRole = (r: unknown): r is Role => typeof r === "string" && (ROLES as readonly string[]).includes(r);
 
 export const STATEMENTS = {
-  case: ["read", "act", "dispatch", "takeover", "monitor", "qa-counts"],
+  case: ["read", "act", "dispatch", "takeover", "monitor", "qa", "qa-counts"],
   training: ["use"],
   field: ["act"],
   insights: ["read"],
@@ -30,7 +30,7 @@ export type Permission = { [K in keyof Statements]: `${K}:${Statements[K][number
 export const MATRIX: Record<Role, Grants> = {
   operator: { case: ["read", "act", "dispatch", "takeover", "monitor"], training: ["use"], insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"] },
   field: { field: ["act"] },
-  manager: { case: ["qa-counts"], insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"] },
+  manager: { case: ["qa-counts","qa"], insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"] },
   // A manager's reach plus accounts. Never impersonation, deletion or setting someone's password: people set their own.
   admin: {
     insights: ["read"], stations: ["read", "disaster"], mcp: ["use"], assistant: ["use"], audit: ["read"],
@@ -50,13 +50,13 @@ export type Access = Permission | "any" | "caller";
 export const COMMANDS: Record<string, Access> = {
   me: "any", mine: "any", caller_screen: "any", ack_allergy: "field:act", assisted_intake: "case:act", assisted_delivery: "case:act",
   // Caller
-  voice_failure: "caller", voice_end: "caller", frontline_turn: "caller", pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
+  resolve_info: "caller", info_delivery: "caller", recontact: "caller", voice_failure: "caller", voice_end: "caller", frontline_turn: "caller", pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
   rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller",
   // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
   push_key: "any", push_subscribe: "any", push_unsubscribe: "any",
   // Operator on a case
   simulate: "case:act", suggest: "case:act", summary_draft: "case:act", summary_save: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
-  frontline_monitor: "case:monitor", frontline_qa_counts: "case:qa-counts", review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",
+  frontline_qa: "case:qa", report_safety_miss: "case:monitor", frontline_monitor: "case:monitor", frontline_qa_counts: "case:qa-counts", review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",
   reset_caller: "case:act", abandon: "case:act", set_fault: "case:act", stated_amount: "case:act", bank_status: "case:act",
   issue_code: "case:act", show_code_on_device: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",
   abusive: "case:act",

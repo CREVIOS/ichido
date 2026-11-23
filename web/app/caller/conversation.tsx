@@ -1,4 +1,5 @@
 "use client";
+import { committedReadback } from "@/content/frontline-policy";
 import { canConfirm } from "@/content/caller-session";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ export function Conversation({ card, draft, lang, turns, refresh }: { card: Call
   }
   const ai = card.handler === "ai";
   const warning = card.confirmed_rev === null ? null : urgentText(card.fault, card.flags, lang);
-  const readback = turns.some((t) => t.speaker === "ai" && t.wording === "readback" && t.rev === draft.rev);
+  const readback = turns.findLast((t) => t.speaker === "ai" && t.rev === draft.rev && t.locale===lang);
   const suggestions = [...new Set(draft.triage?.taps ?? [])].filter((t) => !card.flags.includes(t) && CALLER_FLAGS[t]);
   return <section className="flex flex-col gap-4">
     {ai && <h1 className="text-2xl leading-snug">{FRONTLINE.greeting[lang]}</h1>}
@@ -55,7 +56,8 @@ export function Conversation({ card, draft, lang, turns, refresh }: { card: Call
         <Button type="submit" disabled={busy || !text.trim()}>{UI.send[lang]}</Button>
       </form>
       {card.confirmed_rev === null && <>
-        {ai && readback && <p>{FRONTLINE.readback[lang]}</p>}
+        {ai && readback?.wording==="readback" && <p>{readback.facts ? committedReadback(readback.facts,lang) : FRONTLINE.readback[lang]}</p>}
+        {ai && readback?.wording==="withheld" && <Notice>{UI.numbersWithheld[lang]}</Notice>}
         {suggestions.map((flag) => <Button key={flag} variant="secondary" disabled={busy} onClick={() => submit("tap", { flag,on:true })}>{CALLER_FLAGS[flag].label[lang]}</Button>)}
         {pack.atm && !card.flags.includes("need_other") && <ReadBack lang={lang} draft={{ ...draft, words: null }} busy={busy} onAnswer={(key,value) => submit("facts",{ key,value })} />}
         <CallerFlags card={card} lang={lang} submit={(flag,on) => submit("tap",{ flag,on })} />

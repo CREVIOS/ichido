@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, unansweredLabel, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId, type ShiftCounts } from "@/content/catalogue";
+import { FRONT_DESK, DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, unansweredLabel, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId, type ShiftCounts } from "@/content/catalogue";
 
 export type Insights = ShiftCounts & {
+  frontline:{started:number;resolved:number;open:number;abandoned:number;contact_p50:number|null;contact_p95:number|null;contact_n:number;
+    recontact:number;mature:number;covered:number;escalations:Record<string,number>};
   since: string;
   funnel: Record<string, number>;
   dispatched: number;
@@ -148,3 +150,14 @@ export const METRICS = {
 } satisfies Record<string, { card: (d: Insights) => ReactNode; detail: (d: Insights) => ReactNode }>;
 
 export type MetricKey = keyof typeof METRICS;
+
+export function FrontlineMetrics({data:f}:{data:Insights["frontline"]}) {
+  const ratio = (n:number,d:number) => d ? `${n} / ${d} (${pct(n,d)}%)` : "0 / 0";
+  return <section className="grid gap-3"><h2>{FRONT_DESK.outcomes}</h2>
+    <Pair items={[[FRONT_DESK.resolved,ratio(f.resolved,f.started)],[FRONT_DESK.open,String(f.open)],
+      [FRONT_DESK.abandoned,String(f.abandoned)],[FRONT_DESK.repeat,ratio(f.recontact,f.covered)],
+      [FRONT_DESK.coverage,ratio(f.covered,f.mature)]]}/>
+    <h3>{FRONT_DESK.contact}</h3><Pair items={[["p50",dur(f.contact_p50)],["p95",dur(f.contact_p95)],[FRONT_DESK.contacts,String(f.contact_n)]]}/>
+    <h3>{FRONT_DESK.transfer}</h3><Pair items={Object.entries(f.escalations).map(([k,n])=>[FRONT_DESK.reasons[k] ?? k,String(n)])}/>
+  </section>;
+}

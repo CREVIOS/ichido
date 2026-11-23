@@ -68,7 +68,7 @@ export default function CallerPage() {
       {frontline && draft && <Conversation key={generation} turns={turns} card={card} draft={draft} lang={lang} refresh={load} />}
       {!frontline && !confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}
       {!frontline && confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
-      {latest && <Guidance key={latest.id} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
+      {latest && <Guidance refresh={load} key={latest.id + lang} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
       {!frontline && open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
       {P.atm && (card.bank_status || !open) && <BankStatus status={(card.bank_status === "contact_by" || card.bank_status === "contacted") && !card.callback_channel ? null : card.bank_status} due={card.bank_due} lang={lang} />}
       <AllergyCard flags={card.flags} lang={lang} />

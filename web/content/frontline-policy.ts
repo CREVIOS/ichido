@@ -1,4 +1,4 @@
-import { CALLER_FLAGS, FRONTLINE, LANGS, REPLY_RULES, UI, replyBlock, replyOf, type Lang } from "./catalogue.ts";
+import { CALLER_FLAGS, FRONTLINE, LANGS, REPLY_RULES, UI, readBackText, replyBlock, replyOf, type Fact, type Lang } from "./catalogue.ts";
 import { frontlineNumber } from "./numbers.ts";
 
 export type Transfer = { priority: 0 | 1 | 2; reason: string };
@@ -29,4 +29,10 @@ export function approvedInfo(intent: string, fault: string, flags: string[], con
   if (replyBlock(intent, false, { fault, flags, confirmed, card_back: "unknown", remote_release: null })) return null;
   const words = replyOf(intent)?.text({});
   return words && LANGS.every((l) => words[l]?.trim() && !frontlineNumber(words[l])) ? words[lang] : null;
+}
+
+export type ReadbackFacts = {card_back:Fact; cash_received:Fact; triage?:{taps:string[]}};
+export function committedReadback(facts:ReadbackFacts, lang:Lang) {
+  const taps = facts.triage?.taps ?? [];
+  return [readBackText(lang,facts), ...taps.map(t => CALLER_FLAGS[t]?.label[lang]), FRONTLINE.readback[lang]].filter(Boolean).join(" ");
 }

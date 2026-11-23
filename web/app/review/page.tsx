@@ -11,10 +11,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from "@/lib/utils";
 import { CASES, REVIEW, staffError } from "@/content/catalogue";
 import { useClock } from "../operator/queue";
+import { Closures } from "./closures";
 import { Detail, KIND_ICON, subtitle, type Decide } from "./item";
 
 export default function ReviewPage() {
-  return <StaffGate need="case:act" title={REVIEW.title}>{(me) => <Inbox me={me} />}</StaffGate>;
+  return <StaffGate need={["case:act","case:qa"]} title={REVIEW.title}>{(me) => me.role==="manager" ? <Closures me={me} /> : <Inbox me={me} />}</StaffGate>;
 }
 
 const SEEN_KEY = "ichido.review.seen";
