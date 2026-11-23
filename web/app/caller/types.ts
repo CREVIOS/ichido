@@ -6,6 +6,8 @@ export type CallerCase = {
   reply_id: string | null; flags: string[]; bank_status: string | null; bank_due: string | null;
   fraud?: boolean; notice?: string | null;
 };
-export type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean };
+// triage: the AI's suggestion as catalogue codes (lib/triage.ts); nothing counts until the caller taps it.
+export type Triage = { situation: string | null; taps: string[]; ask: string[]; clarify: boolean };
+export type Draft = { rev: number; card_back: Fact; cash_received: Fact; words: string | null; needs_clarification: boolean; triage?: Triage | null };
 export type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
 export type Station = { label: L10n };

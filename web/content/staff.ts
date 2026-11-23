@@ -167,8 +167,16 @@ export const DESK = {
     off: "AI提案は未設定です（GEMINI_API_KEY）。",
     failed: "AI提案を取得できませんでした。",
     trace: "判断の過程",
-    tools: { model: "Gemini 推論", get_case: "案件を確認", list_replies: "承認済み返答を確認", list_guards: "警備員の空き状況", station_status: "機器の状態" } as Record<string, string>,
+    tools: { model: "Gemini 推論", get_case: "案件を確認", list_replies: "承認済み返答を確認", list_guards: "警備員の空き状況", get_pack_rules: "返答の条件を確認", station_status: "機器の状態" } as Record<string, string>,
     total: (ms: number) => `合計 ${(ms / 1000).toFixed(1)}秒`,
+  },
+  // Pack triage (lib/triage.ts): the intake model's suggestion, shown beside what the caller confirmed.
+  triage: {
+    title: "AIの読み取り（提案）",
+    situation: (s: string) => `AIが提案した状況：${s}`,
+    taps: "AIが読み取った回答（お客様が確認したものは左に表示）",
+    asked: "AIがお客様に確認を促した至急項目",
+    note: "AIの提案であり、事実ではありません。状況の変更は担当者が判断します。",
   },
   dispatch: {
     title: "取次・出動依頼",
@@ -288,8 +296,21 @@ export const HANDOFF = {
   revoked: "失効済み",
   expired: "期限切れ",
   views: (n: number) => `閲覧 ${n}回`,
+  // The hand-off summary: an AI draft from the case record only, reviewed and saved by the operator (lib/summary.ts).
+  summary: {
+    title: "引継ぎ要約",
+    lead: "案件記録のみから要約を下書きします。お客様の発言・氏名・番号は含みません。内容を確認・修正してから保存してください。",
+    draft: "AIで下書き",
+    save: "確認して保存",
+    saved: "要約を保存しました",
+    off: "AIの下書きは利用できません。要約を直接入力してください。",
+    withheld: "番号と思われる内容は保存できません。",
+    by: (n: string, t: string) => `AI下書き・${n}が確認（${t}）`,
+    unsaved: "未保存の下書き",
+  },
   doc: {
     title: "引継票",
+    aiSummary: "要約（AI下書き・担当者確認済み）",
     subtitle: "ATM障害対応の記録（読み取り専用）",
     to: (r: string) => `${r} 御中`,
     caseId: "案件番号",
@@ -328,6 +349,29 @@ export const STAFF_JA = {
     done: "現地対応完了（カードの扱いは銀行所定の手続き）",
   } as Record<string, string>,
   fault: { card_retained: "取引後にカードが排出されない", ...FAULT_STAFF, ...OPS_FAULT_STAFF } as Record<string, string>,
+};
+
+// Ask Ichido (/api/assistant): read-only questions over the MCP tools, as the staff member asking.
+export const ASSISTANT = {
+  title: "Ichidoに質問",
+  lead: "閲覧のみのアシスタントです。ご自身の権限で見られる記録だけを使って回答します。返答の送信や出動依頼は行いません。",
+  placeholder: "例：今週カード未排出が多かった拠点は？",
+  ask: "質問する",
+  thinking: "ツールで確認しています…",
+  trace: "使用したツール",
+  cases: "参照した案件",
+  off: "AIアシスタントは未設定です（OPENAI_API_KEY）。",
+  failed: "回答を取得できませんでした。もう一度お試しください。",
+  limited: "質問が多すぎます。1分ほどおいてお試しください。",
+  maps: "出典：Google マップ",
+  mode: { remote: "リモートMCP", local: "MCP（サーバー内）" } as Record<string, string>,
+  total: (ms: number) => `合計 ${(ms / 1000).toFixed(1)}秒`,
+  examples: ["今週カード未排出が多かった拠点は？", "いま対応中の案件と担当者は？", "Which field jobs are still open?"],
+  tools: {
+    list_open_cases: "対応中の案件", get_case: "案件の詳細", station_health: "拠点の機器状態", insights: "集計",
+    suggest_next_step: "AI提案", search_cases: "案件の検索", station_detail: "拠点の詳細", field_jobs_open: "未完了の現地対応",
+    search_places: "Google マップ：場所", compute_routes: "Google マップ：経路", lookup_weather: "Google マップ：天気",
+  } as Record<string, string>,
 };
 
 // Ichido Bot: the per-case workflow that recommends, prepares, reminds and records. A person makes every decision.

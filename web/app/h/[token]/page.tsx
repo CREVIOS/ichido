@@ -22,7 +22,7 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
   if (!h) return <main className="grid min-h-dvh place-items-center p-6"><p className="max-w-sm text-center text-[14px]">{D.gone}</p></main>;
   const id = h.incident;
   const [{ data: d }, { data: events }, { data: replies }, { data: job }, { data: card }] = await Promise.all([
-    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at, stated_amount, fraud_at").eq("id", id).single(),
+    admin.from("desk").select("station, source, fault, status, lang, card_back, cash_received, confirmed_rev, remote_release, abandoned, created_at, finished_at, stated_amount, fraud_at, ai_summary, ai_summary_by, ai_summary_at").eq("id", id).single(),
     admin.from("case_event").select(`
       id, at, actor, kind, fault:data->>fault, source:data->>source, lang:data->>lang,
       level:data->>level, reason:data->>reason, result:data->>result,
@@ -100,6 +100,14 @@ async function Report({ params }: { params: Promise<{ token: string }> }) {
       {d.finished_at && d.status === "guided" && (
         <Section title={D.summary}>
           <p className="text-[15px] leading-7 text-foreground">{summaryDraft({ card_back: d.card_back as Fact, cash_received: d.cash_received as Fact, remote_release: d.remote_release, dispatched: Boolean(job), choice: card?.choice ?? null, fault: d.fault, flags: card?.flags ?? [] })}</p>
+        </Section>
+      )}
+
+      {/* Drafted by AI from the case record only, then reviewed and saved by the operator (lib/summary.ts). */}
+      {d.ai_summary && (
+        <Section title={D.aiSummary}>
+          <p className="text-[15px] leading-7 text-foreground">{d.ai_summary}</p>
+          <p className="text-[12px] text-muted-foreground">{HANDOFF.summary.by(ACTOR.operator, at(d.ai_summary_at))}</p>
         </Section>
       )}
 

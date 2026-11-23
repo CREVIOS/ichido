@@ -77,7 +77,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
         <Timeline events={events} fault={d.fault} />
-        {d.operator_id && <HandoffPanel incident={d.id} fault={d.fault} />}
+        {d.operator_id && <HandoffPanel d={d} mine={mine} />}
         {d.operator_id && atm && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
@@ -172,9 +172,25 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
           </div>
         </div>
       )}
+      {d.confirmed_rev != null && d.triage && <TriageNote d={d} flags={card?.flags ?? []} />}
       {card?.choice && <span className="text-[14px]">{DESK.choice}：<span className="text-foreground">{DESK.choiceText[card.choice]}</span></span>}
       {card?.teachback && <TeachBack card={card} lang={lang} canJudge={canJudge} onJudge={(result) => run("outcome", { incident: d.id, reply: card.teachback_reply, result })} />}
     </Panel>
+  );
+}
+
+// What the intake model suggested, labelled as the AI's: the caller's own taps stay the facts.
+function TriageNote({ d, flags }: { d: Desk; flags: string[] }) {
+  const t = d.triage!;
+  const unconfirmed = t.taps.filter((f) => !flags.includes(f));
+  return (
+    <div className="inset flex flex-col gap-1.5 px-3 py-2.5 text-[13px] leading-5">
+      <span className="flex items-center gap-2"><Chip className="shrink-0">AI</Chip><span className="label">{DESK.triage.title}</span>{t.model && <span className="mono text-faint">{t.model}</span>}</span>
+      {t.situation && <span className="text-foreground">{DESK.triage.situation(STAFF_JA.fault[t.situation] ?? t.situation)}</span>}
+      {unconfirmed.length > 0 && <span>{DESK.triage.taps}：{unconfirmed.map((f) => CALLER_FLAGS[f]?.staff ?? f).join("、")}</span>}
+      {t.ask.length > 0 && <span>{DESK.triage.asked}：{t.ask.map((f) => CALLER_FLAGS[f]?.staff ?? f).join("、")}</span>}
+      <span className="text-muted-foreground">{DESK.triage.note}</span>
+    </div>
   );
 }
 

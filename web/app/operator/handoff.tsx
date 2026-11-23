@@ -1,19 +1,22 @@
 "use client";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Link2 } from "lucide-react";
+import { Copy, Link2, Sparkles } from "lucide-react";
 import { cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Chip, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { HANDOFF, PACKS, packOfFault, staffError } from "@/content/catalogue";
+import { when, type Desk } from "./types";
 
 type Link = { id: string; recipient: string; created_at: string; expires_at: string; revoked_at: string | null; views: number };
 const at = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 // Read-only links to this case's record for its pack's recipients (an ATM: the bank, the police, the security company).
-export function HandoffPanel({ incident, fault }: { incident: string; fault: string }) {
+export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
+  const { id: incident, fault } = d;
   const RECIPIENTS = Object.keys(PACKS[packOfFault(fault)].recipients);
   const [state, setState] = useState<{ links: Link[]; now: number }>({ links: [], now: 0 });
   const load = useCallback(() => cmd<{ links: Link[] }>("handoff_list", { incident })
@@ -41,6 +44,7 @@ export function HandoffPanel({ incident, fault }: { incident: string; fault: str
       <div className="flex flex-wrap gap-2">
         {RECIPIENTS.map((r) => <Button key={r} variant="secondary" onClick={() => create(r)}><Link2 className="stroke-[1.5]" />{HANDOFF.create(HANDOFF.recipient[r])}</Button>)}
       </div>
+      <Summary d={d} mine={mine} />
       {links.length > 0 && (
         <ul className="flex flex-col">
           {links.map((l) => {
@@ -59,5 +63,44 @@ export function HandoffPanel({ incident, fault }: { incident: string; fault: str
         </ul>
       )}
     </Panel>
+  );
+}
+
+// The hand-off summary: an AI draft from the case record (never the caller's words), which the operator edits and saves.
+// Only the saved text reaches the recipient, marked as an AI draft reviewed by the operator.
+function Summary({ d, mine }: { d: Desk; mine: boolean }) {
+  const [text, setText] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const S = HANDOFF.summary;
+  const fail = (e: Error) => toast.error(staffError(e.message));
+  const draft = () => {
+    setBusy(true); setNote("");
+    cmd<{ summary: string | null }>("summary_draft", { incident: d.id })
+      .then((r) => { if (r.summary) setText(r.summary); else { setNote(S.off); setText((t) => t ?? ""); } })
+      .catch(fail).finally(() => setBusy(false));
+  };
+  const save = () => cmd<{ withheld?: boolean }>("summary_save", { incident: d.id, text })
+    .then((r) => { if (r.withheld) return setNote(S.withheld); setText(null); toast.success(S.saved); }).catch(fail);
+  if (!mine && !d.ai_summary) return null;
+  return (
+    <div className="flex flex-col gap-2 border-t pt-3">
+      <span className="flex items-center justify-between gap-2">
+        <span className="label">{S.title}</span>
+        {d.ai_summary && d.ai_summary_by && d.ai_summary_at && <Chip>{S.by(d.ai_summary_by, when(d.ai_summary_at))}</Chip>}
+      </span>
+      {text == null ? (
+        <>
+          {d.ai_summary && <p className="text-[14px] leading-6 text-foreground">{d.ai_summary}</p>}
+          {mine && <span className="flex items-center gap-3"><Button variant="secondary" size="sm" disabled={busy} onClick={draft}><Sparkles className="stroke-[1.5]" />{S.draft}</Button><span className="text-[12px] leading-5 text-muted-foreground">{S.lead}</span></span>}
+        </>
+      ) : (
+        <>
+          <Textarea aria-label={S.title} value={text} onChange={(e) => setText(e.target.value)} maxLength={600} className="min-h-24 text-[14px]" />
+          <span className="flex items-center gap-2"><Pill tone="neutral">{S.unsaved}</Pill><Button size="sm" className="ml-auto" disabled={!text.trim()} onClick={save}>{S.save}</Button></span>
+        </>
+      )}
+      {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
+    </div>
   );
 }

@@ -6,6 +6,8 @@ export type Desk = {
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
   remote_release: string | null; abandoned: boolean; text_only?: boolean; created_at: string; finished_at: string | null; stated_amount?: number | null;
   fraud_at?: string | null; abusive_at?: string | null; mass_incident?: string | null;
+  triage?: { situation: string | null; taps: string[]; ask: string[]; model?: string } | null;   // the intake AI's suggestion (codes)
+  ai_summary?: string | null; ai_summary_by?: string | null; ai_summary_at?: string | null;
 };
 export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;

@@ -13,12 +13,17 @@ import type { CallerCase } from "./types";
 // The caller's own taps: what happened and who is with them. Each tap is their statement, shown to the operator as is.
 // A pack groups its taps under headings (who, where, since when, how much it hurts…); a one-answer group turns the
 // others off. A red-flag tap shows the pack's urgent approved text at once, the same words the operator would send.
+// One tap as the caller's own statement: a one-answer group turns its other answers off first.
+export async function tapFlag(flags: readonly string[], flag: string, on: boolean) {
+  for (const f of on ? exclusiveOff(flag, flags) : []) await cmd("flag", { flag: f, on: false });
+  await cmd("flag", { flag, on });
+}
+
 export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
   const [note, setNote] = useState("");
   const tap = async (flag: string, on: boolean) => {
     try {
-      for (const f of on ? exclusiveOff(flag, card.flags) : []) await cmd("flag", { flag: f, on: false });
-      await cmd("flag", { flag, on });
+      await tapFlag(card.flags, flag, on);
       setNote("");
     } catch (e) { setNote(errorText((e as Error).message, lang)); }
   };
