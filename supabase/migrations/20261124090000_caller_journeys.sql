@@ -136,15 +136,16 @@ end $$;
 create or replace trigger require_allergy_ack before update of state on public.field_job for each row when(new.state='done') execute function ichido.require_allergy_ack();
 create or replace function ichido.job_allergy() returns trigger language plpgsql security definer set search_path='' as $$
 begin
-  select ichido.allergy_choices(c.confirmed_flags) into new.allergy_flags from public.caller_card c where c.id=new.incident;
+  -- A job without a confirmed caller card (staff-opened, assisted before intake) has no allergy choices.
+  new.allergy_flags := coalesce((select ichido.allergy_choices(c.confirmed_flags) from public.caller_card c where c.id=new.incident), '{}');
   new.allergy_ack_at:=null;
   return new;
 end $$;
 create or replace trigger job_allergy before insert or update of generation on public.field_job for each row execute function ichido.job_allergy();
 create or replace function ichido.refresh_job_allergy() returns trigger language plpgsql security definer set search_path='' as $$
 begin
-  update public.field_job set allergy_flags=ichido.allergy_choices(new.confirmed_flags),allergy_ack_at=null
-    where incident=new.id and allergy_flags<>ichido.allergy_choices(new.confirmed_flags);
+  update public.field_job set allergy_flags=coalesce(ichido.allergy_choices(new.confirmed_flags),'{}'),allergy_ack_at=null
+    where incident=new.id and allergy_flags<>coalesce(ichido.allergy_choices(new.confirmed_flags),'{}');
   return null;
 end $$;
 create or replace trigger refresh_job_allergy after update on public.caller_card for each row
