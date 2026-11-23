@@ -36,8 +36,8 @@ export function SuggestCard({ d, run, prepared, step }: { d: Desk; run: Run; pre
 
   const adopt = async (s: Suggestion) => {
     if (!s.intent || !(await run("send", { incident: d.id, intent: s.intent }))) return;
-    if (s.dispatch && s.guard) await run("assign", { incident: d.id, assignee: s.guard.uid });
-    toast.success(s.dispatch && s.guard ? DESK.reply.bundleToast(s.guard.name) : DESK.reply.toast);
+    const assigned = s.dispatch && s.guard && await run("assign", { incident: d.id, assignee: s.guard.uid });
+    toast.success(assigned && s.guard ? DESK.reply.bundleToast(s.guard.name) : DESK.reply.toast);
   };
 
   return (

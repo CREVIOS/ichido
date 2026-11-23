@@ -8,7 +8,7 @@ import { Chip, Notice, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { OPERATOR_PROMISES, OPS, PROMISE_MINUTES, staffError } from "@/content/catalogue";
-import { hhmm, type Desk, type Guard, type Job, type OpenDesk, type Run } from "./types";
+import { hhmm, type Desk, type OpenDesk, type Run } from "./types";
 
 // Console parts for content/ops.ts: fraud mode, mass incidents, promises, harassment flag and takeover.
 
@@ -47,7 +47,7 @@ export function DispatchChain({ company }: { company: string }) {
   );
 }
 
-type Mass = { id: string; started_at: string; broadcast_at: string | null; broadcast_by: string | null; recipients: number | null };
+type Mass = { id: string; started_at: string; broadcast_at: string | null; broadcast_by: string | null; recipients: number | null; eligible: number; kinds: string[] };
 
 // One banner for a mass incident, with the single approved broadcast.
 export function MassBanner({ open }: { open: OpenDesk[] | null }) {
@@ -62,10 +62,13 @@ export function MassBanner({ open }: { open: OpenDesk[] | null }) {
       sb().from("mass_incident").select("*").in("id", key.split(",")),
       sb().schema("ichido").from("ops_setting").select("value").eq("key", "mass_window_s").maybeSingle(),
     ]);
-    setRows((m.data ?? []) as Mass[]);
+    setRows(await Promise.all((m.data ?? []).map(async (row) => {
+      const { data } = await sb().rpc("mass_preview", { p_mass: row.id });
+      return { ...row, eligible: data?.eligible ?? 0, kinds: data?.kinds ?? [] } as Mass;
+    })));
     setWin(s.data?.value ?? null);
   }, [key]);
-  useLive(["mass_incident"], load);
+  useLive(["mass_incident", "desk", "caller_card", "case_event", "station"], load);
   return rows.map((m) => {
     const n = new Set((open ?? []).filter((c) => c.mass_incident === m.id).map((c) => c.station)).size;
     const send = () => cmd<{ sent: number }>("broadcast", { mass: m.id }).then((r) => toast.success(OPS.mass.toast(r.sent))).catch(fail).finally(() => setArming(null));
@@ -73,31 +76,24 @@ export function MassBanner({ open }: { open: OpenDesk[] | null }) {
       <section key={m.id} className="m-4 flex flex-col gap-2 rounded-xl border border-alert/40 bg-[oklch(0.98_0.015_25)] p-4 lg:mx-8">
         <span className="flex items-center gap-2 text-[15px] font-medium text-foreground"><Siren className="size-4 stroke-[1.5] text-alert" />{OPS.mass.title(n)}</span>
         <p className="text-[13px] leading-5">{OPS.mass.body(Math.round((win ?? 600) / 60))}</p>
+        <span>{OPS.mass.preview(m.eligible, m.kinds)}</span>
         {m.broadcast_at
           ? <span className="text-[13px] text-foreground">{OPS.mass.sent(hhmm(m.broadcast_at), m.broadcast_by ?? "", m.recipients ?? 0)}</span>
           : <div className="flex flex-wrap items-center gap-3">{arming === m.id
-            ? <><Button variant="destructive" onClick={send}>{OPS.mass.confirm}</Button><Button variant="ghost" onClick={() => setArming(null)}>{OPS.mass.cancel}</Button></>
-            : <Button onClick={() => setArming(m.id)}>{OPS.mass.send}</Button>}<span className="text-[12px] leading-5 text-muted-foreground">{OPS.mass.note}</span></div>}
+            ? <><Button variant="destructive" disabled={!m.eligible} onClick={send}>{OPS.mass.confirm}</Button><Button variant="ghost" onClick={() => setArming(null)}>{OPS.mass.cancel}</Button></>
+            : <Button disabled={!m.eligible} onClick={() => setArming(m.id)}>{OPS.mass.send}</Button>}<span className="text-[12px] leading-5 text-muted-foreground">{OPS.mass.note}</span></div>}
       </section>
     );
   });
 }
 
-// 特殊詐欺の疑い in one action: warning on the caller's phone, red light, guard, police hand-off record.
-export function FraudCard({ d, job, guards }: { d: Desk; job: Job | null; guards: Guard[] }) {
-  const guard = guards.find((g) => g.uid === job?.assignee) ?? guards[0];
-  if (d.fraud_at) return <Notice tone="warn">{OPS.fraud.active(hhmm(d.fraud_at))}</Notice>;
-  const go = () => cmd<{ police: { path: string } }>("fraud", { incident: d.id, assignee: guard!.uid })
-    .then(async (r) => {
-      const url = `${location.origin}${r.police.path}`;
-      await navigator.clipboard.writeText(url).catch(() => undefined);
-      toast.success(OPS.fraud.toast, { description: url });
-    }).catch(fail);
+export function FraudCard({ d, run }: { d: Desk; run: Run }) {
   return (
-    <Panel title={<span className="inline-flex items-center gap-1.5"><Siren className="size-3.5 stroke-[1.5]" />{OPS.fraud.title}</span>}>
-      <p className="text-[13px] leading-5">{OPS.fraud.body}</p>
-      <ul className="flex flex-col gap-1 text-[13px] leading-5 text-foreground">{OPS.fraud.effects.map((x) => <li key={x} className="flex gap-2"><span className="mt-2 size-1 shrink-0 rounded-full bg-alert" />{x}</li>)}</ul>
-      {guard ? <Button variant="destructive" onClick={go}>{OPS.fraud.action(guard.display_name)}</Button> : <Notice>{OPS.fraud.noGuard}</Notice>}
+    <Panel title={OPS.fraud.title}>
+      <p>{d.fraud_at ? OPS.fraud.active(hhmm(d.fraud_at)) : OPS.fraud.body}</p>
+      <Button variant={d.fraud_at ? "secondary" : "destructive"} onClick={() => run(d.fraud_at ? "fraud_safe" : "fraud", { incident: d.id })}>
+        {d.fraud_at ? OPS.fraud.safe : OPS.fraud.warn}
+      </Button>
     </Panel>
   );
 }

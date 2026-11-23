@@ -80,7 +80,7 @@ function Board({ me }: { me: Me }) {
           disaster: Boolean(s.disaster), mobile: s.kind === "mobile_branch", pack: packOfKind(s.kind), selected: picked.includes(s.id),
         };
       })} />
-      {can(me.role, "stations:disaster") && <DisasterPanel selected={picked} all={stations.map((s) => s.id)} onSelect={setPicked} label={Object.fromEntries(stations.map((s) => [s.id, s.label.ja]))} />}
+      {can(me.role, "stations:disaster") && <DisasterPanel selected={picked} all={shown} onSelect={setPicked} label={Object.fromEntries(stations.map((s) => [s.id, s.label.ja]))} />}
       <div className="overflow-x-auto">
         <div className="min-w-[1130px]">
           <div className="flex h-10 items-center border-b text-[13px] text-muted-foreground">

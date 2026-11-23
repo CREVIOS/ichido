@@ -7,7 +7,7 @@ import { useLive } from "@/lib/live";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DISASTER_NOTICES, DISASTER_STAFF as T, staffError } from "@/content/catalogue";
+import { packOfKind, DISASTER_NOTICES, DISASTER_STAFF as T, staffError } from "@/content/catalogue";
 
 type Event = { id: number; station: string; kind: "entered" | "left"; notice: string; actor_name: string; at: string };
 const NOTICES = Object.keys(DISASTER_NOTICES);
@@ -16,8 +16,9 @@ const time = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeri
 
 // Disaster / outage mode: pick stations (map or list), pick one of the bank's approved notices, set or clear.
 export function DisasterPanel({ selected, all, onSelect, label }: {
-  selected: string[]; all: string[]; onSelect: (ids: string[]) => void; label: Record<string, string>;
+  selected: string[]; all: { id: string; kind: string }[]; onSelect: (ids: string[]) => void; label: Record<string, string>;
 }) {
+  const eligible = all.filter((s) => packOfKind(s.kind) === "atm" && selected.includes(s.id));
   const [notice, setNotice] = useState(NOTICES[0]);
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
@@ -30,7 +31,7 @@ export function DisasterPanel({ selected, all, onSelect, label }: {
   const apply = async (name: "disaster_set" | "disaster_clear") => {
     setBusy(true);
     try {
-      const r = await cmd<{ changed: string[] }>(name, { stations: selected, notice });
+      const r = await cmd<{ changed: string[] }>(name, { stations: name === "disaster_set" ? eligible.map((s) => s.id) : selected, notice });
       toast.success((name === "disaster_set" ? T.toastSet : T.toastClear)(r.changed.length));
       onSelect([]);
     } catch (e) {
@@ -46,8 +47,8 @@ export function DisasterPanel({ selected, all, onSelect, label }: {
           <p className="text-[13px] leading-5 text-muted-foreground">{T.lead}</p>
         </div>
         <div className="flex items-center gap-2 text-[13px]">
-          <span className="num text-foreground">{T.selected(selected.length)}</span>
-          <Button variant="ghost" size="sm" onClick={() => onSelect(all)}>{T.selectAll}</Button>
+          <span className="num text-foreground">{T.selected(eligible.length)} · {[...new Set(eligible.map((s) => s.kind))].join("・")}</span>
+          <Button variant="ghost" size="sm" onClick={() => onSelect(all.filter((s) => packOfKind(s.kind) === "atm").map((s) => s.id))}>{T.selectAll}</Button>
           <Button variant="ghost" size="sm" disabled={!selected.length} onClick={() => onSelect([])}>{T.unselect}</Button>
         </div>
       </div>
@@ -61,7 +62,7 @@ export function DisasterPanel({ selected, all, onSelect, label }: {
           <span className="label pt-1">{T.preview}</span>
           <p lang="ja" className="inset p-3 text-[13px] leading-6 text-foreground">{DISASTER_NOTICES[notice].text.ja}</p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button disabled={busy || !selected.length} onClick={() => apply("disaster_set")}>{T.set}</Button>
+            <Button disabled={busy || !eligible.length} onClick={() => apply("disaster_set")}>{T.set}</Button>
             <Button variant="secondary" disabled={busy || !selected.length} onClick={() => apply("disaster_clear")}>{T.clear}</Button>
           </div>
         </div>

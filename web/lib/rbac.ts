@@ -60,7 +60,7 @@ export const COMMANDS: Record<string, Access> = {
   reset_caller: "case:act", abandon: "case:act", set_fault: "case:act", stated_amount: "case:act", bank_status: "case:act",
   issue_code: "case:act", show_code_on_device: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",
   abusive: "case:act",
-  assign: "case:dispatch", fraud: "case:dispatch",
+  assign: "case:dispatch", fraud: "case:dispatch", fraud_safe: "case:dispatch",
   takeover: "case:takeover",
   training_start: "training:use", training_say: "training:use", training_readback: "training:use", training_reply: "training:use",
   training_dispatch: "training:use", training_end: "training:use",

@@ -62,7 +62,7 @@ export const disasterCommands: Record<string, Command> = {
     const seen = (h: unknown) => ((Array.isArray(h) ? h[0] : h) as { last_seen?: string } | null)?.last_seen ?? null;
     const all = (rows ?? []).map((r) => ({ ...r, last_seen: seen(r.device_health) }));
     const here = all.find((r) => r.id === d?.station);
-    if (!here?.disaster) return { notice: null, nearby: [] };
+    if (!here?.disaster || packOfKind(here.kind) !== "atm") return { notice: null, nearby: [] };
     const near = here.lat != null && here.lng != null ? nearestWorking({ lat: here.lat, lng: here.lng }, (all as Place[]).filter((r) => packOfKind(r.kind) === packOfKind(here.kind)), Date.now(), STATIONS.onlineWithinS) : [];
     const byId = new Map(all.map((r) => [r.id, r]));
     return {

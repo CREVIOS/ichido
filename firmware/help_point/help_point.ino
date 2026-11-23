@@ -160,6 +160,7 @@ void setRgb(bool r, bool g, bool b) {
 // Words for the station state. The code is shown only while fresh and unexpired; never while offline.
 void showDisplay(bool stale) {
   const char *title = "Ichido Help Point";
+  if (state == "fraud") return drawScreen("STOP", "End the call", "Do not use ATM");
   if (stale) return drawScreen(title, "Offline", "Reconnecting...");
   long left = (long)(codeUntilMs - millis()) / 1000;
   if (pairCode.length() && left > 0) {

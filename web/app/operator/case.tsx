@@ -37,7 +37,7 @@ function useCase(id: string) {
   const load = useCallback(async () => {
     const db = sb();
     const [c, e, r, j, b, x, p, rec, ok] = await Promise.all([
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
@@ -108,7 +108,8 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
   if (!mine) return <TakeoverPanel d={d} run={run} title={DESK.otherOperator} body={DESK.otherOperatorBody} />;
   return (
     <>
-      <FraudCard d={d} job={job} guards={guards} />
+      {packOfFault(d.fault) === "atm" && <FraudCard d={d} run={run} />}
+      {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
       {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <FaultCard d={d} flags={card?.flags ?? []} run={run} />
@@ -125,7 +126,7 @@ function CaseHeader({ d, closed, mine, run }: { d: Desk; closed: boolean; mine: 
   const pack = packOfFault(d.fault);
   const atm = pack === "atm";
   const menu = !closed && mine ? [
-    ...(!d.remote_release && atm ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
+    ...(d.remote_release !== "released" && atm ? Object.keys(DESK.recordRelease).map((result) => ({ label: DESK.recordRelease[result], onClick: () => run("remote_release", { incident: d.id, result }) })) : []),
     { label: DESK.resetCaller, onClick: () => run("reset_caller", { incident: d.id }) },
     { label: OPS.abusive.mark, onClick: () => abusive(d.id, run), disabled: Boolean(d.abusive_at) },
     { label: DESK.abandon, onClick: () => run("abandon", { incident: d.id }), danger: true },

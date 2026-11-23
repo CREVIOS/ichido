@@ -22,16 +22,24 @@ export const OPS_CALLER = {
   fraud: {
     title: { ja: "とまって ください", bn: "থামুন", en: "Stop", vi: "Dừng lại", id: "Berhenti", ne: "रोकिनुहोस्" } as L10n,
     body: {
-      ja: "お金を かえす ために ATM を つかって ほしい と いう 市役所、年金の 事務所、銀行は ありません。電話を すぐ きって ください。係の 人が いま 来ます。",
-      bn: "কোনো সিটি অফিস, পেনশন অফিস বা ব্যাংক টাকা ফেরত দেওয়ার জন্য এটিএম ব্যবহার করতে বলে না। এখনই ফোন কেটে দিন। কর্মীরা আসছেন।",
-      en: "No city office, pension office or bank asks you to use an ATM to get money back. End the call now. Staff are coming.",
-      vi: "Không có văn phòng thành phố, cơ quan lương hưu hay ngân hàng nào yêu cầu bạn dùng ATM để nhận lại tiền. Hãy tắt cuộc gọi ngay. Nhân viên đang đến.",
-      id: "Tidak ada kantor kota, kantor pensiun, atau bank yang meminta Anda memakai ATM untuk mendapatkan uang kembali. Akhiri telepon sekarang. Petugas sedang datang.",
-      ne: "कुनै पनि नगरपालिका कार्यालय, पेन्सन कार्यालय वा बैंकले पैसा फिर्ता पाउन एटीएम प्रयोग गर्न भन्दैन। अहिले नै फोन काट्नुहोस्। कर्मचारी आउँदै हुनुहुन्छ।",
+      ja: "お金を かえす ために ATM を つかって ほしい と いう 市役所、年金の 事務所、銀行は ありません。電話を すぐ きって ください。",
+      bn: "কোনো সিটি অফিস, পেনশন অফিস বা ব্যাংক টাকা ফেরত দেওয়ার জন্য এটিএম ব্যবহার করতে বলে না। এখনই ফোন কেটে দিন।",
+      en: "No city office, pension office or bank asks you to use an ATM to get money back. End the call now.",
+      vi: "Không có văn phòng thành phố, cơ quan lương hưu hay ngân hàng nào yêu cầu bạn dùng ATM để nhận lại tiền. Hãy tắt cuộc gọi ngay.",
+      id: "Tidak ada kantor kota, kantor pensiun, atau bank yang meminta Anda memakai ATM untuk mendapatkan uang kembali. Akhiri telepon sekarang.",
+      ne: "कुनै पनि नगरपालिका कार्यालय, पेन्सन कार्यालय वा बैंकले पैसा फिर्ता पाउन एटीएम प्रयोग गर्न भन्दैन। अहिले नै फोन काट्नुहोस्।",
     } as L10n,
   },
   noticeLabel: { ja: "おしらせ", bn: "হালনাগাদ", en: "Update", vi: "Cập nhật", id: "Kabar terbaru", ne: "जानकारी" } as L10n,
   notice: {
+    guidance_changed: {
+      ja: "さきほどの あんないは かわりました。つぎの あんないを まって ください。",
+      en: "The previous guidance has changed. Please wait for the next message.",
+      vi: "Hướng dẫn trước đã thay đổi. Xin chờ tin nhắn tiếp theo.",
+      bn: "আগের নির্দেশনা বদলেছে। পরের বার্তার জন্য অপেক্ষা করুন।",
+      id: "Petunjuk sebelumnya sudah berubah. Silakan tunggu pesan berikutnya.",
+      ne: "अघिको निर्देशन फेरिएको छ। अर्को सन्देश पर्खनुहोस्।",
+    },
     mass_leave: {
       ja: "いま、たくさんの ATM が とまって います。かえっても いいです。銀行から れんらくします。カードは 銀行の きまりに そって あつかいます。",
       bn: "এখন অনেক এটিএমে সমস্যা হচ্ছে। আপনি এখন চলে যেতে পারেন। ব্যাংক আপনার সাথে যোগাযোগ করবে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে।",
@@ -65,6 +73,9 @@ export const OPS = {
   fraud: {
     title: "特殊詐欺の疑い",
     body: "還付金や「銀行」を名乗る電話の指示で、お客様がATMを操作している疑いがあるときに使います。",
+    warn: "警告を表示する",
+    safe: "安全を確認・通常の案内に戻る",
+    replacement: "案内を取り下げました。状況に合う案内を選んでください。",
     effects: [
       "お客様の画面に、承認済みの警告を全画面で表示",
       "Help Point のランプを赤に",
@@ -91,6 +102,7 @@ export const OPS = {
     toast: "この案件を引き継ぎました",
   },
   mass: {
+    preview: (n: number, kinds: string[]) => `対象 ${n}人（${kinds.join("・") || "—"}）`,
     chip: "大規模障害",
     title: (n: number) => `大規模障害：${n}拠点で障害が発生しています`,
     body: (m: number) => `${m}分以内に複数のATMで障害が発生したため、1件の障害としてまとめました。対応中の案件は、お客様の待ち時間が長い順に並べています。`,
@@ -145,6 +157,7 @@ export function opsEventText(kind: string, d: Record<string, string | undefined>
     case "dispatch": return `${viaCompany(d.company)}へ出動を要請（警備員 ${d.assignee ?? ""}）`;
     case "redispatch": return `${viaCompany(d.company)}へ別の警備員の出動を要請（${d.assignee ?? ""}）`;
     case "fraud": return "特殊詐欺の疑い：お客様の画面に警告を表示し、ランプを赤に";
+    case "fraud_safe": return "担当者が安全を確認し、通常の案内を再開";
     case "abusive": return "カスハラとして記録（担当者の判断）";
     case "takeover": return `担当を引き継ぎ（${d.from ?? "—"} から）`;
     case "mass_grouped": return "大規模障害としてまとめました";

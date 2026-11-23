@@ -8,7 +8,7 @@ import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, T
 import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
-  FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
+  OPS, FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
   eventText, summaryDraft, pick, replyOf, replyBlock, FAULT_DESK,
   type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
@@ -17,7 +17,7 @@ const O = MOBILE.operator;
 type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
   teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
-  flags: string[];
+  notice?: string; flags: string[];
 };
 type Event = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
@@ -44,7 +44,7 @@ function CaseView({ me }: { me: Me }) {
     const db = sb();
     const [k, c, e, r, j] = await Promise.all([
       db.from("desk").select("*").eq("id", id).maybeSingle(),
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, flags").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta").eq("incident", id).maybeSingle(),
@@ -78,7 +78,7 @@ function CaseView({ me }: { me: Me }) {
       onRefresh={load}
       right={!closed && mine ? (
         <Menu label={O.actions} closeLabel={MOBILE.staff.close} items={[
-          ...(!d.remote_release ? [
+          ...(packOfFault(d.fault) === "atm" && d.remote_release !== "released" ? [
             { label: O.releaseFailed, onPress: () => run("remote_release", { incident: d.id, result: "failed" }) },
             { label: O.releaseOk, onPress: () => run("remote_release", { incident: d.id, result: "released" }) },
           ] : []),
@@ -107,6 +107,8 @@ function CaseView({ me }: { me: Me }) {
       {!closed && mine && (
         <>
           {!paired && <PairCard incident={d.id} />}
+          {packOfFault(d.fault) === "atm" && <Button label={d.fraud_at ? OPS.fraud.safe : OPS.fraud.warn} onPress={() => run(d.fraud_at ? "fraud_safe" : "fraud", { incident: d.id })} />}
+          {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
           <SuggestCard d={d} run={run} />
           <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />

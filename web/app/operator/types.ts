@@ -12,7 +12,7 @@ export type Desk = {
 export type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
   teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
-  flags: string[]; bank_status: string | null; bank_due: string | null;
+  notice?: string; flags: string[]; bank_status: string | null; bank_due: string | null;
 };
 export type OpenDesk = Desk & {
   case_event: { at: string }[]; reply: { id: string; sent_at?: string }[]; escalation: { reason: string }[];

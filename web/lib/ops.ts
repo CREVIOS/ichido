@@ -28,8 +28,14 @@ export const OPS_COMMANDS: Record<string, (a: Actor, b: Body) => Promise<object>
   async fraud(a, b) {
     const op = operator(a);
     const incident = id(b, "incident");
-    await rpc("cmd_fraud", { p_uid: op.uid, p_name: op.name, p_incident: incident, p_assignee: id(b, "assignee") });
-    return { police: await createHandoff(incident, "police", op) };
+    await rpc("cmd_fraud", { p_uid: op.uid, p_name: op.name, p_incident: incident, p_assignee: b.assignee == null ? null : id(b, "assignee") });
+    return b.assignee ? { police: await createHandoff(incident, "police", op) } : {};
+  },
+
+  async fraud_safe(a, b) {
+    const op = operator(a);
+    await rpc("cmd_fraud_safe", { p_uid: op.uid, p_name: op.name, p_incident: id(b, "incident") });
+    return {};
   },
 
   async broadcast(a, b) {
