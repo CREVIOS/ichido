@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { chromium } from "playwright-core";
-import { CALLER_FLAGS, RATING, ACCESS, FRONTLINE, FRONT_DESK, JOURNEY, STATION, UI } from "../content/catalogue.ts";
+import { ANSWER, FACTS, FAULT_UI, REPLIES, CALLER_FLAGS, RATING, ACCESS, FRONTLINE, FRONT_DESK, JOURNEY, STATION, UI } from "../content/catalogue.ts";
 import { CHAT } from "../content/chat.ts";
-import { APP } from "./helpers.mjs";
+import { APP, cmd, ok } from "./helpers.mjs";
 import { enableClosure, frontlineCase } from "./frontline-fixture.mjs";
 
 test("pairing opens with the code as its first textbox and an unpaired phone has a staff fallback", async t => {
@@ -59,10 +59,17 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
   await page.waitForURL("**/caller");
   if (lang === "en") await page.getByRole("log").getByText(FRONTLINE.greeting.en,{exact:true}).waitFor();
   else await page.getByText(ACCESS.textOnly.ne,{exact:true}).waitFor();
+  await page.getByRole("button",{name:CHAT.settings[lang],exact:true}).click();
+  await page.getByRole("dialog").getByRole("button",{name:FAULT_UI.largeText[lang],exact:true}).waitFor();
+  await page.keyboard.press("Escape");
   await page.getByRole("button",{name:(lang === "en" ? FRONTLINE.start : FRONTLINE.write)[lang]}).click();
   const message = lang === "en" ? "I have a question about the machine." : "मलाई यहाँ सहयोग चाहिन्छ।";
   const input = page.getByLabel(UI.whatHappened[lang],{exact:true});
   await input.fill(message);
+  await page.setViewportSize({width:390,height:480});
+  const composer = await input.boundingBox();
+  assert.ok(composer && composer.y + composer.height <= 480,"the focused composer stays inside the shorter viewport");
+  await page.setViewportSize({width:390,height:844});
   if (lang === "en") {
     await context.setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -87,7 +94,8 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
     await route.continue();
   });
   const submitted = page.waitForResponse(r => r.url().endsWith("/api/cmd") && r.request().postDataJSON()?.act === "text");
-  await page.getByRole("button",{name:UI.send[lang],exact:true}).click();
+  if (lang === "en") await input.press("Enter");
+  else await page.getByRole("button",{name:UI.send[lang],exact:true}).click();
   if (lang === "en") {
     await page.getByRole("button",{name:CHAT.retry.en}).waitFor();
     assert.equal(await input.inputValue(),message);
@@ -116,6 +124,14 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
   await operator.getByText(FRONT_DESK.consent,{exact:false}).waitFor();
   await operator.getByRole("button",{name:FRONT_DESK.takeover,exact:true}).click();
   await page.getByText(FRONTLINE.connected[lang],{exact:true}).waitFor({timeout:40000});
+  await page.getByRole("button",{name:FACTS.card_back.question[lang],exact:true}).click();
+  await page.getByRole("button",{name:FACTS.card_back.question[lang] + " — " + ANSWER.no[lang],exact:true}).click();
+  await page.getByRole("button",{name:UI.confirm[lang],exact:true}).click();
+  await page.getByRole("log").getByText(UI.confirm[lang],{exact:true}).waitFor();
+  await ok(cmd(op,"send",{incident,intent:"OFFICIAL_CHANNEL"}));
+  const approved = page.locator('[data-from="operator"]');
+  await approved.getByText(CHAT.operator[lang],{exact:true}).waitFor();
+  assert.ok((await approved.innerText()).includes(REPLIES.OFFICIAL_CHANNEL.text({})[lang]));
   assert.deepEqual(documents,[`/s/${station}`,"/caller"]);
 });
 

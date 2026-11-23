@@ -75,7 +75,7 @@ export default function CallerPage() {
         <Human key={generation + String(open)} lang={lang} state={open ? card.handler : undefined} requested={open && card.needs_human} refresh={load} /></div>
       {card.fraud ? <FraudScreen lang={lang} /> : chat ? <Conversation key={generation} generation={generation} turns={turns} card={card} draft={draft}
         lang={lang} refresh={load} sync={sync} alerts={alerts} reply={latest} rate={speechRate(prefs)}>
-        <details className="chat-details"><summary>{CHAT.details[lang]}</summary><p>{JOURNEY.privacy[lang]}</p>{!card.text_only && VOICE_LANGS.includes(lang) && <p>{FRONTLINE.voicePrivacy[lang]} {VOICE.notice[lang]}</p>}{details}</details>
+        <details className="chat-details"><summary>{CHAT.details[lang]}</summary><p>{FRONTLINE.disclosure[lang]}</p>{!card.text_only && VOICE_LANGS.includes(lang) && <p>{FRONTLINE.voicePrivacy[lang]} {VOICE.notice[lang]}</p>}{details}</details>
       </Conversation> : <>
         <SyncStatus sync={sync} lang={lang} />{alerts}
         {!confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}

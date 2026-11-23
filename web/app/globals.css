@@ -196,3 +196,4 @@
   .operator-case :is([data-slot="button"],summary) { max-width:100%; white-space:normal; height:auto; }
   .operator-case :is(.flex-wrap,.grid) { min-width:0; }
 }
+.chat-header button:disabled { opacity:1; color:var(--soft); }

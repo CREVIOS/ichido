@@ -77,9 +77,9 @@ export default function CallerScreen() {
           <T v="label" tone="onPrimary">{UI.caseNo.ja}：<T v="label" mono tone="onPrimary">{card.id.slice(0, 8)}</T></T>
         </View>}
         <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T>
-    {chat && <T v="small">{JOURNEY.privacy[lang]} {!card.text_only && VOICE_LANGS.includes(lang) && VOICE.notice[lang]}</T>}
+    {chat && <T v="small">{FRONTLINE.disclosure[lang]} {!card.text_only && VOICE_LANGS.includes(lang) && VOICE.notice[lang]}</T>}
   </>;
-  const guidance = latest && <Guidance key={latest.id+lang} refresh={load} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} chat={chat} inThread={chat && turns.some(t=>t.speaker===latest.author && t.wording===latest.intent)}/>;
+  const guidance = latest && <Guidance key={latest.id+lang} refresh={load} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} chat={chat} inThread={chat && !!sentText(latest,lang) && turns.some(t=>t.speaker===latest.author && t.wording===latest.intent)}/>;
   return <TextScale.Provider value={textScale(prefs)}>
     <Screen fixed={chat} onRefresh={load} eyebrow={<><Mark/><T style={{flex:1}} numberOfLines={1} weight={500}>{stationName}</T></>}
       right={<View style={{flexDirection:"row"}}><LangPicker compact lang={lang} onChange={changeLang}/><PrefsBar prefs={prefs} onChange={setPrefs} lang={lang}/></View>}

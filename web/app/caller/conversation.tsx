@@ -5,7 +5,7 @@ import { ChatBubble } from "@/components/chat-bubble";
 import { VoiceIntake } from "@/components/VoiceIntake";
 import { Button } from "@/components/ui/button";
 import { CHAT, callerLines, chatChoices, type Choice } from "@/content/chat";
-import { FACTS, FRONTLINE, JOURNEY, UI, VOICE_LANGS, callerPack, contentPack, errorText, urgentText, type FactKey, type Lang } from "@/content/catalogue";
+import { FACTS, FRONTLINE, JOURNEY, UI, VOICE_LANGS, callerPack, contentPack, errorText, sentText, urgentText, type FactKey, type Lang } from "@/content/catalogue";
 import { frontlineNumber } from "@/content/numbers";
 import type { CallerCase, Draft, Reply, Turn } from "@/content/caller-session";
 import { cmd } from "@/lib/supabase";
@@ -75,7 +75,7 @@ export function Conversation({card,draft,lang,turns,generation,refresh,sync,aler
     <div className="chat-scroll" ref={viewport} onScroll={e => {
       const el = e.currentTarget; follow.current = el.scrollHeight - el.clientHeight - el.scrollTop < 72;
     }}>
-      <p className="chat-system mt-0">{FRONTLINE.disclosure[lang]}</p>
+      <p className="chat-system mt-0">{JOURNEY.privacy[lang]}</p>
       {alerts}
       <div role="log" aria-live="polite">
         {lines.map((l,i) => <Fragment key={l.id}>{l.from === "system"
@@ -95,11 +95,11 @@ export function Conversation({card,draft,lang,turns,generation,refresh,sync,aler
         {caption && <ChatBubble from="caller">{caption}</ChatBubble>}
         {ai && busy && busy !== "start" && <ChatBubble from="ai"><span role="status" aria-label={CHAT.typing[lang]} className="chat-dots"><i/><i/><i/></span></ChatBubble>}
       </div>
-      {!started && <div className="chat-system"><p>{JOURNEY.privacy[lang]}</p>{voice && <p className="mt-2">{FRONTLINE.voicePrivacy[lang]}</p>}</div>}
+      {!started && <div className="chat-system"><p>{FRONTLINE.disclosure[lang]}</p>{voice && <p className="mt-2">{FRONTLINE.voicePrivacy[lang]}</p>}</div>}
       {started && pack.scope && <p className="chat-system">{pack.scope[lang]}</p>}
       {question && <ChatBubble from="ai">{FACTS[question].question[lang]}</ChatBubble>}
       {draft.needs_clarification && <p className="chat-system">{UI.unsure[lang]}</p>}
-      {reply && <Guidance key={reply.id+lang} inThread={turns.some(t => t.speaker === reply.author && t.wording === reply.intent)} chat refresh={refresh} lang={lang} card={card} reply={reply} rate={rate} />}
+      {reply && <Guidance key={reply.id+lang} inThread={!!sentText(reply,lang) && turns.some(t => t.speaker === reply.author && t.wording === reply.intent)} chat refresh={refresh} lang={lang} card={card} reply={reply} rate={rate} />}
       {children}
       {note && !lines.some(l => l.text === note) && <p className="chat-system" role="status">{note}</p>}
     </div>

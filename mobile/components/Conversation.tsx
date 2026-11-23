@@ -63,7 +63,7 @@ export function Conversation({card,draft,turns,lang,generation,sync,refresh,aler
     <ScrollView ref={scroll} style={{flex:1}} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.thread}
       onContentSizeChange={() => { if (follow.current) scroll.current?.scrollToEnd({animated:false}); }}
       onScroll={({nativeEvent:e}) => {follow.current=e.contentSize.height-e.layoutMeasurement.height-e.contentOffset.y<72;}} scrollEventThrottle={64}>
-      <T v="label" style={styles.system}>{FRONTLINE.disclosure[lang]}</T>
+      <T v="label" style={styles.system}>{JOURNEY.privacy[lang]}</T>
       {alerts}
       {lines.map((l,i) => <Fragment key={l.id}>
         {l.from === "system" ? <T v="label" style={styles.system} accessibilityLiveRegion="polite">{l.text}</T> :
@@ -78,7 +78,7 @@ export function Conversation({card,draft,turns,lang,generation,sync,refresh,aler
         : <Button kind="ghost" label={CHAT.retry[lang]} onPress={() => submit("text",{text:pending.text})}/>}</>}
       {voice && caption && <ChatBubble from="caller" text={caption}/>}
       {ai && !!busy && busy !== "start" && <View style={styles.typing}><ActivityIndicator size="small"/><T v="small">{CHAT.typing[lang]}</T></View>}
-      {!started && <T v="label" style={styles.system}>{JOURNEY.privacy[lang]} {voice && FRONTLINE.voicePrivacy[lang]}</T>}
+      {!started && <T v="label" style={styles.system}>{FRONTLINE.disclosure[lang]} {voice && FRONTLINE.voicePrivacy[lang]}</T>}
       {started && pack.scope && <T v="label" style={styles.system}>{pack.scope[lang]}</T>}
       {draft.needs_clarification && <T v="label" style={styles.system}>{UI.unsure[lang]}</T>}
       {question && <ChatBubble from="ai" text={FACTS[question].question[lang]}/>}
