@@ -19,7 +19,7 @@ export type Fields = {
   code?: string;            // stable error/outcome code, e.g. forbidden, conflict, unauthorised
   uid?: string;             // staff user id on auth events (never an email or name)
   duration_ms?: number;
-  count?: number;           // alerts delivered (lib/alerts.ts)
+  count?: number;           // alerts delivered (lib/alerts.ts), feed items (lib/disaster-feeds.ts)
   station?: string;
   incident?: string;
   session?: string;         // training session id (lib/training.ts)
@@ -45,7 +45,6 @@ export type Fields = {
   source?: string;
   alert?: number;
   proposal?: number;
-  count?: number;
   // unhandled errors (see errorFields)
   error?: string;
   error_code?: string;

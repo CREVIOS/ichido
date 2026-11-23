@@ -24,6 +24,12 @@ const baseURL = process.env.BETTER_AUTH_URL;
 const origin = baseURL ? new URL(baseURL).origin : undefined;
 const extraOrigins = (process.env.AUTH_TRUSTED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const dev = process.env.NODE_ENV === "development";
+// Secure (__Secure-) cookies whenever the app is served over https. A production build may run over plain http only
+// on this machine (a local `next start`), never on a public host.
+const secure = origin?.startsWith("https:") ?? process.env.NODE_ENV === "production";
+if (process.env.NODE_ENV === "production" && origin && !secure && !["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname)) {
+  throw new Error("BETTER_AUTH_URL must be https outside this machine");
+}
 
 // Better Auth access control, built from the one matrix in lib/rbac.ts.
 export const ac = createAccessControl(STATEMENTS);
@@ -113,7 +119,7 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "ichido",
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies: secure,
     defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
     database: { generateId: "uuid" },
     // Vercel overwrites this header. Elsewhere no client header is trusted, and limits share one bucket.

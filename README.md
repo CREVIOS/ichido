@@ -203,7 +203,7 @@ and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `web/.env.loca
 
 **Extraction from free text (optional):** set `OPENAI_API_KEY`. Without it, callers set the facts with the on-screen choices, pack callers answer with taps only, the hand-off summary is typed by the operator, and Ask Ichido is hidden.
 
-**Local model stub:** `node web/tests/ai-stub.mjs` serves the OpenAI Responses API and Gemini `generateContent` on port 3199 (shapes from the official docs). Start the server with `OPENAI_API_KEY=stub OPENAI_BASE_URL=http://localhost:3199/v1 GEMINI_API_KEY=stub GEMINI_BASE_URL=http://localhost:3199/v1beta` to try every AI feature without keys; `tests/ai.test.mjs` runs against it (and skips when it is not running).
+**Local model stub:** `node web/tests/ai-stub.mjs` serves the OpenAI Responses API and Gemini `generateContent` on port 3198 (shapes from the official docs). Start the server with `OPENAI_API_KEY=stub OPENAI_BASE_URL=http://localhost:3198/v1 GEMINI_API_KEY=stub GEMINI_BASE_URL=http://localhost:3198/v1beta` to try every AI feature without keys; `tests/ai.test.mjs` runs against it (and skips when it is not running).
 
 **Mobile app (optional):** `mobile/` is an Expo app with every role (caller, operator, guard, insights) against the same backend and the same `web/content/catalogue.ts`. It needs a development build because of LiveKit's native WebRTC module:
 

@@ -68,6 +68,11 @@ jobs:
           echo 'BETTERSTACK_HEARTBEATS_JSON={"TABLE-A":"http://127.0.0.1:3199/bs/TABLE-A"}' >> web/.env.local
           echo 'BETTERSTACK_UPTIME_ORIGIN=http://127.0.0.1:3199' >> web/.env.local
           echo "CRON_SECRET=$(openssl rand -hex 16)" >> web/.env.local
+          # AI (tests/ai.test.mjs): tests/ai-stub.mjs on 3198 serves the OpenAI Responses and Gemini generateContent shapes.
+          echo 'OPENAI_API_KEY=stub' >> web/.env.local
+          echo 'OPENAI_BASE_URL=http://localhost:3198/v1' >> web/.env.local
+          echo 'GEMINI_API_KEY=stub' >> web/.env.local
+          echo 'GEMINI_BASE_URL=http://localhost:3198/v1beta' >> web/.env.local
       - run: npm ci
         working-directory: web
       - run: node scripts/vapid-keys.mjs >> .env.local
@@ -79,6 +84,7 @@ jobs:
         env:
           APP: http://localhost:3127
         run: |
+          node tests/ai-stub.mjs > "$RUNNER_TEMP/ai-stub.log" 2>&1 &
           npm run dev -- --hostname 127.0.0.1 --port 3127 > "$RUNNER_TEMP/ichido-dev.log" 2>&1 &
           curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 2 "$APP/api/health"
           node --env-file=.env.local scripts/wait-realtime.mjs supabase_db_ichido 180

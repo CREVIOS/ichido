@@ -2,12 +2,12 @@
 //   OpenAI Responses API   POST /v1/responses                              (json_schema output, function calls, remote MCP, streaming)
 //   Gemini generateContent POST /v1beta/models/{model}:generateContent     (function calling, then a JSON answer)
 // Run it beside the dev server (`node tests/ai-stub.mjs`) and start the server with
-//   OPENAI_API_KEY=stub OPENAI_BASE_URL=http://localhost:3199/v1 GEMINI_API_KEY=stub GEMINI_BASE_URL=http://localhost:3199/v1beta
+//   OPENAI_API_KEY=stub OPENAI_BASE_URL=http://localhost:3198/v1 GEMINI_API_KEY=stub GEMINI_BASE_URL=http://localhost:3198/v1beta
 // The response shapes follow the official docs. Control: GET /__stub/log (recorded requests), POST /__stub/reset,
 // POST /__stub/script { key, value } (the next answer for "triage", "summary", "gemini" or "assistant").
 import { createServer } from "node:http";
 
-export const STUB_PORT = Number(process.env.AI_STUB_PORT ?? 3199);
+export const STUB_PORT = Number(process.env.AI_STUB_PORT ?? 3198);
 export const STUB = `http://localhost:${STUB_PORT}`;
 
 let log = [];
