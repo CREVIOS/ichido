@@ -202,9 +202,7 @@ production credentials. The stock core verifies the CA and hostname. For certifi
 
 ### Display (optional)
 
-A 0.96" SSD1306 128×64 I²C OLED lets a caller who cannot hear the handset pair: the operator presses
-端末に表示 on a 文字対応 case and the 6-character code appears on the screen for its 5 minutes (gone as soon
-as the caller pairs). Otherwise the screen shows the station state in words (ready, alert sent, operator
+A physical press on a 0.96" SSD1306 128×64 I²C OLED Help Point can open a text intake and show its single-use code. Staff can also press 端末に表示 on a 文字対応 case. The displayed code expires after five minutes or when the caller pairs. Otherwise the screen shows the station state in words (ready, alert sent, operator
 checking, staff requested / on the way / arrived, guidance confirmed, offline).
 
 ```
