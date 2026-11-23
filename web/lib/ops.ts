@@ -1,6 +1,5 @@
 import "server-only";
 import { OPERATOR_PROMISES, PROMISE_MINUTES } from "@/content/catalogue";
-import { createHandoff } from "@/lib/handoff";
 import { fail, priv, rpc, type Actor } from "@/lib/server";
 
 // Operator commands for the real-world paths in content/ops.ts: fraud mode, the mass-incident broadcast, promises,
@@ -29,7 +28,7 @@ export const OPS_COMMANDS: Record<string, (a: Actor, b: Body) => Promise<object>
     const op = operator(a);
     const incident = id(b, "incident");
     await rpc("cmd_fraud", { p_uid: op.uid, p_name: op.name, p_incident: incident, p_assignee: b.assignee == null ? null : id(b, "assignee") });
-    return b.assignee ? { police: await createHandoff(incident, "police", op) } : {};
+    return {};
   },
 
   async fraud_safe(a, b) {

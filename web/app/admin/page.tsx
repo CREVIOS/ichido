@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { can, ROLES, type Role } from "@/lib/rbac";
-import { ADMIN, STAFF } from "@/content/catalogue";
+import { ADMIN, FIRST_SHIFT, SHIFT, STAFF } from "@/content/catalogue";
 
 // Account administration (admins) and the account audit log (admins and auditors). Every change goes through
 // /api/admin, which checks lib/rbac.ts and writes the append-only audit log.
@@ -16,7 +16,8 @@ export default function AdminPage() {
   return <StaffGate need="audit:read" title={ADMIN.title}>{(me) => <Admin me={me} />}</StaffGate>;
 }
 
-type User = { id: string; email: string; name: string; role: Role; banned: boolean; verified: boolean; totp: boolean; passkeys: number; active_at: string | null };
+type Site = { id: string; kind: string; label: string };
+type User = { delivery: string | null; notifications: boolean; duty_station: string | null; available: boolean; id: string; email: string; name: string; role: Role; banned: boolean; verified: boolean; totp: boolean; passkeys: number; active_at: string | null };
 type AuditRow = { id: number; at: string; action: string; data: { from?: string; to?: string; role?: string }; actor_name: string | null; target_name: string | null };
 
 async function api<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
@@ -40,15 +41,16 @@ function RoleSelect({ value, onChange, disabled, label }: { value: Role; onChang
 
 function Admin({ me }: { me: Me }) {
   const manage = can(me.role, "user:list");
+  const [sites, setSites] = useState<Site[]>([]);
   const [users, setUsers] = useState<User[] | null>(null);
   const [audit, setAudit] = useState<AuditRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [invite, setInvite] = useState<{ name: string; email: string; role: Role }>({ name: "", email: "", role: "operator" });
 
-  const load = useCallback(() => Promise.all([manage ? api<{ users: User[] }>("users") : null, api<{ audit: AuditRow[] }>("audit")])
-    .then(([u, a]) => { setUsers(u?.users ?? null); setAudit(a.audit); setFailed(false); })
+  const load = useCallback(() => Promise.all([manage ? api<{ users: User[]; sites: Site[] }>("users") : null, api<{ audit: AuditRow[] }>("audit")])
+    .then(([u, a]) => { setUsers(u?.users ?? null); setSites(u?.sites ?? []); setAudit(a.audit); setFailed(false); })
     .catch(() => setFailed(true)), [manage]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); const timer = setInterval(load,15000); return () => clearInterval(timer); }, [load]);
 
   async function run(action: string, body: Record<string, unknown>, ok = ADMIN.saved, question?: string) {
     if (question && !window.confirm(question)) return false;
@@ -99,7 +101,13 @@ function Admin({ me }: { me: Me }) {
                         <td className="px-4 py-2.5"><span className="flex flex-col leading-tight"><span className="text-[14px] text-foreground">{u.name}</span><span className="text-muted-foreground">{u.email}</span></span></td>
                         <td className="px-4 py-2.5"><RoleSelect label={`${ADMIN.role}: ${u.name}`} value={u.role} disabled={self} onChange={(r) => void run("set_role", { userId: u.id, role: r })} /></td>
                         <td className="px-4 py-2.5">{ADMIN.mfa(u.totp, u.passkeys)}</td>
-                        <td className="px-4 py-2.5"><Chip>{ADMIN.status[state]}</Chip></td>
+                        <td className="px-4 py-2.5"><Chip>{u.banned ? ADMIN.status.disabled : u.verified ? (u.totp || u.passkeys ? FIRST_SHIFT.ready : FIRST_SHIFT.verified) : u.delivery === "invite_failed" ? FIRST_SHIFT.failed : u.delivery === "invite_sent" ? FIRST_SHIFT.sent : ADMIN.status.invited}</Chip>
+                          <div>{u.notifications ? FIRST_SHIFT.pushOn : FIRST_SHIFT.pushOff}</div>
+                          {u.role === "field" && <div className="flex gap-2">
+                            <select aria-label={SHIFT.duty} value={u.duty_station ?? ""} onChange={(e) => void run("set_duty",{ userId:u.id,station:e.target.value,available:u.available })}>
+                              <option value="" disabled>{SHIFT.duty}</option>{sites.map((s) => <option key={s.id} value={s.id}>{s.label ?? s.id} · {s.kind}</option>)}
+                            </select><Button size="sm" disabled={!u.duty_station} onClick={() => void run("set_duty",{userId:u.id,station:u.duty_station,available:!u.available})}>{u.available ? SHIFT.off : SHIFT.available}</Button>
+                          </div>}</td>
                         <td className="num px-4 py-2.5 text-muted-foreground">{when(u.active_at)}</td>
                         <td className="px-4 py-2.5 text-right">
                           {self ? <span className="text-[12px] text-muted-foreground">{ADMIN.self}</span> : (

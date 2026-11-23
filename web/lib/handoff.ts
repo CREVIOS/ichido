@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { ACTOR, CALLER_FLAGS, FACT_STAFF, HANDOFF, LANG_NAME, OPS, PACKS, PACK_RECIPIENTS, PARTNER, STAFF_JA, eventText, packOfFault, type Fact, type Lang } from "@/content/catalogue";
+import { ACTOR, CALLER_FLAGS, FACT_STAFF, HANDOFF, LANG_NAME, OPS, PACKS, PACK_RECIPIENTS, PARTNER, eventText, packOfFault, type Fact, type Lang } from "@/content/catalogue";
 import { admin, fail, priv } from "@/lib/server";
 import { rpc } from "@/lib/access";
 

@@ -5,7 +5,7 @@ import { Bell, BellOff } from "lucide-react";
 import { cmd } from "@/lib/supabase";
 import { Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { ACCOUNT_PUSH } from "@/content/catalogue";
+import { FIRST_SHIFT, ACCOUNT_PUSH } from "@/content/catalogue";
 
 // Notifications on this browser for this session (web/lib/alerts.ts). Hidden when the server has no VAPID keys.
 // The subscription is tied to the session on the server, so signing out or being signed out ends it there too.
@@ -30,7 +30,7 @@ export function PushPanel() {
     }).catch(() => setKey(null));
   }, [supported]);
 
-  if (!key) return null;
+  if (!key) return <Panel title={ACCOUNT_PUSH.title}><p>{FIRST_SHIFT.pushUnavailable}</p></Panel>;
 
   const enable = async () => {
     if (await Notification.requestPermission() !== "granted") return void toast.error(ACCOUNT_PUSH.denied);

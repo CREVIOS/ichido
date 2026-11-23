@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { sb, cmd } from "@/lib/supabase";
@@ -100,6 +100,7 @@ function CaseView({ me }: { me: Me }) {
       </View>
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
+      {me.push && <T v="small">{me.push}</T>}
       <Machine d={d} />
       {closed ? (
         <Card title={O.finished}><T v="body">{d.abandoned ? O.finishedAbandoned : O.finishedDone}</T></Card>

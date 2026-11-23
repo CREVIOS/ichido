@@ -23,18 +23,21 @@ export default function FieldPage() {
 
 // Only this guard's open assignments (row-level security). No identity checks or card handback here.
 function Jobs({ me }: { me: Me }) {
+  const [previous,setPrevious] = useState<{ incident: string; station: string; generation: number }[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sites, setSites] = useState<Record<string, Site>>({});
   const load = useCallback(async () => {
     const db = sb();
-    const [j, s] = await Promise.all([
+    const [j, s, old] = await Promise.all([
       db.from("field_job").select("*").neq("state", "done").order("assigned_at"),
       db.from("station").select("id, label, security_company"),
+      db.from("field_standdown").select("incident,station,generation").gt("at",new Date(Date.now()-86400000).toISOString()).order("at",{ascending:false}),
     ]);
+    setPrevious(old.data ?? []);
     setJobs((j.data ?? []) as Job[]);
     setSites(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n; security_company: string }[]).map((x) => [x.id, { label: x.label.ja, company: x.security_company }])));
   }, []);
-  useLive(["field_job"], load);
+  useLive(["field_job","field_standdown"], load);
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("job");
     if (id) document.getElementById(id)?.scrollIntoView();
@@ -43,6 +46,7 @@ function Jobs({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role, { "/field": jobs.length })} footer={<MeFooter me={me} />} title={FIELD.title}>
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4 lg:p-8">
+        {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
         {jobs.length === 0 && <p className="py-16 text-center text-[14px] text-muted-foreground">{FIELD.none}</p>}
         {jobs.map((j) => <JobCard key={`${j.incident}-${j.generation}`} j={j} label={sites[j.station]?.label ?? j.station} company={sites[j.station]?.company} />)}
       </div>

@@ -12,7 +12,7 @@ import { StaffRole } from "@/components/assistant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ART, AUTH, STAFF, NAV, REVIEW, authError } from "@/content/catalogue";
+import { ART, FIRST_SHIFT, AUTH, STAFF, NAV, REVIEW, authError } from "@/content/catalogue";
 
 export type { Role };
 export type Me = { uid: string; role: Role; name: string };
@@ -304,7 +304,7 @@ function SecondFactor({ passkeys, totp, done }: { passkeys: number; totp: boolea
         </div>
         <div className="flex flex-col gap-1.5">
           <Button type="button" variant="outline" size="lg" className="h-11 rounded-lg text-[14px]" onClick={() => addPasskey()} disabled={busy}><KeyRound className="stroke-[1.5]" />{AUTH.enrol.passkey}</Button>
-          <span className="text-[12px] text-muted-foreground">{AUTH.enrol.passkeyHint}</span>
+          <span className="text-[12px] text-muted-foreground">{AUTH.enrol.passkeyHint} {FIRST_SHIFT.native}</span>
         </div>
         {other}
       </form>

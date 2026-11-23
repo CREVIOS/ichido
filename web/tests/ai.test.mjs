@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { APP, staff, caller, cmd, ok } from "./helpers.mjs";
 import { STUB } from "./ai-stub.mjs";
-import { CALLER_FLAGS, CONTENT_PACKS, HANDOFF, packTaps, situationsOf } from "../content/catalogue.ts";
+import { CALLER_FLAGS, CONTENT_PACKS, packTaps, situationsOf } from "../content/catalogue.ts";
 
 const STATION = { hospital: "HOSP-A", city_office: "CITY-A", transit: "RAIL-A", shelter: "SHELTER-A" };
 const stubUp = await fetch(`${STUB}/__stub/log`).then((r) => r.ok, () => false);

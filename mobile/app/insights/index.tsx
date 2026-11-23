@@ -19,6 +19,7 @@ function Board({ me }: { me: Me }) {
   return (
     <Screen back eyebrow={<Brand />} title={INSIGHTS.title} onRefresh={load}
       right={me.role === "manager" ? <IconButton icon={LogOut} label={STAFF.signOut} onPress={me.signOut} /> : undefined}>
+      {me.push && <T v="small">{me.push}</T>}
       <Segments value={days} options={PERIODS.map((p) => ({ key: p, label: INSIGHTS.period(p) }))} onChange={setDays} />
       {last && <T v="small">{shiftCaption(last)}</T>}
       {data && <T v="small">{shiftOutcomes(data)}</T>}

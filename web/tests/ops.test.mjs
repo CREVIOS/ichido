@@ -109,7 +109,10 @@ test("fraud mode: the alert source, the operator's one action, the caller's scre
   // Only the operator who owns the case presses 詐欺の疑い, with a guard.
   for (const who of [g, m, a, op2]) assert.equal((await cmd(who, "fraud", { incident, assignee: g.uid })).status, 403);
   assert.equal((await cmd(op, "fraud", { incident, assignee: "not-a-guard" })).status, 400);
-  const { police } = await ok(cmd(op, "fraud", { incident, assignee: g.uid }));
+  await ok(cmd(op, "fraud", { incident }));
+  assert.equal((await op.c.from("field_job").select("incident").eq("incident",incident)).data.length,0);
+  await ok(cmd(op,"assign",{ incident,assignee:g.uid }));
+  const police = await ok(cmd(op,"handoff_create",{ incident,recipient:"police" }));
   assert.equal((await cmd(op, "fraud", { incident, assignee: g.uid })).status, 409, "once");
 
   // The caller's phone shows the approved full-screen warning in their language.

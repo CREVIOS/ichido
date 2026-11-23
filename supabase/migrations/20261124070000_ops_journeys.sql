@@ -159,7 +159,7 @@ begin
   if d.fraud_at is null then perform ichido.fail('conflict'); end if;
   update public.desk set fraud_at=null where id=d.id;
   update public.caller_card set fraud=false where id=d.id;
-  perform ichido.set_light(d.station,d.id,d.status);
+  perform ichido.set_light(d.station,d.id,d.status::text);
   perform ichido.event(d.id,'operator','fraud_safe','{}',p_name);
 end $$;
 revoke all on function public.cmd_fraud_safe(uuid,text,uuid) from public, anon, authenticated;
@@ -194,7 +194,11 @@ create or replace function public.cmd_assign(p_uid uuid, p_name text, p_incident
 language plpgsql security definer set search_path = '' as $$
 declare d public.desk; guard text; prev public.field_job; company text;
 begin
-  d := ichido.owned_case(p_uid, p_incident);
+  select * into d from public.desk where id=p_incident for update;
+  if d.finished_at is null then d:=ichido.owned_case(p_uid,p_incident);
+  elsif d.operator_id is distinct from p_uid or d.abandoned or not exists(select from ichido.staff where uid=p_uid and role='operator')
+    or not exists(select from public.field_job where incident=d.id and state<>'done' and not case_closed)
+    then perform ichido.fail('forbidden'); end if;
   perform 1 from ichido.staff where uid=p_assignee for update;
   select display_name into guard from public.available_responders(p_incident) where uid=p_assignee;
   if guard is null then perform ichido.fail('bad_request'); end if;
@@ -205,9 +209,9 @@ begin
     values (d.id, d.station, d.fault, p_assignee, coalesce(prev.generation, 0) + 1, 'requested', null, false, now())
     on conflict (incident) do update set assignee = excluded.assignee, generation = excluded.generation,
       state = 'requested', acknowledged_at=null, declined_at=null, provider_at=null, help_at=null, reestimate_gen=null, assigned_at=now(), fault=excluded.fault, eta = null, case_closed = false, updated_at = now();
-  update public.desk set status = 'field' where id = d.id;
-  update public.caller_card set status = 'field', field_state = 'requested', eta = null where id = d.id;
-  perform ichido.set_light(d.station, d.id, 'field');
+  update public.desk set status = 'field' where id = d.id and finished_at is null;
+  update public.caller_card set status = case when d.finished_at is null then 'field'::public.case_status else d.status end, field_state = 'requested', eta = null where id = d.id;
+  if d.finished_at is null then perform ichido.set_light(d.station, d.id, 'field'); end if;
   perform ichido.event(d.id, 'operator', case when prev.incident is null then 'dispatch' else 'redispatch' end,
                        jsonb_build_object('assignee', guard, 'company', company), p_name);
 end $$;
@@ -556,3 +560,38 @@ create or replace function public.shift_insights(p_days int) returns jsonb langu
 $$;
 revoke all on function public.shift_insights(int) from public,anon,authenticated;
 grant execute on function public.shift_insights(int) to authenticated;
+
+create or replace function public.my_external_work() returns table(incident uuid,station text,task text,due_at timestamptz)
+language sql stable security definer set search_path='' as $$
+ select w.incident,d.station,w.recipient,w.due_at from public.partner_work w join public.desk d on d.id=w.incident
+   where ichido.has_role('operator') and w.owner_id=auth.uid() and w.accepted_at is null
+ union all
+ select d.id,d.station,'field',j.assigned_at+make_interval(secs=>t.seconds) from public.desk d
+   join public.field_job j on j.incident=d.id join ichido.sla_target t on t.reason='guard_late'
+   where ichido.has_role('operator') and d.operator_id=auth.uid() and j.state<>'done' and not j.case_closed
+ order by due_at
+$$;
+revoke all on function public.my_external_work() from public,anon,authenticated;
+grant execute on function public.my_external_work() to authenticated;
+
+create table if not exists public.field_standdown (
+  incident uuid not null references public.desk on delete cascade, generation int not null,
+  assignee uuid not null references ichido.staff, station text not null, at timestamptz not null default now(),
+  primary key(incident,generation)
+);
+alter table public.field_standdown enable row level security;
+revoke all on public.field_standdown from public,anon,authenticated;
+grant select on public.field_standdown to authenticated;
+drop policy if exists my_standdown on public.field_standdown;
+create policy my_standdown on public.field_standdown for select to authenticated using (assignee=auth.uid() and ichido.has_role('field'));
+drop trigger if exists live_insert on public.field_standdown;
+create trigger live_insert after insert on public.field_standdown referencing new table as new_rows for each statement execute function ichido.live_send();
+drop policy if exists live_standdown on realtime.messages;
+create policy live_standdown on realtime.messages for select to authenticated using(extension='broadcast' and realtime.topic()='live:field_standdown' and ichido.has_role('field'));
+create or replace function ichido.stand_down() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  insert into public.field_standdown(incident,generation,assignee,station) values(old.incident,old.generation,old.assignee,old.station);
+  return null;
+end $$;
+create or replace trigger stand_down after update of generation on public.field_job for each row
+when (old.assignee<>new.assignee) execute function ichido.stand_down();

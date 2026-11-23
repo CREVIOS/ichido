@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
 import { KeyRound, Laptop, Plus } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ACCOUNT, AUTH, STAFF, authError } from "@/content/catalogue";
+import { FIRST_SHIFT, ACCOUNT, AUTH, STAFF, authError } from "@/content/catalogue";
 import { PushPanel } from "./push";
 
 // The signed-in person's own account: where they are signed in, their passkeys, password and backup codes.
@@ -27,6 +28,9 @@ const device = (ua?: string | null) => {
 const field = "h-10 rounded-lg bg-secondary/60 px-3 text-[14px] shadow-none";
 
 function Account({ me }: { me: Me }) {
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("shift")) location.replace(FIRST_SHIFT.desk[me.role]);
+  }, [me.role]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [current, setCurrent] = useState("");
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
@@ -55,6 +59,8 @@ function Account({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={ACCOUNT.title}>
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-10 px-4 py-6 lg:px-6">
+        <div className="flex gap-4"><Link href={FIRST_SHIFT.desk[me.role]}>{FIRST_SHIFT.open}</Link>
+          {me.role === "operator" && <Link href="/training">{FIRST_SHIFT.training}</Link>}</div>
         <Panel title={ACCOUNT.sessions} action={<Button variant="ghost" size="sm" onClick={() => act(authClient.revokeOtherSessions())}>{ACCOUNT.revokeOthers}</Button>}>
           <p className="text-[13px] text-muted-foreground">{ACCOUNT.sessionsLead}</p>
           <ul className="flex flex-col divide-y rounded-xl border" aria-label={ACCOUNT.sessions}>
@@ -71,7 +77,7 @@ function Account({ me }: { me: Me }) {
           </ul>
         </Panel>
 
-        <PushPanel />
+        {["operator","manager","field"].includes(me.role) && <PushPanel />}
 
         <Panel title={ACCOUNT.passkeys} action={<Button variant="ghost" size="sm" onClick={() => act(authClient.passkey.addPasskey({ name: AUTH.enrol.passkeyName }).then((r) => ({ error: r?.error ?? null })))}><Plus />{ACCOUNT.addPasskey}</Button>}>
           <p className="text-[13px] text-muted-foreground">{totp ? ACCOUNT.totpOn : ACCOUNT.totpOff}</p>

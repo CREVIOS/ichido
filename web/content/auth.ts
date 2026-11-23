@@ -166,3 +166,10 @@ export const ADMIN = {
   errors: { exists: "このメールアドレスはすでに登録されています。", conflict: "自分自身には実行できません。", bad_request: "入力内容を確認してください。", forbidden: "この操作を行う権限がありません。", mfa_required: "二段階認証を完了したセッションが必要です。" } as Record<string, string>,
   loadError: "読み込めませんでした。",
 };
+
+export const FIRST_SHIFT = {
+  sent: "招待メール送信済み", failed: "招待メール送信失敗・再送してください", verified: "メール確認済み・二段階認証の登録待ち", ready: "二段階認証の準備完了",
+  pushOn: "通知登録あり", pushOff: "通知登録なし", pushUnavailable: "このブラウザーでは通知を登録できません。",
+  native: "スマートフォンのアプリで勤務する方は認証アプリを登録してください。パスキーでのサインインはウェブ版で利用できます。",
+  open: "勤務画面を開く", training: "初回の対応練習", desk: { operator:"/operator",field:"/field",manager:"/insights",admin:"/admin",auditor:"/cases" },
+};

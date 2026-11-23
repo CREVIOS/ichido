@@ -104,7 +104,7 @@ function Actions({ work, d, me, mine, closed, paired, lang, replies, job, guards
   work: string[]; d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
 }) {
   const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
-  if (closed) return <Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>;
+  if (closed) return <><Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>{mine && job && job.state !== "done" && <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />}</>;
   if (!d.operator_id) return (
     <Panel title={DESK.unclaimed}>
       <p className="text-[14px]">{DESK.unclaimedBody}</p>

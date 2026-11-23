@@ -10,6 +10,7 @@ import { useLive } from "@/lib/live";
 import { sb } from "@/lib/supabase";
 import { CaseFilters } from "./filters";
 import { allCases, historyCsv, PAGE_SIZE, readHistory, type Filters, type HistoryRow } from "./history";
+import { ExternalWork } from "./external";
 import { CaseTable } from "./table";
 
 export default function CasesPage() {
@@ -63,6 +64,7 @@ function History({ me }: { me: Me }) {
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />}
       title={<span className="flex items-center gap-3">{NAV.cases}<Chip><Table className="size-3 stroke-[1.5]" />{CASES.all}</Chip></span>}
       actions={<Button variant="outline" size="sm" onClick={download} disabled={exporting}><Download />{CASES.export}</Button>}>
+      {me.role === "operator" && <ExternalWork name={me.name} />}
       <Panel className="gap-0">
         <CaseFilters filters={filters} change={filter} />
         {failed && <div className="p-4" role="alert"><Notice tone="warn">{CASES.loadError}</Notice></div>}

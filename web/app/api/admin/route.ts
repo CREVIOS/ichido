@@ -24,6 +24,16 @@ async function userRow(id: string) {
 // Nobody changes, disables or resets themselves here: another admin must, so the last admin cannot lock everyone out.
 const notSelf = (a: Staff, id: string) => { if (a.uid === id) fail(409, "conflict"); };
 
+async function deliverInvite(a: Staff, u: { id: string; name: string; email: string }) {
+  try {
+    await sendInvite(u);
+  } catch (error) {
+    await audit(a,"invite_failed",u.id);
+    throw error;
+  }
+  await audit(a,"invite_sent",u.id);
+}
+
 type Action = { need: Permission; run: (a: Staff, b: Body, headers: Headers) => Promise<object> };
 const ACTIONS: Record<string, Action> = {
   users: {
@@ -33,9 +43,12 @@ const ACTIONS: Record<string, Action> = {
         select u.id, u.email, u.name, u.role, u.banned, u."emailVerified" as verified, u."twoFactorEnabled" as totp,
                (select count(*)::int from auth_ba.passkey p where p."userId" = u.id) as passkeys,
                (select max(x."updatedAt") from auth_ba."session" x where x."userId" = u.id and x."expiresAt" > now()) as active_at,
-               u."createdAt" as created_at
-          from auth_ba."user" u order by u."createdAt"`);
-      return { users: rows };
+               (select a.action from ichido.staff_audit a where a.target=u.id and a.action in ('invite_sent','invite_failed') order by a.id desc limit 1) as delivery,
+               exists(select from public.push_subscription p join auth_ba."session" x on x.id=p.session_id where p.uid=u.id and x."expiresAt">now() and x.aal='aal2' and not u.banned) as notifications,
+               s.duty_station,s.duty_function,s.available,u."createdAt" as created_at
+          from auth_ba."user" u join ichido.staff s on s.uid=u.id order by u."createdAt"`);
+      const { rows: sites } = await pool.query("select id,kind,label->>'ja' as label from public.station order by id");
+      return { users: rows, sites };
     },
   },
   audit: {
@@ -56,7 +69,7 @@ const ACTIONS: Record<string, Action> = {
       if (!EMAIL.test(email) || !name || name.length > 60 || !isRole(b.role)) fail(400, "bad_request");
       const { user } = await auth.api.createUser({ body: { email, name, role: b.role as "field" }, headers });
       await audit(a, "user_invited", user.id, { role: b.role });
-      await sendInvite({ id: user.id, email, name });
+      await deliverInvite(a,{ id: user.id, email, name });
       return { id: user.id };
     },
   },
@@ -66,7 +79,19 @@ const ACTIONS: Record<string, Action> = {
       const u = await userRow(uuid(b, "userId"));
       if (u.verified) fail(409, "conflict");
       await audit(a, "invite_resent", u.id);
-      await sendInvite(u);
+      await deliverInvite(a,u);
+      return {};
+    },
+  },
+  set_duty: {
+    need: "user:update",
+    async run(a,b) {
+      const id = uuid(b,"userId");
+      if (typeof b.station !== "string" || typeof b.available !== "boolean") fail(400,"bad_request");
+      const changed = await pool.query(`update ichido.staff s set duty_station=st.id,duty_function=ichido.pack_of(st.kind),available=$3
+        from public.station st where s.uid=$1 and s.role='field' and st.id=$2`,[id,b.station,b.available]);
+      if (!changed.rowCount) fail(400,"bad_request");
+      await audit(a,"duty_changed",id,{ station:b.station, available:b.available });
       return {};
     },
   },

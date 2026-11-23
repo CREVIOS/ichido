@@ -24,6 +24,7 @@ function Jobs({ me }: { me: Me }) {
   const { job } = useLocalSearchParams<{ job?: string }>();
   const [all, setAll] = useState(false);
   const [correct, setCorrect] = useState("");
+  const [previous,setPrevious] = useState<{ incident: string; station: string; generation: number }[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [labels, setLabels] = useState<Record<string, string>>({});
   // Each job's estimate starts unknown; only the guard's own pick is ever sent.
@@ -31,14 +32,16 @@ function Jobs({ me }: { me: Me }) {
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const db = sb();
-    const [j, s] = await Promise.all([
+    const [j, s, old] = await Promise.all([
       db.from("field_job").select("*").neq("state", "done").order("updated_at", { ascending: false }),
       db.from("station").select("id, label"),
+      db.from("field_standdown").select("incident,station,generation").gt("at",new Date(Date.now()-86400000).toISOString()).order("at",{ascending:false}),
     ]);
+    setPrevious(old.data ?? []);
     setJobs((j.data ?? []) as Job[]);
     setLabels(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n }[]).map((x) => [x.id, x.label.ja])));
   }, []);
-  useLive(["field_job"], load);
+  useLive(["field_job","field_standdown"], load);
   // The generation pins the update to this assignment; a replaced guard gets "forbidden".
   const act = (j: Job, state: string) =>
     cmd("field", { incident: j.incident, generation: j.generation, state, eta: state === "on_way" ? eta[j.incident] ?? UNKNOWN_ETA : undefined })
@@ -51,6 +54,7 @@ function Jobs({ me }: { me: Me }) {
       <Tag value={F.header(me.name)} />
       {me.push && <T v="small">{me.push}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
+      {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
       {jobs.length === 0 && <Card><T v="body">{F.empty}</T></Card>}
       {job && !all && <Button kind="ghost" label={F.title} onPress={() => setAll(true)} />}
       {job && !all && !jobs.some((j) => j.incident === job) && <Notice>{F.changed}</Notice>}

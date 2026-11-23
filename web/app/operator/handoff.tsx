@@ -18,10 +18,10 @@ const at = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeric"
 export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
   const { id: incident, fault } = d;
   const RECIPIENTS = Object.keys(PACKS[packOfFault(fault)].recipients);
-  const [recipient, setRecipient] = useState("");
+  const [previewing, setPreviewing] = useState(false);
   const [due, setDue] = useState("");
   const [reference, setReference] = useState("");
-  const [preview, setPreview] = useState<[string,string][] | null>(null);
+  const [preview, setPreview] = useState<{recipient: string; due: string; rows: [string,string][]} | null>(null);
   const [work, setWork] = useState<{ recipient: string; owner_id: string; requested_at: string | null; accepted_at: string | null; due_at: string }[]>([]);
   const [state, setState] = useState<{ links: Link[]; now: number }>({ links: [], now: 0 });
   const load = useCallback(async () => {
@@ -35,14 +35,14 @@ export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
   useLive(["case_event","partner_work"], load);
   const fail = (e: Error) => toast.error(staffError(e.message));
 
-  const deadline = () => due ? new Date(due).toISOString() : new Date(Date.now()+86400000).toISOString();
+
   const inspect = (r: string) => {
-    const value = deadline();
-    setDue(value); setRecipient(r); setPreview(null);
-    return cmd<{ rows: [string,string][] }>("handoff_preview", { incident, recipient:r, due:value }).then((res) => setPreview(res.rows)).catch(fail);
+    const value = due ? new Date(due).toISOString() : new Date(Date.now()+86400000).toISOString();
+    setPreviewing(true); setPreview(null);
+    return cmd<{ rows: [string,string][] }>("handoff_preview", { incident, recipient:r, due:value }).then((res) => setPreview({ recipient:r, due:value, rows:res.rows })).catch(fail).finally(() => setPreviewing(false));
   };
   const progress = (r: string, action: string) => cmd("partner_progress",{ incident,recipient:r,action,reference }).then(load).catch(fail);
-  const create = (recipient: string) => cmd<{ path: string }>("handoff_create", { incident, recipient, due:deadline() })
+  const create = (recipient: string, due: string) => cmd<{ path: string }>("handoff_create", { incident, recipient, due })
     .then(async (r) => {
       setPreview(null);
       const url = `${location.origin}${r.path}`;
@@ -60,11 +60,11 @@ export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
     <Panel title={HANDOFF.title}>
       <p className="max-w-2xl text-[13px] leading-5">{HANDOFF.lead}</p>
       <div className="flex flex-wrap gap-2">
-        {RECIPIENTS.map((r) => <Button key={r} variant="secondary" onClick={() => inspect(r)}><Link2 className="stroke-[1.5]" />{HANDOFF.recipient[r]} · {PARTNER.preview}</Button>)}
+        {RECIPIENTS.map((r) => <Button key={r} disabled={previewing} variant="secondary" onClick={() => inspect(r)}><Link2 className="stroke-[1.5]" />{HANDOFF.recipient[r]} · {PARTNER.preview}</Button>)}
       </div>
-      <label>{PARTNER.due} <input type="datetime-local" onChange={(e) => { setDue(e.target.value); setPreview(null); }} /></label>
-      {preview && <div className="inset p-3"><dl>{preview.map(([k,v],i) => <div key={i}><dt className="label">{k}</dt><dd>{v}</dd></div>)}</dl>
-        <Button onClick={() => create(recipient)}>{PARTNER.issue}</Button></div>}
+      <label>{PARTNER.due} <input disabled={previewing} type="datetime-local" onChange={(e) => { setDue(e.target.value); setPreview(null); }} /></label>
+      {preview && <div className="inset p-3"><dl>{preview.rows.map(([k,v],i) => <div key={i}><dt className="label">{k}</dt><dd>{v}</dd></div>)}</dl>
+        <Button onClick={() => create(preview.recipient,preview.due)}>{PARTNER.issue}</Button></div>}
       {work.map((w) => <div className="flex flex-wrap items-center gap-2" key={w.recipient}>
         <span>{HANDOFF.recipient[w.recipient]} · {at(w.due_at)} · {w.accepted_at ? PARTNER.accepted : w.requested_at ? PARTNER.sent : PARTNER.pending}</span>
         {!w.accepted_at && mine && <>
