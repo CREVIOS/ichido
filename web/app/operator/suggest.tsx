@@ -6,7 +6,7 @@ import { cmd } from "@/lib/supabase";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DESK, OPS, replyOf, staffError } from "@/content/catalogue";
+import { suggestionResult, DESK, OPS, replyOf, staffError } from "@/content/catalogue";
 import type { BotStep, Desk, Prepared, Run, Suggestion } from "./types";
 
 type Step = Suggestion["steps"][number];
@@ -37,8 +37,9 @@ export function SuggestCard({ d, run, prepared, step }: { d: Desk; run: Run; pre
   const adopt = async (s: Suggestion) => {
     if (!s.intent || !(await run("send", { incident: d.id, intent: s.intent }))) return;
     const assigned = s.dispatch && s.guard && await run("assign", { incident: d.id, assignee: s.guard.uid });
-    if (s.dispatch && s.guard && !assigned) return void toast.warning(DESK.reply.sendOnly);
-    toast.success(assigned && s.guard ? DESK.reply.bundleToast(s.guard.name) : DESK.reply.toast);
+    const result = suggestionResult(s.dispatch ? s.guard?.name ?? null : null,Boolean(assigned));
+    if (s.dispatch && s.guard && !assigned) toast.warning(result);
+    else toast.success(result);
   };
 
   return (

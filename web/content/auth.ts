@@ -168,8 +168,16 @@ export const ADMIN = {
 };
 
 export const FIRST_SHIFT = {
+  title: "初回の勤務",
   sent: "招待メール送信済み", failed: "招待メール送信失敗・再送してください", verified: "メール確認済み・二段階認証の登録待ち", ready: "二段階認証の準備完了",
   pushOn: "通知登録あり", pushOff: "通知登録なし", pushUnavailable: "このブラウザーでは通知を登録できません。",
   native: "スマートフォンのアプリで勤務する方は認証アプリを登録してください。パスキーでのサインインはウェブ版で利用できます。",
   open: "勤務画面を開く", training: "初回の対応練習", desk: { operator:"/operator",field:"/field",manager:"/insights",admin:"/admin",auditor:"/cases" },
 };
+
+export function inviteState(u: { banned: boolean; verified: boolean; totp: boolean; passkeys: number; delivery: string | null }) {
+  if (u.banned) return ADMIN.status.disabled;
+  if (u.verified) return u.totp || u.passkeys ? FIRST_SHIFT.ready : FIRST_SHIFT.verified;
+  if (u.delivery === "invite_failed") return FIRST_SHIFT.failed;
+  return u.delivery === "invite_sent" ? FIRST_SHIFT.sent : ADMIN.status.invited;
+}

@@ -74,3 +74,9 @@ Apply the database migration before the web release. Rebuild native binaries, re
 - Reachable Git patches were searched for provider credentials, JWTs, private keys, assignments and sensitive filenames. Three credential-assignment matches were local test fixtures. Tracked environment files were examples. No production credential was identified or tested. Pattern matching cannot rule out arbitrary secrets.
 - Web typecheck, lint, Japanese copy checks, production build, loopback HTTP tests, native TypeScript, agent unittests and firmware compilation passed. Hosted workflow delivery, real voice, map tiles, physical secure storage and hardware rollback await deployment or device evidence.
 - The read-only Supabase guard blocked application of the migration. The version has not been registered. SQL and PL/pgSQL parsed offline. Full journey, migrated RLS and private Realtime verification remain outstanding. A quota test received 503 with the limiter absent.
+
+### Hand-off links and case retention
+
+A hand-off link expires after 24 hours and can be revoked sooner. Its expiry ends access to the recipient-specific report. The operator records the receiving desk's acceptance through the established service channel. Opening the link does not acknowledge the task.
+
+Raw wording belongs to the case. Deleting the case removes its draft and teach-back through the foreign-key cascades and removes the original and translated statements stored on the desk. Operators must use the case owner's retention and deletion procedure for these records independently of link expiry. This prototype has no automatic raw-text deletion deadline. A deployment owner must set the retention period before collecting real caller statements.

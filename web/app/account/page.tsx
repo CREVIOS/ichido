@@ -28,9 +28,6 @@ const device = (ua?: string | null) => {
 const field = "h-10 rounded-lg bg-secondary/60 px-3 text-[14px] shadow-none";
 
 function Account({ me }: { me: Me }) {
-  useEffect(() => {
-    if (new URLSearchParams(location.search).has("shift")) location.replace(FIRST_SHIFT.desk[me.role]);
-  }, [me.role]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [current, setCurrent] = useState("");
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);

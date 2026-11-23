@@ -5,7 +5,7 @@ import { cmd } from "@/lib/supabase";
 import { errorJa, type Desk } from "@/lib/staff";
 import { Button, Card, Icon, Notice, T, Tag } from "@/components/ui";
 import { chart, color, radius, space } from "@/theme";
-import { DESK, replyOf } from "@content/catalogue";
+import { suggestionResult, DESK, replyOf } from "@content/catalogue";
 
 type Step = { tool: string; ms: number };
 type Suggestion = { intent: string | null; dispatch: boolean; guard: { uid: string; name: string } | null; reasons: string[]; risks: string[]; model: string; steps: Step[]; ms: number };
@@ -29,8 +29,7 @@ export function SuggestCard({ d, run }: { d: Desk; run: Run }) {
   const adopt = async (s: Suggestion) => {
     if (!s.intent || !(await run("send", { incident: d.id, intent: s.intent }))) return;
     const assigned = s.dispatch && s.guard && await run("assign", { incident: d.id, assignee: s.guard.uid });
-    if (s.dispatch && s.guard && !assigned) return setNote(DESK.reply.sendOnly);
-    setNote(assigned && s.guard ? DESK.reply.bundleToast(s.guard.name) : DESK.reply.toast);
+    setNote(suggestionResult(s.dispatch ? s.guard?.name ?? null : null,Boolean(assigned)));
   };
 
   return (

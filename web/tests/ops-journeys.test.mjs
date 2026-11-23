@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { shareFlag } from "../lib/handoff-fields.ts";
 import pg from "pg";
-import { FIRST_SHIFT, LANGS, OPS_CALLER, PARTNER, flagsFor, identifyingSummary, nextFieldStep, replyOf, shiftCaption } from "../content/catalogue.ts";
+import { ADMIN, DESK, inviteState, suggestionResult, FIRST_SHIFT, LANGS, OPS_CALLER, PARTNER, flagsFor, identifyingSummary, nextFieldStep, replyOf, shiftCaption } from "../content/catalogue.ts";
 
 test("staff journeys enforce pack, work, delivery and reporting boundaries in one rolled-back transaction", async () => {
   const url = new URL(process.env.DATABASE_URL);
@@ -52,6 +52,18 @@ test("handoff flags depend on the recipient and the current railway sharing choi
 test("summary review withholds contact details, names with explicit labels and account numbers", () => {
   for (const s of ["name@example.invalid","連絡先 https://example.invalid","氏名：佐藤","山田さん","my name is Smith","カード 1111"]) assert.equal(identifyingSummary(s),true,s);
   assert.equal(identifyingSummary("お客様が状況を確認しました。"),false);
+});
+
+test("adoption names the worker only after dispatch succeeds and first-shift states reflect recorded milestones", () => {
+  assert.equal(suggestionResult(null,false),DESK.reply.toast);
+  assert.equal(suggestionResult("Worker",false),DESK.reply.sendOnly);
+  assert.equal(suggestionResult("Worker",true),DESK.reply.bundleToast("Worker"));
+  const pending = { banned:false, verified:false, totp:false,passkeys:0,delivery:null };
+  assert.equal(inviteState(pending),ADMIN.status.invited);
+  for (const [delivery,label] of [["invite_sent",FIRST_SHIFT.sent],["invite_failed",FIRST_SHIFT.failed]]) assert.equal(inviteState({ ...pending,delivery }),label);
+  assert.equal(inviteState({ ...pending,verified:true }),FIRST_SHIFT.verified);
+  assert.equal(inviteState({ ...pending,verified:true,passkeys:1 }),FIRST_SHIFT.ready);
+  assert.equal(inviteState({ ...pending,verified:true,totp:true }),FIRST_SHIFT.ready);
 });
 
 test("shift destinations and Monday report labels expose sample, unanswered and freshness", () => {

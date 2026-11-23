@@ -100,6 +100,7 @@ async function validate(raw: Raw, ctx: Ctx): Promise<Omit<Suggestion, "steps" | 
   const intent = replies.find((r) => r.intent === raw.intent && r.eligible) && replyOf(raw.intent) ? raw.intent : null;
   const guards = (await runTool("list_guards", ctx)) as { uid: string; name: string }[];
   const g = raw.dispatch ? guards.find((x) => x.uid === raw.guard_uid) ?? null : null;
+  const fraudCase = raw.fraud === true ? await runTool("get_case",ctx) as { suspected_phone_fraud_alert?: boolean; fraud_mode_active?: boolean } : null;
   const clean = (xs: unknown) => (Array.isArray(xs) ? xs.filter((x): x is string => typeof x === "string").map((x) => x.slice(0, 160)).slice(0, 3) : []);
-  return { intent, dispatch: Boolean(raw.dispatch), guard: g ? { uid: g.uid, name: g.name } : null, fraud: raw.fraud === true, reasons: clean(raw.reasons), risks: clean(raw.risks), model: MODEL() };
+  return { intent, dispatch: Boolean(raw.dispatch), guard: g ? { uid: g.uid, name: g.name } : null, fraud: fraudCase?.suspected_phone_fraud_alert === true && !fraudCase.fraud_mode_active, reasons: clean(raw.reasons), risks: clean(raw.risks), model: MODEL() };
 }

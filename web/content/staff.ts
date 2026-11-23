@@ -425,3 +425,8 @@ export const BOT = {
     steps: "ステップ",
   },
 };
+
+export function suggestionResult(guard: string | null, assigned: boolean): string {
+  if (!guard) return DESK.reply.toast;
+  return assigned ? DESK.reply.bundleToast(guard) : DESK.reply.sendOnly;
+}

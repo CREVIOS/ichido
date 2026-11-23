@@ -33,6 +33,10 @@ begin
   update public.desk set mass_incident=m where id in (a,r,s);
   insert into ichido.binding(incident,uid,lang,expires) values(a,caller,'en',now()+interval '1 hour');
   assert (public.mass_preview(m)->>'eligible')::int=1,'paired ATM only';
+  update ichido.binding set expires=now() where incident=a;
+  assert pg_temp.refused(format('select public.cmd_broadcast(%L,%L,%L)',op,'Dispatch',m),'conflict');
+  assert (select broadcast_at is null from public.mass_incident where id=m);
+  update ichido.binding set expires=now()+interval '1 hour' where incident=a;
   assert public.cmd_broadcast(op,'Dispatch',m)=1,'send eligibility';
   assert not exists(select from public.caller_card where id in (r,s) and notice='mass_leave'),'no bank notice outside ATM';
   assert pg_temp.refused(format('select public.cmd_disaster(%L,%L,%L,%L)',op,'Dispatch',array[atm,shelter],'earthquake'),'bad_request');

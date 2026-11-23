@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { can, ROLES, type Role } from "@/lib/rbac";
-import { ADMIN, PACKS, FIRST_SHIFT, SHIFT, STAFF } from "@/content/catalogue";
+import { inviteState, ADMIN, PACKS, FIRST_SHIFT, SHIFT, STAFF } from "@/content/catalogue";
 
 // Account administration (admins) and the account audit log (admins and auditors). Every change goes through
 // /api/admin, which checks lib/rbac.ts and writes the append-only audit log.
@@ -101,7 +101,7 @@ function Admin({ me }: { me: Me }) {
                         <td className="px-4 py-2.5"><span className="flex flex-col leading-tight"><span className="text-[14px] text-foreground">{u.name}</span><span className="text-muted-foreground">{u.email}</span></span></td>
                         <td className="px-4 py-2.5"><RoleSelect label={`${ADMIN.role}: ${u.name}`} value={u.role} disabled={self} onChange={(r) => void run("set_role", { userId: u.id, role: r })} /></td>
                         <td className="px-4 py-2.5">{ADMIN.mfa(u.totp, u.passkeys)}</td>
-                        <td className="px-4 py-2.5"><Chip>{u.banned ? ADMIN.status.disabled : u.verified ? (u.totp || u.passkeys ? FIRST_SHIFT.ready : FIRST_SHIFT.verified) : u.delivery === "invite_failed" ? FIRST_SHIFT.failed : u.delivery === "invite_sent" ? FIRST_SHIFT.sent : ADMIN.status.invited}</Chip>
+                        <td className="px-4 py-2.5"><Chip>{inviteState(u)}</Chip>
                           <div>{u.notifications ? FIRST_SHIFT.pushOn : FIRST_SHIFT.pushOff}</div>
                           {u.role === "field" && <div className="flex gap-2">
                             <select aria-label={SHIFT.duty} value={u.duty_station ?? ""} onChange={(e) => void run("set_duty",{ userId:u.id,station:e.target.value, dutyFunction:u.duty_function, available:u.available })}>

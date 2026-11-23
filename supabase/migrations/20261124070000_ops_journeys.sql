@@ -64,6 +64,7 @@ begin
       select id, 'operator', 'broadcast', '{}', p_name from sent returning 1
   )
   select count(*) into n from logged;
+  if n=0 then perform ichido.fail('conflict'); end if;
   update public.mass_incident set broadcast_at = now(), broadcast_by = p_name, recipients = n where id = p_mass;
   return n;
 end $$;

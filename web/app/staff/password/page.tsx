@@ -43,7 +43,7 @@ function SetPassword() {
       <SignInLayout heading={heading} error="">
         <div className="flex flex-col gap-4">
           <Notice tone="info">{invite ? AUTH.password.done : AUTH.password.resetDone}</Notice>
-          <Link href={invite ? "/account?shift=1" : "/account"} className={cn(buttonVariants({ size: "lg" }), "h-11 rounded-lg text-[14px]")}>{AUTH.password.toSignIn}</Link>
+          <Link href={invite ? "/account/first-shift" : "/account"} className={cn(buttonVariants({ size: "lg" }), "h-11 rounded-lg text-[14px]")}>{AUTH.password.toSignIn}</Link>
         </div>
       </SignInLayout>
     );

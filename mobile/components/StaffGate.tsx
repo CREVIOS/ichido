@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth";
 import { registerPush } from "@/lib/push";
 import { can, isRole, type Permission, type Role } from "@rbac";
 import { Button, Input, Mark, Notice, Screen, T } from "@/components/ui";
-import { AUTH, SHIFT, STAFF, authError } from "@content/catalogue";
+import { AUTH, FIRST_SHIFT, SHIFT, STAFF, authError } from "@content/catalogue";
 
 export type { Role };
 export type Me = { uid: string; role: Role; name: string; push?: string; signOut: () => Promise<void> };
@@ -97,6 +97,9 @@ export function StaffGate({ need, title, children }: { need: Permission; title: 
     body = (
       <>
         <Notice tone="alert">{STAFF.noAccess(STAFF.roleName[status.who.role] ?? status.who.role)}</Notice>
+        {status.who.role === "operator" || status.who.role === "field" || status.who.role === "manager"
+          ? <Button label={FIRST_SHIFT.open} onPress={() => router.replace(status.who.role === "operator" ? "/operator" : status.who.role === "field" ? "/field" : "/insights")} />
+          : null}
         <Button kind="ghost" label={STAFF.otherAccount} onPress={out} />
       </>
     );
