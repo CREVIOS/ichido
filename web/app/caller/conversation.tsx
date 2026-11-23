@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Notice } from "@/components/kit";
 import { cmd } from "@/lib/supabase";
 import type { Turn } from "@/content/caller-session";
-import { ANSWER, CALLER_FLAGS, JOURNEY, FRONTLINE, UI, callerPack, contentPack, errorText, urgentText, type Lang } from "@/content/catalogue";
+import { ANSWER, CALLER_FLAGS, JOURNEY, FRONTLINE, UI, VOICE_LANGS, callerPack, contentPack, errorText, urgentText, type Lang } from "@/content/catalogue";
 import { CallerFlags } from "./faults";
 import { ReadBack } from "./intake";
 import type { CallerCase, Draft } from "./types";
@@ -44,7 +44,7 @@ export function Conversation({ card, draft, lang, turns, refresh }: { card: Call
     {card.transfer_reason === "suspected_risk" && <Notice tone="warn">{FRONTLINE.risk[lang]}</Notice>}
     {card.handler === "queued" && <Notice tone="info">{["provider", "unclear", "limit"].includes(card.transfer_reason ?? "") && FRONTLINE.fallback[lang]} {FRONTLINE.queued[lang]} {contentPack(card.fault)?.hint[lang] ?? FRONTLINE.inPerson[lang]}</Notice>}
     {warning && <Notice tone="warn">{warning}</Notice>}
-    <p className="text-sm leading-6">{FRONTLINE.disclosure[lang]}</p>
+    <p className="text-sm leading-6">{FRONTLINE.disclosure[lang]} {!card.text_only && VOICE_LANGS.includes(lang) && FRONTLINE.voicePrivacy[lang]}</p>
     {!started ? <Button disabled={busy} onClick={() => submit("start")}>{ai ? FRONTLINE.start[lang] : FRONTLINE.write[lang]}</Button> : <>
       <Notice>{pack.neverAsk[lang]}</Notice>
       {pack.scope && <Notice>{pack.scope[lang]}</Notice>}

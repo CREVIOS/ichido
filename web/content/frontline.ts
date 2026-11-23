@@ -41,6 +41,7 @@ export const FRONTLINE = {
 } satisfies Record<string, L10n>;
 
 export const FRONT_DESK = {
+  delivery: {committed:"記録済み", pending:"未配信", playing:"読み上げ中", partial:"途中で中断", full:"配信済み"} as Record<string,string>,
   quality: "AIの案内を確認", checked: "確認を記録する", safetyMiss: "見逃した危険を報告", redacted: "自由記述は非表示",
   qaReason: {closure:"AIが完了", recontact:"もう一度相談", dispute:"回答に不満", safety_miss:"危険の見逃し"} as Record<string,string>,
   outcomes: "AI受付の結果", resolved: "本人が解決を確認／AI受付", open: "対応中", abandoned: "中断",

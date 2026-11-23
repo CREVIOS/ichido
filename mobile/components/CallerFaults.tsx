@@ -1,11 +1,13 @@
 import type { FollowUpCase } from "@content/caller-session";
+import { Frown, Meh, Smile } from "lucide-react-native";
+import { color, radius, shadow } from "@/theme";
 import { Human } from "./Human";
 import { useEffect, useState } from "react";
-import { Share, View } from "react-native";
+import { Pressable, Share, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cmd } from "@/lib/supabase";
 import { Brand, Button, Card, LangPicker, LiveText, Notice, Screen, T, TextScale, Toggle } from "@/components/ui";
-import { CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, receipt, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, sentText, urgentText, type Lang } from "@content/catalogue";
+import { FRONTLINE, RATING, RATINGS, CALLER_FLAGS, FAULTS, FAULT_UI, GROUP_TITLE, JOURNEY, CONSULTATION, receipt, UI, bankStatusText, errorText, exclusiveOff, flagsFor, packOfFault, pick, sentText, urgentText, type Lang } from "@content/catalogue";
 
 // Caller additions for the real-world fault paths (web/app/caller/faults.tsx and prefs.tsx on the web).
 
@@ -101,10 +103,12 @@ export function SyncStatus({sync,lang}: {sync:Sync;lang:Lang}) {
 export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCase; prefs: Prefs; onPrefs: (p: Prefs) => void; }) {
   const [chosen, setLang] = useState<Lang | null>(null);
   const lang = chosen ?? f.lang ?? "bn";
+  const [note,setNote] = useState("");
+  const resolved = f.resolved_by === "ai";
   const told = f.reply && (sentText(f.reply, lang) ?? errorText("server",lang));
   return (
     <TextScale.Provider value={textScale(prefs)}>
-      <Screen eyebrow={<Brand />} pinned={<Human lang={lang} />} onRefresh={sync.retry}>
+      <Screen eyebrow={<Brand />} pinned={<Human lang={lang} requested={f.recontacted} receipt={resolved ? f.id : undefined} refresh={sync.retry} />} onRefresh={sync.retry}>
         <SyncStatus sync={sync} lang={lang} />
         <LangPicker lang={lang} onChange={setLang} />
         <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
@@ -114,10 +118,39 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
         {packOfFault(f.fault) === "atm" ? <BankStatus status={(f.bank_status === "contact_by" || f.bank_status === "contacted") && !f.callback_channel ? null : f.bank_status} due={f.bank_due} lang={lang} /> : null}
         {told ? <View style={{ gap: 6 }}><T v="label" tone="muted">{FAULT_UI.lastReply[lang]}</T><T v="body" tone="ink">{told}</T></View> : null}
         {f.station?.contact && <T selectable>{f.station.contact}</T>}
+        {resolved && <>
+          <Rate lang={lang} rating={f.rating ?? null} receipt={f.id} refresh={sync.retry} onNote={setNote} />
+          <Button label={FRONTLINE.stillHelp[lang]} disabled={f.recontacted} onPress={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch((e:Error) => setNote(errorText(e.message,lang)))} />
+          <LiveText>{note}</LiveText></>}
         <Receipt station={f.station_id} id={f.id} lang={lang} />
         <T>{pick(f.station?.branch,lang)} · {pick(f.station?.hours,lang)}</T>
         <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T>
       </Screen>
     </TextScale.Provider>
+  );
+}
+
+const FACE = { 3: Smile, 2: Meh, 1: Frown } as const;
+
+// Three faces after a guided close (web/app/caller/guidance.tsx): one tap, no text, counted in insights.
+export function Rate({ lang, rating, onNote, receipt, refresh }: { receipt?:string; refresh?:()=>void; lang: Lang; rating: number | null; onNote: (n: string) => void }) {
+  if (rating) return <T v="row">{UI.rateThanks[lang]}</T>;
+  return (
+    <View style={{ gap: 10 }}>
+      <T v="label" tone="muted">{UI.rateTitle[lang]}</T>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {RATINGS.map((r) => {
+          const Face = FACE[r];
+          return (
+            <Pressable key={r} accessibilityRole="button" accessibilityLabel={RATING[r][lang]}
+              onPress={() => cmd("rate", { rating: r, receipt }).then(refresh).catch((e: Error) => onNote(errorText(e.message, lang)))}
+              style={({ pressed }) => [{ flex: 1, height: 84, alignItems: "center", justifyContent: "center", gap: 6, borderRadius: radius.card, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.press : color.surface }, shadow]}>
+              <Face size={24} strokeWidth={1.5} color={color.ink} />
+              <T v="row">{RATING[r][lang]}</T>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }

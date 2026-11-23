@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform, View } from "react-native";
 import type { Room, RemoteParticipant } from "livekit-client";
 import { Mic, Square } from "lucide-react-native";
-import { API_URL, bearer } from "@/lib/supabase";
+import { API_URL, bearer, cmd } from "@/lib/supabase";
 import { livekit } from "@/lib/voice";
 import { Button, T } from "@/components/ui";
 import { MOBILE, VOICE, type Lang } from "@content/catalogue";
@@ -46,8 +46,15 @@ async function micAllowed(): Promise<boolean> {
 
 // Joins the case's private LiveKit room. The agent transcribes; each final transcript of *this* caller goes to onFinal.
 // `say` is server-signed text (the read-back) the agent may speak; the agent rejects anything unsigned.
-export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text: string) => void; say?: SignedSpeech | null }) {
+export function VoiceIntake({ lang, onFinal, say, generation, handler }: { lang: Lang; generation?: string; handler?: string; onFinal?: (text: string) => void; say?: SignedSpeech | null }) {
   const room = useRef<Room | null>(null);
+  const owner = useRef(handler);
+  useEffect(() => {
+    owner.current = handler;
+    if (generation && handler !== "ai") room.current?.remoteParticipants.forEach(p => {
+      if (p.isAgent) p.audioTrackPublications.forEach(pub => pub.setSubscribed(false));
+    });
+  }, [generation,handler]);
   const finalRef = useRef(onFinal);
   useEffect(() => { finalRef.current = onFinal; });
   const [state, setState] = useState<State>("idle");
@@ -67,24 +74,59 @@ export function VoiceIntake({ lang, onFinal, say }: { lang: Lang; onFinal: (text
     const { Room, RoomEvent, AudioSession } = livekit();
     const r = new Room();
     room.current = r; // tracked from creation so any failure path can disconnect it
+    let lease: string | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const release = () => {
+      clearTimeout(timer);
+      if (!lease || !generation) return;
+      const session = lease;
+      lease = undefined;
+      void cmd("voice_end",{generation,session}).catch(() => setState("unavailable"));
+    };
     const fail = () => {
+      const failedSession = lease;
+      release();
       if (room.current !== r) return;
-      r.disconnect(); room.current = null; AudioSession.stopAudioSession(); setState("unavailable");
+      room.current = null; void r.disconnect(); void AudioSession.stopAudioSession(); setState("unavailable");
+      if (generation) void cmd("voice_failure",{generation,session:failedSession}).catch(() => setState("unavailable"));
     };
     try {
       if (!(await micAllowed())) return fail();
       const res = await fetch(`${API_URL}/api/livekit/token`, { method: "POST", headers: { authorization: await bearer() } });
       if (!res.ok) return fail(); // 503 when the server has no voice keys: the typed path stays available
-      const { url, token } = await res.json();
+      const { url, token, session, ttl, needsAgent } = await res.json();
 
+      lease = session;
+      if (room.current !== r) { release(); return; }
       await AudioSession.startAudioSession();
-      wire(r, (t) => finalRef.current(t), setPartial);
-      r.on(RoomEvent.Disconnected, () => { if (room.current === r) { room.current = null; AudioSession.stopAudioSession(); setState("idle"); } });
-      const agentJoined = waitForAgent(r);
-      await r.connect(url, token);
+      if (onFinal) wire(r, (t) => finalRef.current?.(t), setPartial);
+      if (generation) r.on(RoomEvent.TrackPublished, (pub,p) => {
+        pub.setSubscribed(p.isAgent && owner.current === "ai");
+      });
+      r.on(RoomEvent.Reconnecting, () => { void r.disconnect(); });
+      r.on(RoomEvent.Disconnected, () => { release(); if (room.current === r) { room.current = null; AudioSession.stopAudioSession(); setState("idle"); } });
+      const agentJoined = needsAgent ? waitForAgent(r) : Promise.resolve(true);
+      await r.connect(url, token, {autoSubscribe:!generation});
+      if (room.current !== r) return r.disconnect();
+      if (generation && owner.current === "ai") r.remoteParticipants.forEach(p => {
+        if (p.isAgent) p.audioTrackPublications.forEach(pub => pub.setSubscribed(true));
+      });
       await r.localParticipant.setMicrophoneEnabled(true);
       if (room.current !== r) return r.disconnect(); // stopped or unmounted meanwhile
-      if (!(await agentJoined)) return fail();
+      async function lostAgent() {
+        if (room.current !== r || !generation || owner.current !== "ai") return;
+        try {
+          const {screen} = await cmd<{screen?:{generation:string;card:{handler:string}}}>("caller_screen");
+          if (screen?.generation === generation && screen.card.handler === "ai") fail();
+        } catch { fail(); }
+      }
+      if (generation && needsAgent) r.on(RoomEvent.ParticipantDisconnected,p => { if (p.isAgent) void lostAgent(); });
+      if (!(await agentJoined)) {
+        if (!generation) return fail();
+        await lostAgent();
+      }
+      if (room.current !== r) return r.disconnect();
+      timer = setTimeout(() => { void r.disconnect(); },ttl*1000);
       setState("live");
     } catch {
       fail();
