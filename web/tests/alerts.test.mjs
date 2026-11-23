@@ -44,7 +44,13 @@ before(async () => {
   });
   await new Promise((r) => server.listen(3199, "127.0.0.1", r));
 });
-after(() => server?.close());
+// The cached test sessions live on; their stub subscriptions should not.
+after(async () => {
+  server?.close();
+  if (!configured) return;
+  await service.from("push_subscription").delete().like("endpoint", `${STUB}/%`);
+  await service.from("push_subscription").delete().like("endpoint", "ExponentPushToken[%");
+});
 
 // A browser's subscription: an endpoint on the stub and the keys the server encrypts to; open() decrypts like a browser.
 function browser() {

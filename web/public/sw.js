@@ -8,7 +8,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(Promise.all([
     self.registration.showNotification(m.title, { body: typeof m.body === "string" ? m.body : "", tag: m.tag, data: { url }, icon: "/icon.svg", lang: "ja" }),
     // Open Ichido tabs hear about it too (tests and an in-page toast can use it).
-    self.clients.matchAll({ type: "window" }).then((tabs) => tabs.forEach((t) => t.postMessage({ type: "ichido-push", tag: m.tag, url }))),
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((tabs) => tabs.forEach((t) => t.postMessage({ type: "ichido-push", tag: m.tag, url }))),
   ]));
 });
 
