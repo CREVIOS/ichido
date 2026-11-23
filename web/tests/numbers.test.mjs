@@ -32,4 +32,10 @@ test("frontline screens short spoken and typed fragments before they can accumul
   for (const fragment of ["12", "३", "four", "my PIN starts with two", "এক দুই", "một", "satu", "दुई", "いちにさんよん", "イチニサン", "イチ", "〇"]) {
     assert.ok(frontlineNumber(fragment), fragment);
   }
+  // Ordinary sentences that contain a number word or a small number still reach the desk.
+  for (const sentence of ["Thẻ của tôi bị kẹt trong máy ATM, không ra được. Có người gọi điện bảo tôi chuyển tiền.",
+    "khoảng 30 phút", "I'm the one who pressed the button", "しごとにいくところでした", "カードがもどりません",
+    "saya sudah coba dua kali di mesin ini", "আমি এক ঘণ্টা ধরে অপেক্ষা করছি", "म दुई पटक प्रयास गरें"]) {
+    assert.equal(frontlineNumber(sentence), false, sentence);
+  }
 });

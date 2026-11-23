@@ -116,7 +116,7 @@ export const HOME = {
     ],
     words: "কার্ড বের হয়নি, টাকা পেয়েছি। আমি কি অপেক্ষা করব?",
     slots: {
-      branch: { ja: "出島銀行 駅前支店（架空）", bn: "দেজিমা ব্যাংক স্টেশন শাখা (কাল্পনিক)", en: "Dejima Bank Station branch (fictional)" },
+      branch: { ja: "出島銀行 駅前支店", bn: "দেজিমা ব্যাংক স্টেশন শাখা", en: "Dejima Bank Station branch" },
       hours: { ja: "平日 9:00〜15:00", bn: "সোম–শুক্র, ৯:০০–১৫:০০", en: "weekdays 9:00–15:00" },
     },
   },

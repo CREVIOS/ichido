@@ -53,7 +53,7 @@ export function Conversation({ card, draft, lang, refresh }: { card: CallerCase;
       <form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); void submit("text", { text }); }}>
         <label htmlFor="frontline-message">{UI.whatHappened[lang]}</label>
         <Textarea id="frontline-message" value={text} maxLength={500} onChange={(e) => setText(e.target.value)} />
-        <Button disabled={busy || !text.trim()}>{UI.send[lang]}</Button>
+        <Button type="submit" disabled={busy || !text.trim()}>{UI.send[lang]}</Button>
       </form>
       {card.confirmed_rev === null && <>
         {ai && readback && <p>{FRONTLINE.readback[lang]}</p>}

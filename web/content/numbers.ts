@@ -16,13 +16,20 @@ const NUMBER_WORDS = new Set([
   // Nepali
   "शून्य", "सुन्ना", "एक", "दुई", "तीन", "चार", "पाँच", "छ", "सात", "आठ", "नौ",
 ]);
-// Treat even short standalone number fragments as sensitive in a multi-turn conversation.
+// In a multi-turn conversation a PIN can arrive one fragment per message, so a message that is mostly numbers ("một",
+// "12", "এক দুই", "いちにさんよん") is withheld, and so is any number next to a word for a PIN or password. An ordinary
+// sentence that happens to contain a number word is not: Vietnamese "không" is "zero" and also "not"; "khoảng 30 phút".
+const READING = "(?:ぜろ|まる|れい|いち|に|さん|よん|しち|し|ご|ろく|なな|はち|きゅう|く)";
+const SECRET_WORDS = /\bpin\b|password|passcode|暗証|あんしょう|パスワード|ぱすわーど|পিন|পাসওয়ার্ড|mã pin|mật khẩu|kata sandi|sandi|पिन|पासवर्ड/iu;
 export function frontlineNumber(text: string): boolean {
-  if (looksLikeNumber(text) || /\p{N}|[〇零一二三四五六七八九]{2}/u.test(text)) return true;
-  const normalized = text.normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 96));
-  if (/(?:ぜろ|まる|れい|いち|に|さん|よん|しち|し|ご|ろく|なな|はち|きゅう|く){2,}/u.test(normalized)) return true;
-  const words = normalized.toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
-  return words.some((w) => NUMBER_WORDS.has(w));
+  if (looksLikeNumber(text)) return true;
+  const normalized = text.normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 96)).toLowerCase();
+  const words = normalized.match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
+  const numeric = (w: string) => /^\p{N}+$/u.test(w) || NUMBER_WORDS.has(w) || /^[〇零一二三四五六七八九]+$/u.test(w) || new RegExp(`^${READING}+$`, "u").test(w);
+  const n = words.filter(numeric).length;
+  // Japanese has no spaces: four spoken readings in a row inside a longer run of kana is a number read aloud.
+  if (!n) return new RegExp(`${READING}{4,}`, "u").test(normalized);
+  return SECRET_WORDS.test(normalized) || n / words.length > 0.5;
 }
 // Words for an ID, insurance, residence-card, My Number, passport or account number in the caller languages: with three
 // or more digits anywhere in the text, the text is withheld even when the digits are split up.

@@ -58,7 +58,7 @@ test("device health is visible to operators and managers only", async () => {
 // ---- Operator-side real-world paths (supabase/migrations/20261123130000_ops.sql) ----
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
-const COMPANY = "架空警備株式会社";   // TABLE-A's security company in seed.sql
+const COMPANY = "出島警備株式会社";   // TABLE-A's security company in seed.sql
 
 async function until(what, fn, ms = 20_000) {
   const end = Date.now() + ms;
