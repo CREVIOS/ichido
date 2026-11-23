@@ -113,8 +113,9 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
         <T v="body">{FAULT_UI.followLead[lang]}</T>
         {packOfFault(f.fault) === "atm" ? <BankStatus status={(f.bank_status === "contact_by" || f.bank_status === "contacted") && !f.callback_channel ? null : f.bank_status} due={f.bank_due} lang={lang} /> : null}
         {told ? <View style={{ gap: 6 }}><T v="label" tone="muted">{FAULT_UI.lastReply[lang]}</T><T v="body" tone="ink">{told}</T></View> : null}
+        {f.station?.contact && <T selectable>{f.station.contact}</T>}
         <Receipt station={f.station_id} id={f.id} lang={lang} />
-        <T>{pick(f.station?.branch,lang)} · {pick(f.station?.counter_hours,lang)}</T>
+        <T>{pick(f.station?.branch,lang)} · {pick(f.station?.hours,lang)}</T>
         <T selectable v="small">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</T>
       </Screen>
     </TextScale.Provider>

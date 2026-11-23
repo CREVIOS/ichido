@@ -23,6 +23,10 @@ begin
   s:=public.record_fault(shelter,md5(random()::text),'device','shelter_needs');
   perform public.cmd_claim(op,'Operator',s);
   insert into ichido.binding(incident,uid,lang,expires) values(s,phone,'bn',now()+interval '2 hours');
+  update public.station set public_contact_url='https://example.invalid/desk' where id=shelter;
+  assert public.caller_screen(phone)->'station'->>'contact' is null;
+  update public.station set contact_verified_at=now() where id=shelter;
+  assert public.caller_screen(phone)->'station'->>'contact'='https://example.invalid/desk';
   update public.desk set lang='bn' where id=s;
   perform public.cmd_flag(phone,'diet_allergy',true);
   perform public.cmd_flag(phone,'allergy_child',true);

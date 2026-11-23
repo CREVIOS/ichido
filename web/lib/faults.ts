@@ -69,7 +69,8 @@ export async function followup(c: Caller) {
   if (error) throw error;
   const [{ data: reply }, { data: station }] = await Promise.all([
     card.reply_id ? admin.from("reply").select("intent, slots, manual_version").eq("id", card.reply_id).maybeSingle().throwOnError() : Promise.resolve({ data: null }),
-    admin.from("station").select("label,branch,counter_hours").eq("id", card.station).maybeSingle().throwOnError(),
+    admin.from("station").select("label,branch,hours:counter_hours,public_contact_url,contact_verified_at").eq("id", card.station).maybeSingle().throwOnError(),
   ]);
-  return { case: { ...card, station_id:card.station, reply, station } };
+  return { case: { ...card, station_id:card.station, reply, station:station && { label:station.label,branch:station.branch,hours:station.hours,
+    contact:station.contact_verified_at && Date.parse(station.contact_verified_at)<=Date.now() ? station.public_contact_url : null } } };
 }

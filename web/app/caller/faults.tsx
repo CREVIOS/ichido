@@ -99,8 +99,9 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
           <p className="text-[16px] leading-7 text-foreground">{told}</p>
         </section>
       )}
+      {f.station?.contact && <a className="underline" href={f.station.contact}>{f.station.contact}</a>}
       <Receipt station={f.station_id} id={f.id} lang={lang} />
-      <p>{pick(f.station?.branch,lang)} · {pick(f.station?.counter_hours,lang)}</p>
+      <p>{pick(f.station?.branch,lang)} · {pick(f.station?.hours,lang)}</p>
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]} {CONSULTATION.phone} · {CONSULTATION.email}</p>
     </Phone>
   );

@@ -6,7 +6,9 @@ alter table public.desk add column if not exists binding_expires timestamptz,
 alter table public.draft add column if not exists words_lang text;
 alter table public.caller_card add column if not exists teachback_lang text, add column if not exists eta_at timestamptz,
   add column if not exists callback_channel text check (callback_channel in ('phone','email'));
-alter table public.station add column if not exists host_org text, add column if not exists short_address text;
+alter table public.station add column if not exists host_org text, add column if not exists short_address text,
+  add column if not exists public_contact_url text check(public_contact_url ~ '^https://[^/[:space:]@]+(/[^[:space:]]*)?$'),
+  add column if not exists contact_verified_at timestamptz;
 alter table public.field_job add column if not exists allergy_flags text[] not null default '{}',
   add column if not exists allergy_ack_at timestamptz;
 
@@ -160,7 +162,8 @@ end $$;
 
 -- One MVCC snapshot prevents a changed binding or a partial refresh from mixing two people's data.
 create or replace function public.caller_screen(p_uid uuid) returns jsonb language sql stable security definer set search_path='' as $$
-  select jsonb_build_object('card',to_jsonb(c),'draft',to_jsonb(dr),'station',jsonb_build_object('label',s.label,'branch',s.branch,'hours',s.counter_hours),
+  select jsonb_build_object('card',to_jsonb(c),'draft',to_jsonb(dr),'station',jsonb_build_object('label',s.label,'branch',s.branch,'hours',s.counter_hours,
+    'contact',case when s.contact_verified_at<=now() then s.public_contact_url end),
     'generation',b.voice_room,'reply',(select to_jsonb(r)-'operator_id' from public.reply r where r.id=c.reply_id),
     'turns',coalesce((select jsonb_agg(jsonb_build_object('seq',t.seq,'rev',t.rev,'speaker',t.speaker,'words',t.words,'wording',t.wording,'locale',t.locale) order by t.seq)
       from public.frontline_turn t where t.incident=c.id and t.generation=b.voice_room),'[]'::jsonb))

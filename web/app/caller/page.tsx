@@ -72,7 +72,8 @@ export default function CallerPage() {
       <AllergyCard flags={card.flags} lang={lang} />
       {(card.choice === "leave" || !open) && <section className="grid gap-2 text-foreground"><p>{JOURNEY.checkHere[lang]}</p>
         <p>{pick(station.branch,lang)} · {pick(station.hours,lang)}</p>
-        <Receipt station={card.station} id={card.id} lang={lang} /></section>}
+        {station?.contact && <a className="underline" href={station.contact}>{station.contact}</a>}
+      <Receipt station={card.station} id={card.id} lang={lang} /></section>}
       {confirmed && !card.flags.includes("need_other") && <ShowStaff card={card} lang={lang} />}
       <p className="text-[12px] leading-5">{UI.helpDesk[lang]} <a href={`tel:${CONSULTATION.phone}`}>{CONSULTATION.phone}</a> · <a href={`mailto:${CONSULTATION.email}`}>{CONSULTATION.email}</a></p></>}
     </Phone>

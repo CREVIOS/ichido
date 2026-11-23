@@ -76,7 +76,8 @@ export default function CallerScreen() {
         {allergyFacts(card.flags).length>0 && <Card><Button kind="secondary" label={JOURNEY.allergyCard[lang]} onPress={() => setAllergyOpen(!allergyOpen)} />
           {allergyOpen && (["bn","ja"] as const).map(l => <T key={l} accessibilityLanguage={l}>{allergyFacts(card.flags).map(f => CALLER_FLAGS[f].label[l]).join(" · ")}</T>)}</Card>}
         {(card.choice === "leave" || !open) && <Card><T>{JOURNEY.checkHere[lang]}</T><T>{pick(station.branch,lang)} · {pick(station.hours,lang)}</T>
-          <Receipt station={card.station} id={card.id} lang={lang} /></Card>}
+          {station?.contact && <T selectable>{station.contact}</T>}
+        <Receipt station={card.station} id={card.id} lang={lang} /></Card>}
         {confirmed && !card.flags.includes("need_other") && <View style={{ backgroundColor: color.primary, borderRadius: radius.card, padding: space.lg, gap: 6 }}>
           <T v="small" tone="onPrimary" style={{ opacity: 0.6 }}>{UI.showStaff[lang]}</T>
           <T v="h2" tone="onPrimary" weight={500}>{FAULTS[card.fault]?.ja}。</T>
