@@ -47,13 +47,13 @@ export function PairCard({ incident }: { incident: string }) {
 // practice: the training console, where the held-card rule is scored in the debrief instead of hinted here.
 // flags: the caller's own taps, which some replies need (content/faults.ts REPLY_RULES). Only the case's pack's
 // replies are listed (content/packs).
-export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [], work = [] }: {
-  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; work?: string[]; flags?: string[];
+export function ReplyCard({ reference, d, lang, replies, run, bundleTo, practice, flags = [], work = [] }: {
+  reference?: string; d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; work?: string[]; flags?: string[];
 }) {
   const INTENTS = intentsOf(packOfFault(d.fault ?? DEVICE_FAULT));
   const [intent, setIntent] = useState(INTENTS[0]);
   const r = replyOf(intent) ?? REPLIES[INTENTS[0]];
-  const preview = r.text(replies.at(-1)?.slots ?? {});
+  const preview = r.text({ ...replies.at(-1)?.slots, reference });
   // Mirrors the server rules: "card is still inside" only when the caller confirmed it and no release succeeded,
   // and each reply only for its own fault types and caller statements.
   const ctx = { fault: d.fault ?? DEVICE_FAULT, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release };
@@ -81,7 +81,7 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
         ))}
       </div>
       <div className="inset flex flex-col gap-2 p-3.5">
-        {replies.length || !r.offersChoice ? (
+        {intent === "TRANSIT_LEAVE" || replies.length || !r.offersChoice ? (
           <><span className="text-[14px] leading-6 text-foreground">{preview.ja}</span><span className="text-[14px] leading-6" lang={lang}>{preview[lang]}</span></>
         ) : (
           <span className="text-[13px] leading-5">{DESK.reply.slotsNote(LANG_NAME[lang])}</span>

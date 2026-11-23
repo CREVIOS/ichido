@@ -37,6 +37,7 @@ function CaseView({ me }: { me: Me }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [job, setJob] = useState<Job | null>(null);
+  const [reference,setReference] = useState<string>();
   const [work, setWork] = useState<string[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
   const [error, setError] = useState("");
@@ -59,12 +60,17 @@ function CaseView({ me }: { me: Me }) {
     }
   }, [id]);
   useLive(["desk", "caller_card", "case_event", "reply", "field_job"], load);
+  const railway = d && packOfFault(d.fault) === "transit";
   const roster = useCallback(async () => {
     const r = await cmd<{ field: Guard[] }>("staff_list", { incident: id }).catch(() => null);
     setGuards(r?.field ?? []);
     const { data } = await sb().rpc("blocked_work_replies", { p_incident: id });
     setWork(data ?? []);
-  }, [id]);
+    if (railway) {
+      const { data: partner } = await sb().from("partner_work").select("railway_ref").eq("incident",id).eq("recipient","railway").maybeSingle();
+      setReference(partner?.railway_ref ?? undefined);
+    }
+  }, [id,railway]);
   useLive(["field_job", "staff", "partner_work"], roster);
 
   const run: Run = (name, body = {}) =>
@@ -119,7 +125,7 @@ function CaseView({ me }: { me: Me }) {
           {packOfFault(d.fault) === "atm" && <Button label={d.fraud_at ? OPS.fraud.safe : OPS.fraud.warn} onPress={() => run(d.fraud_at ? "fraud_safe" : "fraud", { incident: d.id })} />}
           {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
           <SuggestCard d={d} run={run} />
-          <ReplyCard work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
+          <ReplyCard reference={reference} work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
           {job && <Notice>{job.declined_at ? SHIFT.declined : job.accepted_at ? SHIFT.accepted : job.acknowledged_at ? SHIFT.ack : SHIFT.unack}{job.provider_at && ` · ${SHIFT.provider}`}{job.help_at && ` · ${SHIFT.helpNeeded}`}</Notice>}
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
@@ -237,12 +243,12 @@ function PairCard({ incident }: { incident: string }) {
   );
 }
 
-function ReplyCard({ work, d, lang, replies, run, flags }: { work: string[]; d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
+function ReplyCard({ reference, work, d, lang, replies, run, flags }: { reference?: string; work: string[]; d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
   // Only the case's pack's replies (content/packs).
   const intents = intentsOf(packOfFault(d.fault));
   const [intent, setIntent] = useState(intents[0]);
   const r = replyOf(intent) ?? REPLIES[intents[0]];
-  const preview = r.text(replies.at(-1)?.slots ?? {});
+  const preview = r.text({ ...replies.at(-1)?.slots, reference });
   // Mirrors the server rules (web/content/faults.ts replyBlock): the held-card rule and each reply's fault types and caller taps.
   const block = work.includes(intent) ? "work" : replyBlock(intent, r.needsHeld, { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release });
   const blocked = block === "awaiting" ? O.waitConfirm
@@ -255,7 +261,7 @@ function ReplyCard({ work, d, lang, replies, run, flags }: { work: string[]; d: 
         ))}
       </View>
       <Inset>
-        {replies.length || !r.offersChoice ? (
+        {intent === "TRANSIT_LEAVE" || replies.length || !r.offersChoice ? (
           <><T v="label" tone="ink">{preview.ja}</T><T v="label">{preview[lang]}</T></>
         ) : (
           <T v="label">{O.slotsHint(LANG_NAME[lang])}</T>
