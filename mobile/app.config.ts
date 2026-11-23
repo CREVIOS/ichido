@@ -43,6 +43,8 @@ const config: ExpoConfig = {
     ["expo-splash-screen", { backgroundColor: "#FFFFFF", image: "./assets/images/splash-icon.png", imageWidth: 64 }],
     ["@livekit/react-native-expo-plugin", { android: { audioType: "communication" } }],
     "@config-plugins/react-native-webrtc",
+    // Staff alerts (lib/push.ts). Remote push needs a development build and an EAS project id.
+    ["expo-notifications", { color: "#0A0A0A" }],
   ],
   experiments: { typedRoutes: true, reactCompiler: true },
 };
