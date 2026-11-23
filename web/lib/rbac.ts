@@ -51,6 +51,8 @@ export const COMMANDS: Record<string, Access> = {
   // Caller
   pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
   rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller",
+  // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
+  push_key: "any", push_subscribe: "any", push_unsubscribe: "any",
   // Operator on a case
   simulate: "case:act", suggest: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
   review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",

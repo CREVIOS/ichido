@@ -389,6 +389,7 @@ export * from "./packs/index.ts";
 export * from "./ops.ts";
 export * from "./auth.ts";
 export * from "./mail.ts";
+export * from "./alerts.ts";
 
 // Pairing page behind the Help Point sticker.
 export const STATION = {

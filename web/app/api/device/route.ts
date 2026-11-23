@@ -5,6 +5,8 @@ import { isFault } from "@/content/catalogue";
 import { defaultFault } from "@/lib/faults";
 import { startBot } from "@/lib/bot";
 import { displayLines } from "@/lib/access";
+import { flushAlerts } from "@/lib/alerts";
+import { after } from "next/server";
 
 // POST body: the 32-hex event id. Retries with the same id never create a second incident.
 // X-Fault (optional) names another catalogue fault the monitoring side raises, e.g. phone_fraud; by default the
@@ -33,6 +35,7 @@ export async function POST(req: Request): Promise<Response> {
     return reply(500, { error: "not recorded" });
   }
   if (!seen) await startBot(incident as string);   // a second press on an open case finds its run already there
+  after(flushAlerts);   // the new case's push to the operators on duty (lib/alerts.ts)
   log.info("device_fault", { station, fault, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
   return new Response(null, { status: 204 });
 }

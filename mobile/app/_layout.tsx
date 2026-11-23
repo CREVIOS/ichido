@@ -13,6 +13,7 @@ import { NotoSansJP_400Regular } from "@expo-google-fonts/noto-sans-jp/400Regula
 import { NotoSansJP_500Medium } from "@expo-google-fonts/noto-sans-jp/500Medium";
 import { color } from "@/theme";
 import { setupVoice } from "@/lib/voice";
+import { usePushLinks } from "@/lib/push";
 import { ArtSplash } from "@/components/ArtSplash";
 
 // WebRTC globals for LiveKit voice intake (development build only; see README).
@@ -24,6 +25,7 @@ export default function RootLayout() {
     HindSiliguri_400Regular, HindSiliguri_500Medium, NotoSansDevanagari_400Regular, NotoSansDevanagari_500Medium,
     NotoSansJP_400Regular, NotoSansJP_500Medium,
   });
+  usePushLinks();
   if (!loaded) return null;
   return (
     <>

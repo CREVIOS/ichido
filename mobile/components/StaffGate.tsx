@@ -5,6 +5,7 @@ import * as Linking from "expo-linking";
 import { Image, View } from "react-native";
 import { cmd, enterStaffSession, signOut } from "@/lib/supabase";
 import { authClient } from "@/lib/auth";
+import { registerPush } from "@/lib/push";
 import { can, isRole, type Permission, type Role } from "@rbac";
 import { Button, Input, Mark, Notice, Screen, T } from "@/components/ui";
 import { AUTH, STAFF, authError } from "@content/catalogue";
@@ -21,7 +22,9 @@ async function resolve(): Promise<Status> {
   if (data.session.aal !== "aal2") return { at: "aal1" };
   enterStaffSession();
   const r = await cmd<{ role: string; name?: string }>("me").catch(() => null);
-  return r && isRole(r.role) ? { at: "in", who: { uid: data.user.id, role: r.role, name: r.name ?? "" } } : { at: "out" };
+  if (!r || !isRole(r.role)) return { at: "out" };
+  void registerPush(r.role);
+  return { at: "in", who: { uid: data.user.id, role: r.role, name: r.name ?? "" } };
 }
 
 // Mirrors web/components/StaffGate.tsx: password, then the authenticator code (or a backup code); on first sign-in
