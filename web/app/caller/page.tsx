@@ -1,13 +1,13 @@
 "use client";
-import { VoiceIntake } from "@/components/VoiceIntake";
+import { CHAT } from "@/content/chat";
 import { Human } from "./human";
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Phone } from "@/components/phone";
-import { Notice, StatusLabel } from "@/components/kit";
+import { StatusLabel } from "@/components/kit";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, JOURNEY, CONSULTATION, allergyFacts, CALLER_FLAGS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
+import { ACCESS, JOURNEY, FRONTLINE, VOICE, VOICE_LANGS, CONSULTATION, allergyFacts, CALLER_FLAGS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
 import { Conversation } from "./conversation";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
@@ -50,26 +50,7 @@ export default function CallerPage() {
   // A non-ATM pack's caller answers with taps inside the intake; the ATM's taps sit below the read-back.
   const P = callerPack(card.fault);
 
-  return (
-    <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={(l) => cmd("set_lang", { lang: l }).then(load).catch(() => setOffline(true))} />}>
-      <Human key={generation + String(open)} lang={lang} state={open ? card.handler : undefined} requested={open && card.needs_human} />
-      <SyncStatus sync={sync} lang={lang} />
-      <FieldProgress card={card} lang={lang} />
-      {card.fraud ? <FraudScreen lang={lang} /> : <>
-      <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)}{confirmed && <> · {pick(FAULTS[card.fault], lang)}</>}</span>
-        <StatusLabel status={card.status} lang={lang} text={P.status(card.status, lang)} />
-      </div>
-      {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
-      {card.notice && <CallerNotice code={card.notice} lang={lang} />}
-      <DisasterNotice station={card.station} lang={lang} />
-      {frontline && !card.text_only && turns.some(t => t.speaker==="caller" && t.wording==="start") && <VoiceIntake key={generation + lang} generation={generation} handler={card.handler} lang={lang} />}
-      {frontline && draft && <Conversation key={generation} turns={turns} card={card} draft={draft} lang={lang} refresh={load} />}
-      {!frontline && !confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}
-      {!frontline && confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
-      {latest && <Guidance refresh={load} key={latest.id + lang} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
-      {!frontline && open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
+  const details = <>
       {P.atm && (card.bank_status || !open) && <BankStatus status={(card.bank_status === "contact_by" || card.bank_status === "contacted") && !card.callback_channel ? null : card.bank_status} due={card.bank_due} lang={lang} />}
       <AllergyCard flags={card.flags} lang={lang} />
       {(card.choice === "leave" || !open) && <section className="grid gap-2 text-foreground"><p>{JOURNEY.checkHere[lang]}</p>
@@ -77,7 +58,31 @@ export default function CallerPage() {
         {station?.contact && <a className="underline" href={station.contact}>{station.contact}</a>}
       <Receipt station={card.station} id={card.id} lang={lang} /></section>}
       {confirmed && !card.flags.includes("need_other") && <ShowStaff card={card} lang={lang} />}
-      <p className="text-[12px] leading-5">{UI.helpDesk[lang]} <a href={`tel:${CONSULTATION.phone}`}>{CONSULTATION.phone}</a> · <a href={`mailto:${CONSULTATION.email}`}>{CONSULTATION.email}</a></p></>}
+      <p className="text-[12px] leading-5">{UI.helpDesk[lang]} <a href={`tel:${CONSULTATION.phone}`}>{CONSULTATION.phone}</a> · <a href={`mailto:${CONSULTATION.email}`}>{CONSULTATION.email}</a></p>
+    </>;
+  const alerts = <>
+    <FieldProgress card={card} lang={lang} />
+    {card.text_only && <p className="chat-system">{ACCESS.textOnly[lang]}</p>}
+    {card.notice && <CallerNotice code={card.notice} lang={lang} />}
+    <DisasterNotice station={card.station} lang={lang} />
+  </>;
+  const chat = Boolean(frontline && draft && !card.fraud);
+  return (
+    <Phone lang={lang} large={prefs.large} chat={chat} station={pick(station?.label,lang) || card.station}
+      right={<><LangSelect value={lang} onChange={(l) => cmd("set_lang", {lang:l}).then(load).catch(() => setOffline(true))} />
+        <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} /></>}>
+      <div className="chat-header"><StatusLabel status={card.status} lang={lang} text={P.status(card.status,lang)} />
+        <Human key={generation + String(open)} lang={lang} state={open ? card.handler : undefined} requested={open && card.needs_human} refresh={load} /></div>
+      {card.fraud ? <FraudScreen lang={lang} /> : chat ? <Conversation key={generation} generation={generation} turns={turns} card={card} draft={draft}
+        lang={lang} refresh={load} sync={sync} alerts={alerts} reply={latest} rate={speechRate(prefs)}>
+        <details className="chat-details"><summary>{CHAT.details[lang]}</summary><p>{JOURNEY.privacy[lang]}</p>{!card.text_only && VOICE_LANGS.includes(lang) && <p>{FRONTLINE.voicePrivacy[lang]} {VOICE.notice[lang]}</p>}{details}</details>
+      </Conversation> : <>
+        <SyncStatus sync={sync} lang={lang} />{alerts}
+        {!confirmed && draft && <Intake key={generation} lang={lang} draft={draft} card={card} />}
+        {confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
+        {latest && <Guidance refresh={load} key={latest.id+lang} lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
+        {open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}{details}
+      </>}
     </Phone>
   );
 }

@@ -86,10 +86,9 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
   const resolved = f.resolved_by==="ai";
   const told = f.reply && (sentText(f.reply, lang) ?? errorText("server",lang));
   return (
-    <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={setLang} />}>
+    <Phone lang={lang} large={prefs.large} station={pick(f.station?.label,lang) || f.station_id} right={<><LangSelect value={lang} onChange={setLang} /><PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} /></>}>
       <Human requested={f.recontacted} lang={lang} receipt={resolved ? f.id : undefined} refresh={sync.retry} />
       <SyncStatus sync={sync} lang={lang} />
-      <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</span>
         <h1 className="text-[24px] leading-snug">{FAULT_UI.followTitle[lang]}</h1>
@@ -105,7 +104,7 @@ export function FollowUp({ f, prefs, onPrefs, sync }: { sync:Sync; f: FollowUpCa
       {f.station?.contact && <a className="underline" href={f.station.contact}>{f.station.contact}</a>}
       {resolved && <>
         <Rate lang={lang} receipt={f.id} rating={f.rating ?? null} onNote={setNote} refresh={sync.retry} />
-        <Button disabled={f.recontacted} onClick={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch(e => setNote(errorText(e.message,lang)))}>{FRONTLINE.stillHelp[lang]}</Button>
+        <div className="chat-chips"><Button disabled={f.recontacted} onClick={() => cmd("recontact",{receipt:f.id}).then(sync.retry).catch(e => setNote(errorText(e.message,lang)))}>{FRONTLINE.stillHelp[lang]}</Button></div>
         <p role="status">{note}</p>
       </>}
       <Receipt station={f.station_id} id={f.id} lang={lang} />

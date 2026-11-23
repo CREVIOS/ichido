@@ -1,4 +1,6 @@
 "use client";
+import { ChatBubble } from "@/components/chat-bubble";
+import { CHAT } from "@/content/chat";
 import { useCallback, useEffect, useState } from "react";
 import { CircleCheck, Frown, Meh, Smile, Volume2 } from "lucide-react";
 import { useLive } from "@/lib/live";
@@ -24,33 +26,21 @@ function useHasVoice(lang: Lang) {
 }
 
 // rate: the caller's read-aloud speed (slower when they asked for it).
-export function Guidance({ lang, card, reply, rate = 1, refresh }: { lang: Lang; card: CallerCase; reply: Reply; rate?: number; refresh?: () => Promise<void> }) {
+export function Guidance({ lang, card, reply, rate = 1, chat, inThread }: { lang: Lang; card: CallerCase; reply: Reply; rate?: number; chat?: boolean; inThread?:boolean; refresh?: () => Promise<void> }) {
   const r = replyOf(reply.intent);
   const text = sentText(reply,lang) ?? errorText("server", lang);
   const done = card.teachback_result === "understood";
   const [note, setNote] = useState("");
   const act = (name: string, body: Record<string, unknown> = {}) => cmd(name, body).then(() => setNote("")).catch((e: Error) => setNote(errorText(e.message, lang)));
-  const [ready,setReady] = useState(false);
-  const rev = card.confirmed_rev;
-  const eligible = card.handler==="ai" && reply.author==="ai" && rev!==null && !!sentText(reply,lang);
-  const delivery = useCallback(async (signal:AbortSignal) => {
-    if (document.visibilityState!=="visible") return;
-    try {
-      const result = await cmd<{ready:boolean}>("info_delivery",{reply:reply.id,rev,lang});
-      if (!signal.aborted) setReady(result.ready);
-    } catch (e) {
-      if (!signal.aborted) { setReady(false); setNote(errorText((e as Error).message,lang)); }
-    }
-  },[reply.id,rev,lang]);
-  useLive(["caller_card"],delivery,eligible,{incident:card.id});
   const hasVoice = useHasVoice(lang);
   const speak = () => { const u = new SpeechSynthesisUtterance(text); u.lang = LANG_LOCALE[lang]; u.rate = rate; window.speechSynthesis.speak(u); };
 
   return (
     <>
       <div className="flex flex-col gap-3">
-        <span className="text-[13px] text-muted-foreground">{UI.approved[lang]}</span>
-        <p className="text-[22px] leading-[1.45] tracking-[-0.01em] text-foreground">{text}</p>
+        {inThread ? null : chat ? <ChatBubble from={reply.author === "human" ? "operator" : "ai"} label={reply.author === "human" ? CHAT.operator[lang] : undefined}>{text}</ChatBubble>
+          : <><span className="text-[13px] text-muted-foreground">{UI.approved[lang]}</span>
+            <p className="text-[22px] leading-[1.45] text-foreground">{text}</p></>}
         {hasVoice && lang !== "ne" && !card.text_only && reply.author !== "ai" && <Button variant="secondary" className="self-start" onClick={speak}><Volume2 className="stroke-[1.5]" />{UI.listen[lang]}</Button>}
       </div>
       <div role="status">{note && <Notice tone="warn">{note}</Notice>}</div>
@@ -67,14 +57,36 @@ export function Guidance({ lang, card, reply, rate = 1, refresh }: { lang: Lang;
           </div>
         </div>
       )}
-      {eligible && ready && <Button onClick={async () => {
-        setReady(false);
-        await act("resolve_info",{reply:reply.id,rev,lang,ack:true});
-        await refresh?.();
-      }}>{FRONTLINE.answered[lang]}</Button>}
       {(card.handler === "legacy" || card.handler === "human" && reply.author === "human") && <TeachBack lang={lang} card={card} onNote={setNote} />}
     </>
   );
+}
+
+export function AnswerChips({card,reply,lang,refresh}: {card:CallerCase; reply:Reply; lang:Lang; refresh:()=>Promise<void>}) {
+  const [note,setNote] = useState("");
+  const [ready,setReady] = useState(false);
+  const rev = card.confirmed_rev;
+  const eligible = card.handler==="ai" && reply.author==="ai" && rev!==null && !!sentText(reply,lang);
+  const delivery = useCallback(async (signal:AbortSignal) => {
+    if (document.visibilityState!=="visible") return;
+    try {
+      const result = await cmd<{ready:boolean}>("info_delivery",{reply:reply.id,rev,lang});
+      if (!signal.aborted) setReady(result.ready);
+    } catch (e) {
+      if (!signal.aborted) { setReady(false); setNote(errorText((e as Error).message,lang)); }
+    }
+  },[reply.id,rev,lang]);
+  useLive(["caller_card"],delivery,eligible,{incident:card.id});
+  async function answer(resolved:boolean) {
+    setReady(false);
+    try {
+      if (resolved) await cmd("resolve_info",{reply:reply.id,rev,lang,ack:true});
+      else await cmd("human");
+      setNote(""); await refresh();
+    } catch (e) { setNote(errorText((e as Error).message,lang)); }
+  }
+  return <>{eligible && ready && <><button type="button" onClick={()=>answer(true)}>{FRONTLINE.answered[lang]}</button>
+    <button type="button" onClick={()=>answer(false)}>{FRONTLINE.stillHelp[lang]}</button></>}{note && <span role="status">{note}</span>}</>;
 }
 
 function TeachBack({ lang, card, onNote }: { lang: Lang; card: CallerCase; onNote: (n: string) => void }) {

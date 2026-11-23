@@ -125,8 +125,8 @@ function TriageReadBack({ lang, card, triage, onError }: { lang: Lang; card: Cal
 // No timers in the caller flow: the "find a person" hint is there from the start, so nobody has to wait for it.
 export function Waiting({ lang, textOnly, fault }: { lang: Lang; textOnly: boolean; fault: string }) {
   return (
-    <section className="surface flex flex-col gap-2 p-5">
-      <span className="flex items-center gap-2 text-[18px] text-foreground"><span className="size-2 animate-pulse rounded-full bg-info" aria-hidden />{STATUS.review[lang]}</span>
+    <section className="flex flex-col gap-3 py-6">
+      <span className="flex items-center gap-2 text-[18px] text-foreground"><span className="size-2 rounded-full bg-info" aria-hidden />{STATUS.review[lang]}</span>
       <p className="text-[14px] leading-6">{textOnly ? ACCESS.waiting[lang] : callerPack(fault).waiting(lang)}</p>
     </section>
   );

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import pg from "pg";
 import { chromium } from "playwright-core";
 import { CALLER_FLAGS, RATING, ACCESS, FRONTLINE, FRONT_DESK, JOURNEY, STATION, UI } from "../content/catalogue.ts";
+import { CHAT } from "../content/chat.ts";
 import { APP } from "./helpers.mjs";
 import { enableClosure, frontlineCase } from "./frontline-fixture.mjs";
 
@@ -56,7 +57,7 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
   await textbox.fill(display.code);
   await page.getByRole("button",{name:STATION.go[lang],exact:true}).click();
   await page.waitForURL("**/caller");
-  if (lang === "en") await page.getByRole("heading",{name:FRONTLINE.greeting.en}).waitFor();
+  if (lang === "en") await page.getByRole("log").getByText(FRONTLINE.greeting.en,{exact:true}).waitFor();
   else await page.getByText(ACCESS.textOnly.ne,{exact:true}).waitFor();
   await page.getByRole("button",{name:(lang === "en" ? FRONTLINE.start : FRONTLINE.write)[lang]}).click();
   const message = lang === "en" ? "I have a question about the machine." : "मलाई यहाँ सहयोग चाहिन्छ।";
@@ -70,10 +71,37 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
     await context.setOffline(false);
     await page.getByText(JOURNEY.offline.en,{exact:true}).waitFor({state:"hidden"});
   }
+  const chips = page.locator(".chat-chips").getByRole("button");
+  assert.ok(await chips.count() > 1);
+  assert.equal(await chips.first().evaluate(el => el.closest(".chat-chips").scrollWidth > el.closest(".chat-chips").clientWidth),true);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const attempts = [];
+  await page.route("**/api/cmd",async route => {
+    const body = route.request().postDataJSON();
+    if (body?.act === "text") {
+      attempts.push(body.request_id);
+      if (lang === "en" && attempts.length === 1) return route.abort("failed");
+      await gate;
+    }
+    await route.continue();
+  });
   const submitted = page.waitForResponse(r => r.url().endsWith("/api/cmd") && r.request().postDataJSON()?.act === "text");
   await page.getByRole("button",{name:UI.send[lang],exact:true}).click();
+  if (lang === "en") {
+    await page.getByRole("button",{name:CHAT.retry.en}).waitFor();
+    assert.equal(await input.inputValue(),message);
+    await page.getByRole("button",{name:CHAT.retry.en}).click();
+  }
+  try {
+    await page.getByText(CHAT.sending[lang],{exact:true}).waitFor();
+    if (lang === "en") await page.getByRole("status",{name:CHAT.typing[lang]}).waitFor();
+    assert.equal(await page.getByText(CHAT.delivered[lang],{exact:true}).count(),0);
+  } finally { release(); }
   assert.equal((await submitted).status(),200);
-  await page.getByText(message,{exact:true}).waitFor();
+  if (lang === "en") assert.deepEqual(attempts,[attempts[0],attempts[0]]);
+  await page.locator('[data-from="caller"]').getByText(message,{exact:true}).waitFor();
+  await page.getByText(CHAT.delivered[lang],{exact:true}).waitFor();
   assert.equal(await input.inputValue(),"");
   if (lang === "en") await page.getByRole("button",{name:UI.human.en,exact:true}).click();
   await page.getByText(FRONTLINE.queued[lang],{exact:false}).waitFor();

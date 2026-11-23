@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { Headphones } from "lucide-react";
+import { CHAT } from "@/content/chat";
 import { Button } from "@/components/ui/button";
 import { cmd } from "@/lib/supabase";
 import { FRONTLINE, UI, errorText, type Lang } from "@/content/catalogue";
@@ -16,10 +18,11 @@ export function Human({ lang, open = true, state, requested, receipt, refresh }:
     finally { setBusy(false); }
   }
   const pending = requested || sent || state === "queued";
-  return <div className="sticky top-1 z-10 grid gap-1 bg-background py-1">
-    {state !== "human" && !pending && <Button variant="secondary" size="lg" onClick={request} disabled={busy}>{UI.human[lang]}</Button>}
-    <p role="status" className={state === "human" || pending ? "rounded-lg bg-secondary px-3 py-2" : undefined}>
-      {state === "human" ? FRONTLINE.connected[lang] : pending ? FRONTLINE.requested[lang] : note}
-    </p>
+  const joined = state === "human";
+  return <div className="min-w-0">
+    <Button className="min-h-11 max-w-full rounded-full px-3.5 whitespace-normal text-left" variant="secondary" onClick={request} disabled={busy || joined || pending}>
+      <Headphones aria-hidden />{(joined ? CHAT.joined : pending ? CHAT.asked : UI.human)[lang]}
+    </Button>
+    {note && <p role="status" className="text-sm">{note}</p>}
   </div>;
 }

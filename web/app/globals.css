@@ -127,3 +127,72 @@
 @keyframes splash-art { to { opacity: 1; transform: scale(1); filter: blur(0); } }
 @keyframes splash-mark { to { opacity: 1; transform: none; } }
 @keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+
+.phone { --thread-blue: color-mix(in srgb, var(--brand-strong) 85%, var(--primary)); color: var(--foreground); margin: 0 auto; max-width: 40rem; min-height: 100dvh; background: var(--card); }
+.phone-head { display: flex; align-items: center; gap: .5rem; padding: max(.5rem,env(safe-area-inset-top)) 1rem .5rem; }
+.phone-head > label { margin-left: auto; }
+.phone-head select { max-width: 7rem; }
+.phone-head > a { min-height: 44px; }
+.phone-body { display:flex; flex-direction:column; gap:1.25rem; padding:1rem 1.25rem max(1.5rem,env(safe-area-inset-bottom)); }
+.phone button, .phone summary, .phone a.underline { min-height:44px; }
+.phone summary { display:list-item; align-content:center; cursor:pointer; }
+.phone .surface { border:none; border-radius:0; box-shadow:none; }
+.phone-chat { display:flex; flex-direction:column; height:100dvh; min-height:0; }
+.phone-chat .phone-body { display:contents; }
+.phone-head .station { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+.chat-header { padding:0 1.25rem .65rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; border-bottom:1px solid var(--border); }
+.chat-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:1.25rem 1rem; }
+.chat-system { text-align:center; font-size:.8125rem; line-height:1.5; color:var(--soft); max-width:33rem; margin:.75rem auto; }
+.chat-system[role="alert"] { color:var(--foreground); font-weight:500; }
+.chat-row { position:relative; display:flex; padding-left:1.85rem; margin-top:.2rem; }
+.chat-row[data-first="true"] { margin-top:.85rem; }
+.chat-avatar { position:absolute; left:0; top:.72rem; width:1.35rem; height:1.15rem; }
+.chat-balloon { --bubble:var(--pane); border-radius:1.25rem; padding:.6rem .9rem; background:var(--bubble); color:var(--foreground); font-size:1rem; line-height:1.5; max-width:85%; position:relative; overflow-wrap:anywhere; white-space:pre-wrap; }
+.chat-row:not([data-from="caller"]) .chat-balloon { --bubble:color-mix(in srgb,var(--card) 93%,var(--primary)); }
+.chat-row[data-from="caller"] { justify-content:flex-end; }
+.chat-row[data-from="caller"] .chat-balloon { --bubble:var(--thread-blue,color-mix(in srgb,var(--brand-strong) 85%,var(--primary))); color:white; }
+.chat-row[data-last="true"] .chat-balloon::after { content:""; position:absolute; bottom:0; left:-.32rem; width:.72rem; height:.75rem; background:var(--bubble); clip-path:polygon(70% 0,100% 100%,0 100%,34% 77%,54% 44%); }
+.chat-row[data-from="caller"] .chat-balloon::after { left:auto; right:-.32rem; transform:scaleX(-1); }
+.chat-role { display:block; font-size:.8125rem; font-weight:600; }
+.chat-delivery { display:block; text-align:right; font-size:.8125rem; color:var(--soft); margin:.18rem 0 0 auto; }
+.chat-dock { flex:none; padding:.4rem 1rem max(.75rem,env(safe-area-inset-bottom)); background:var(--card); }
+.chat-chips { display:flex; align-items:center; gap:.45rem; max-width:100%; overflow-x:auto; padding:.25rem .15rem; scrollbar-width:thin; }
+.chat-chips button { border:1px solid var(--input); border-radius:2rem; padding:.4rem .85rem; background:var(--card); flex:none; max-width:min(22rem,85vw); white-space:normal; min-height:44px; height:auto; font-size:.9rem; }
+.chat-chips button[aria-pressed="true"] { background:var(--primary); color:var(--primary-foreground); }
+.chat-compose { display:flex; align-items:flex-end; gap:.35rem; margin-top:.35rem; }
+.chat-entry { display:flex; align-items:flex-end; border:1px solid var(--input); border-radius:1.7rem; flex:1; min-width:0; padding:3px; }
+.chat-entry:focus-within { outline:2px solid var(--brand-strong); }
+.chat-entry textarea { field-sizing:content; min-height:44px; max-height:calc(4lh + 16px); line-height:1.5; font-size:1rem; padding:10px 8px 8px 13px; width:100%; min-width:0; resize:none; outline:none; }
+.chat-send,.chat-mic { width:44px; height:44px; display:grid; place-items:center; border-radius:50%; flex:none; }
+.chat-send { background:var(--thread-blue); color:white; }
+.chat-send:disabled { background:var(--secondary); color:var(--soft); }
+.chat-mic { background:var(--pane); }
+.chat-pin { display:flex; align-items:center; justify-content:center; gap:.4rem; font-size:.75rem; line-height:1.4; margin:.3rem auto; text-align:center; color:var(--soft); }
+.chat-dots { display:inline-flex; gap:4px; vertical-align:middle; padding:.25rem 0; }
+.chat-dots i { width:7px; height:7px; border-radius:50%; background:var(--muted-foreground); }
+@media (prefers-reduced-motion:no-preference) {
+  .chat-dots i { animation:chat-pulse 1s ease-in-out infinite alternate; }
+  .chat-dots i:nth-child(2) { animation-delay:.16s; }
+  .chat-dots i:nth-child(3) { animation-delay:.32s; }
+}
+@keyframes chat-pulse { to { opacity:.45; transform:translateY(-2px); } }
+@media (min-width:700px) { .phone { border-inline:1px solid var(--border); } .chat-scroll,.chat-dock { padding-inline:2rem; } }
+.chat-details { font-size:.8125rem; color:var(--soft); margin:.65rem auto 0; }
+.chat-details summary { width:fit-content; margin-inline:auto; }
+.chat-details[open] { display:grid; gap:.8rem; }
+.phone[data-large] { font-size:1.25rem; }
+.phone[data-large] :is(p,summary,button,label,select,textarea,.chat-balloon,.station,small,.chat-pin,span:not(.dot)) { font-size:max(1em,18px); }
+.chat-compose { flex-wrap:wrap; }
+.voice-notice { order:1; width:100%; text-align:center; font-size:.8125rem; }
+.admin-table :is(th,td):first-child { position:sticky; left:0; background:var(--card); }
+@media (max-width:1023px) {
+  [data-slot="button"], [data-slot="select-trigger"], [data-slot="dropdown-menu-trigger"], [data-slot="sheet-trigger"] { min-height:44px; min-width:44px; }
+  aside[hidden] { display:none; }
+}
+.phone-head > label { padding-inline:.5rem; gap:.25rem; background:transparent; }
+.phone-head select { field-sizing:content; width:auto; max-width:6.25rem; }
+.phone-head .station { font-size:1rem; letter-spacing:-.015em; }
+@media (max-width:640px) {
+  .operator-case :is([data-slot="button"],summary) { max-width:100%; white-space:normal; height:auto; }
+  .operator-case :is(.flex-wrap,.grid) { min-width:0; }
+}

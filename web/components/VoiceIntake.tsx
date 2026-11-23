@@ -12,13 +12,13 @@ type State = "idle" | "connecting" | "live" | "unavailable";
 const AGENT_WAIT_MS = 12_000;
 
 // Caller transcripts arrive on lk.transcription under the caller's own identity; the agent's audio is attached for playback.
-function wire(r: Room, audioEl: () => HTMLElement | null, onFinal: ((t: string) => void) | null, onPartial: (t: string) => void, acceptAudio: (p:RemoteParticipant) => boolean) {
-  if (onFinal) r.registerTextStreamHandler("lk.transcription", async (reader, info) => {
+function wire(r: Room, audioEl: () => HTMLElement | null, onFinal: ((t: string) => void) | null, onPartial: (t: string) => void, acceptAudio: (p:RemoteParticipant) => boolean, captions:boolean) {
+  if (onFinal || captions) r.registerTextStreamHandler("lk.transcription", async (reader, info) => {
     const text = await callerTranscript(reader, info.identity === r.localParticipant.identity);
     if (text === null) return;
     if (reader.info.attributes?.["lk.transcription_final"] !== "true") return onPartial(text);
     onPartial("");
-    if (text.trim()) onFinal(text.trim());
+    if (text.trim()) onFinal?.(text.trim());
   });
   r.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
     if (acceptAudio(participant) && track.kind === Track.Kind.Audio) audioEl()?.appendChild(track.attach());
@@ -42,8 +42,8 @@ function waitForAgent(r: Room): Promise<boolean> {
 
 // Joins the case's private LiveKit room. The agent transcribes; each final transcript of *this* caller goes to onFinal.
 // `say` is server-signed text (the read-back) the agent may speak; the agent rejects anything unsigned.
-export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }: {
-  lang: Lang; onFinal?: (text: string) => void; say?: SignedSpeech | null; generation?: string; monitor?: string; handler?: string;
+export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler, onCaption }: {
+  onCaption?: (text: string) => void; lang: Lang; onFinal?: (text: string) => void; say?: SignedSpeech | null; generation?: string; monitor?: string; handler?: string;
 }) {
   const room = useRef<Room | null>(null);
   const audio = useRef<HTMLDivElement | null>(null);
@@ -71,6 +71,7 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
     let timer: ReturnType<typeof setTimeout> | undefined;
     function release() {
       clearTimeout(timer);
+      onCaption?.("");
       if (!lease || !generation) return;
       const session = lease;
       lease = undefined;
@@ -93,8 +94,8 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
       lease = session;
       if (room.current !== r) { release(); return; }
 
-      wire(r, () => audio.current, onFinal ? (t) => finalRef.current?.(t) : null, setPartial,
-        p => monitor ? p.identity.startsWith("c-") : p.isAgent && (!generation || owner.current === "ai"));
+      wire(r, () => audio.current, onFinal ? (t) => finalRef.current?.(t) : null, onCaption ?? setPartial,
+        p => monitor ? p.identity.startsWith("c-") : p.isAgent && (!generation || owner.current === "ai"), Boolean(onCaption));
       r.on(RoomEvent.Disconnected, () => { release(); if (room.current === r) { room.current = null; setState("idle"); } });
       r.on(RoomEvent.Reconnecting, () => { void r.disconnect(); });
       async function lostAgent() {
@@ -129,6 +130,12 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
     setState("idle");
   }
 
+  if (onCaption) {
+    const label = state === "live" ? VOICE.stop[lang] : state === "connecting" ? VOICE.connecting[lang] : VOICE.start[lang];
+    return <><button type="button" className="chat-mic" aria-label={label} aria-pressed={state === "live"} title={label} disabled={state === "connecting"} onClick={state === "live" ? stop : start}>
+      {state === "live" ? <Square size={18} /> : <Mic size={21} />}</button>
+      {state === "unavailable" && <p className="voice-notice" role="status">{VOICE.unavailable[lang]}</p>}<div ref={audio} hidden /></>;
+  }
   // No speech recognition for this language (Nepali): the caller types.
   if (!VOICE_LANGS.includes(lang)) return (
     <div className="flex flex-col gap-2">

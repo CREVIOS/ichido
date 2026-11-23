@@ -5,13 +5,13 @@ import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { Human } from "@/app/caller/human";
-import { usePrefs } from "@/app/caller/prefs";
+import { PrefsBar, usePrefs } from "@/app/caller/prefs";
 import { Phone } from "@/components/phone";
-import { Chip, Notice } from "@/components/kit";
+import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, JOURNEY, FAULT_UI, FRONTLINE, UI, STATION, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, JOURNEY, FRONTLINE, UI, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
 const noop = () => () => {};
@@ -73,11 +73,8 @@ function StationForm() {
   const alertSilently = () => withSession(async () => { await cmd("silent_alert", { station }); setSilent(true); });
 
   return (
-    <Phone lang={lang} large={prefs.large} center right={<LangSelect value={lang} onChange={setLang} />}>
-      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="sticky top-1 z-10" onClick={alertSilently} disabled={busy || silent}>{(silent ? FRONTLINE.requested : UI.human)[lang]}</Button>}
-      <Button variant="ghost" aria-pressed={prefs.large} onClick={() => setPrefs({ ...prefs,large:!prefs.large })}>{FAULT_UI.largeText[lang]}</Button>
+    <Phone lang={lang} large={prefs.large} center station={station} right={<><LangSelect value={lang} onChange={setLang} /><PrefsBar lang={lang} prefs={prefs} onChange={setPrefs} /></>}>
       {resume && <Button variant="secondary" onClick={() => location.replace("/caller")}>{JOURNEY.resume[lang]} · {resume}</Button>}
-      <Chip className="self-start">Help Point · <span className="mono">{station}</span></Chip>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (
         <div className="flex flex-col gap-3">
@@ -85,12 +82,12 @@ function StationForm() {
           <Button size="lg" onClick={async () => { await authClient.signOut(); setStaffSession(false); }}>{STATION.signOutStaff[lang]}</Button>
         </div>
       ) : (
-        <form className="flex flex-col gap-4" onSubmit={connect}>
+        <form className="flex flex-col gap-5" onSubmit={connect}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="code">{(silent ? ACCESS.screenCode : STATION.code)[lang]}</Label>
             <input id="code" type="text" inputMode="text" autoCapitalize="characters" autoComplete="one-time-code" value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={CODE_LENGTH} required
-              className="h-16 w-full rounded-xl border bg-card text-center font-mono text-[32px] tracking-[0.3em] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40" />
+              className="h-16 w-full rounded-lg border bg-card text-center font-mono text-[32px] tracking-[0.3em] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40" />
           </div>
           {error && <p role="alert">{errorText(error,lang)}</p>}
           <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
@@ -102,6 +99,7 @@ function StationForm() {
           )}
         </form>
       )}
+      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="self-start rounded-full px-4" onClick={alertSilently} disabled={busy || silent}>{(silent ? FRONTLINE.requested : UI.human)[lang]}</Button>}
       <p className="flex gap-2 text-[13px] leading-5"><ShieldCheck className="mt-0.5 size-4 shrink-0 stroke-[1.5]" />{STATION.why[lang]}</p>
     </Phone>
   );
