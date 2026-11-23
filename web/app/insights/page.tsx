@@ -35,12 +35,12 @@ function Board({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} crumb={INSIGHTS.title} title={INSIGHTS.metrics[sel].title} actions={<AskButton />}>
       <div className="grid min-h-full lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-2.5 border-b bg-background/60 p-4 lg:border-r lg:border-b-0">
+        <div className="flex min-w-0 gap-2 overflow-x-auto px-4 py-3 lg:flex-col lg:px-5 lg:py-6">
           {(Object.keys(METRICS) as MetricKey[]).map((k) => (
             <button key={k} type="button" onClick={() => setSel(k)} aria-pressed={k === sel}
-              className={cn("flex min-h-36 flex-col gap-2 rounded-xl border bg-card p-3 text-left transition-shadow", k === sel ? "border-[oklch(0.8_0.07_255)] ring-3 ring-[oklch(0.8_0.07_255/0.25)]" : "hover:border-foreground/15")}>
+              className={cn("flex min-h-11 shrink-0 flex-col justify-center gap-2 rounded-lg px-4 py-2 text-left lg:min-h-20", k === sel ? "bg-accent font-medium" : "hover:bg-muted")}>
               <span className="flex items-center gap-1.5 text-[13px] text-foreground">{INSIGHTS.metrics[k].title}</span>
-              <span className="flex flex-1 flex-col justify-center">{data?.period === days ? METRICS[k].card(data) : null}</span>
+              <span className="hidden flex-1 flex-col justify-center lg:flex">{data?.period === days ? METRICS[k].card(data) : null}</span>
             </button>
           ))}
         </div>
@@ -71,7 +71,7 @@ function Board({ me }: { me: Me }) {
 
 function FilterChip({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-7 items-center divide-x rounded-md border bg-card text-[13px] text-muted-foreground">
+    <span className="inline-flex min-h-11 items-center divide-x rounded-md border bg-card text-[13px] text-muted-foreground">
       <span className="inline-flex items-center gap-1.5 px-2">{icon}{label}</span>
       {children}
     </span>

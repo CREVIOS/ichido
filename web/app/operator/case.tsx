@@ -79,17 +79,18 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   useAbuseKey(d, mine && !closed, run);
 
   return (
-    <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="operator-case grid min-h-full grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-8 p-5 lg:p-8">
         {d.text_only && !closed && <TextOnlyBanner />}
         {!closed && <UrgentBanner flags={card?.flags ?? []} />}
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
-        {!closed && d.handler !== "legacy" && <FrontlineMonitor key={d.id} desk={d} />}
+        {!closed && d.handler !== "legacy" && <FrontlineMonitor desk={d} />}
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
+        <details open={bot.escalations.length > 0 || undefined}><summary className="flex min-h-11 cursor-pointer items-center">{DESK.timeline}</summary><div className="grid gap-6 pt-2">
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
-        <Timeline events={events} fault={d.fault} />
-        {d.operator_id && <HandoffPanel key={d.id} d={d} uid={me.uid} />}
+        <Timeline events={events} fault={d.fault} /></div></details>
+        {d.operator_id && <HandoffPanel d={d} uid={me.uid} />}
         {d.operator_id && atm && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
@@ -98,7 +99,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
           </Panel>
         )}
       </div>
-      <aside className="flex flex-col gap-8 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
+      <aside className="flex min-w-0 flex-col gap-6 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
         <Actions reference={reference} work={work} d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} company={company} run={run} />
       </aside>
     </div>

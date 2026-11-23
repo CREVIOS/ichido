@@ -52,10 +52,11 @@ function Jobs({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role, { "/field": jobs.length })} footer={<MeFooter me={me} />} title={FIELD.title}>
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4 lg:p-8">
-        {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
+
         {failed && <Notice tone="warn">{SHIFT.readFailed}</Notice>}
         {loaded && !failed && jobs.length === 0 && <p className="py-16 text-center text-[14px] text-muted-foreground">{FIELD.none}</p>}
         {jobs.map((j) => <JobCard key={`${j.incident}-${j.generation}`} j={j} label={sites[j.station]?.label ?? j.station} company={sites[j.station]?.company} />)}
+        {previous.length > 0 && <details><summary className="min-h-11 cursor-pointer py-3 text-sm">{SHIFT.reassigned} · {previous.length}</summary><div className="grid gap-2">{previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}</div></details>}
       </div>
     </AppShell>
   );
@@ -70,9 +71,9 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
     cmd("field", { incident: j.incident, generation: j.generation, state, eta: state === "on_way" ? eta : undefined })
       .catch((e: Error) => toast.error(e.message === "forbidden" ? FIELD.changed : FIELD.failed));
   return (
-    <section id={j.incident} className="surface flex flex-col gap-4 p-5">
+    <section id={j.incident} className="flex flex-col gap-5 py-4">
       <div className="flex items-center justify-between">
-        <span className="mono text-muted-foreground">{j.station} · {PACKS[packOfFault(j.fault)].name.staff}</span>
+        <span className="text-sm text-muted-foreground">{j.station} · {PACKS[packOfFault(j.fault)].name.staff}</span>
         <span className="inline-flex items-center gap-1.5 text-[13px]"><Dot s="field" />{(packStaffField(packOfFault(j.fault)) ?? STAFF_JA.field)[j.state]}</span>
       </div>
       <div className="flex flex-col gap-1">
@@ -87,7 +88,7 @@ function JobCard({ j, label, company }: { j: Job; label: string; company?: strin
           cmd("ack_allergy",{incident:j.incident,generation:j.generation,flags:j.allergy_flags}).catch(() => toast.error(FIELD.changed))}>{j.allergy_ack_at ? ASSIST.acknowledged : ASSIST.ack}</Button></section>}
       {j.eta && <Chip className="self-start">{FIELD.etaTag} {FIELD.etaOption(j.eta)}</Chip>}
       {(j.state === "requested" || j.state === "on_way") && (
-        <div className="flex flex-col gap-1.5 border-t pt-4">
+        <div className="flex flex-col gap-2 pt-2">
           <Label>{FIELD.etaLabel}</Label>
           <Select value={eta} onValueChange={(v) => setEta(String(v ?? UNKNOWN_ETA))}>
             <SelectTrigger className="h-10 w-full bg-card"><SelectValue>{(v: string) => (v ? FIELD.etaOption(v) : FIELD.etaUnknown)}</SelectValue></SelectTrigger>

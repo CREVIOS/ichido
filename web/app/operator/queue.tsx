@@ -61,7 +61,7 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
 }) {
   const ago = (t: string) => DESK.minutesAgo(Math.max(0, Math.round((now - Date.parse(t)) / 60000)));
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {[
         { title: FRONT_DESK.queued, empty: FRONT_DESK.emptyQueued, rows: open.filter((c) => c.handler === "queued") },
         { title: FRONT_DESK.ai, empty: FRONT_DESK.emptyAI, rows: open.filter((c) => c.handler === "ai") },
@@ -88,8 +88,8 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
 function QueueGroup({ title, empty, children }: { title: string; empty?: string; children: React.ReactNode[] }) {
   return (
     <div className="flex flex-col gap-px">
-      <span className="px-2 pb-1 text-[12px] text-muted-foreground">{title}</span>
-      {children.length ? children : empty && <p className="px-2 text-[12px] leading-5 text-faint">{empty}</p>}
+      <span className="px-2 pb-2 text-[14px] font-medium text-foreground">{title}</span>
+      {children.length ? children : empty && <p className="px-2 text-[13px] leading-5 text-muted-foreground">{empty}</p>}
     </div>
   );
 }
@@ -97,7 +97,7 @@ function QueueGroup({ title, empty, children }: { title: string; empty?: string;
 function QueueRow({ on, onClick, dot, title, meta, sub, muted, sla }: { on: boolean; onClick: () => void; dot: string; title: string; meta: string; sub?: React.ReactNode; muted?: boolean; sla?: Sla | null }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} data-close
-      className={cn("flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent aria-pressed:bg-accent", muted && "text-muted-foreground")}>
+      className={cn("flex min-h-12 w-full flex-col justify-center gap-1 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent aria-pressed:bg-accent", muted && "text-muted-foreground")}>
       <span className="flex items-center gap-2">
         <Dot s={dot} />
         <span className={cn("min-w-0 flex-1 truncate text-[14px]", !muted && "text-foreground")}>{title}</span>

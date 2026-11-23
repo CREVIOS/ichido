@@ -68,10 +68,10 @@ function Admin({ me }: { me: Me }) {
 
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={ADMIN.title}>
-      <div className="flex flex-col gap-10 px-4 py-6 lg:px-6">
+      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-8 px-4 py-6 lg:px-8">
         {failed && <div role="alert"><Notice tone="warn">{ADMIN.loadError}</Notice></div>}
         {manage && (
-          <Panel title={ADMIN.inviteTitle}>
+          <details><summary className="w-fit cursor-pointer rounded-full bg-secondary px-4 py-3">{ADMIN.inviteTitle}</summary><div className="grid gap-3 pt-4">
             <form className="flex flex-wrap items-end gap-2" onSubmit={async (e) => {
               e.preventDefault();
               if (await run("invite", invite, ADMIN.invited)) setInvite({ name: "", email: "", role: invite.role });
@@ -82,12 +82,12 @@ function Admin({ me }: { me: Me }) {
               <Button type="submit"><UserPlus className="stroke-[1.5]" />{ADMIN.send}</Button>
             </form>
             <p className="text-[12px] text-muted-foreground">{ADMIN.inviteLead}</p>
-          </Panel>
+          </div></details>
         )}
 
         {manage && (
           <Panel title={ADMIN.users}>
-            <div className="overflow-x-auto rounded-xl border">
+            <div className="admin-table max-w-full overflow-x-auto">
               <table className="w-full min-w-[860px] text-left text-[13px]">
                 <thead className="border-b text-muted-foreground">
                   <tr>{[ADMIN.head.name, ADMIN.head.role, ADMIN.head.mfa, ADMIN.head.status, ADMIN.head.active, ADMIN.head.actions].map((h, i) => <th key={i} scope="col" className="px-4 py-2.5 font-normal">{h}</th>)}</tr>
@@ -135,7 +135,7 @@ function Admin({ me }: { me: Me }) {
 
         <Panel title={ADMIN.audit}>
           <p className="text-[13px] text-muted-foreground">{ADMIN.auditLead}</p>
-          <div className="overflow-x-auto rounded-xl border">
+          <div className="admin-table max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-[13px]" aria-label={ADMIN.audit}>
               <thead className="border-b text-muted-foreground">
                 <tr>{[ADMIN.auditHead.at, ADMIN.auditHead.actor, ADMIN.auditHead.action, ADMIN.auditHead.target].map((h) => <th key={h} scope="col" className="px-4 py-2.5 font-normal">{h}</th>)}</tr>

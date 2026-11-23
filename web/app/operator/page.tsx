@@ -84,7 +84,7 @@ function Console({ me }: { me: Me }) {
   // and a newly arriving case never pulls the operator away mid-task.
   const pin = !sel && current ? current.id : null;
   useEffect(() => {
-    if (!pin) return;
+    if (!pin || !window.matchMedia("(min-width:1024px)").matches) return;
     history.replaceState(null, "", `#${pin}`);
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   }, [pin]);
@@ -135,9 +135,13 @@ function Console({ me }: { me: Me }) {
       <MassBanner open={open} />
       <DisasterProposals label={label} />
       {failed && <Notice tone="warn">{CASES.loadError}</Notice>}
+      {snapshot && !sel && <div className="p-4 lg:hidden"><Queue open={snapshot.open} done={snapshot.done} targets={snapshot.targets} now={now} label={label} onPick={select} /></div>}
+      {sel && <button type="button" className="mx-4 min-h-11 text-sm lg:hidden" onClick={() => select("")}>‹ {DESK.queue}</button>}
+      <div className={!sel ? "hidden lg:block" : undefined}>
       {current
         ? <CaseView key={current.id} d={current} me={me} run={run} />
         : !failed && <div className="grid h-full min-h-[60dvh] place-items-center p-8 text-center"><p className="max-w-sm text-[14px] text-muted-foreground">{empty}</p></div>}
+      </div>
     </AppShell>
   );
 }

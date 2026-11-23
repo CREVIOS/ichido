@@ -68,7 +68,7 @@ function SideNav({ nav, side, footer, onSearch, collapsed = false, onToggle }: {
         <nav className={cn("flex flex-col gap-px", collapsed && "items-center")} aria-label={STAFF.menu}>
           {nav.map((n) => (
             <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined} title={collapsed ? n.label : undefined}
-              className={cn("relative flex h-8 items-center rounded-md text-[14px] text-soft transition-colors hover:bg-accent aria-[current=page]:bg-accent aria-[current=page]:text-foreground",
+              className={cn("relative flex min-h-11 items-center lg:min-h-8 rounded-md text-[14px] text-soft transition-colors hover:bg-accent aria-[current=page]:bg-accent aria-[current=page]:text-foreground",
                 collapsed ? "w-8 justify-center" : "gap-2.5 px-2")}>
               <n.icon className="size-4 shrink-0 stroke-[1.5]" />
               {collapsed ? <span className="sr-only">{n.label}</span> : <span className="flex-1">{n.label}</span>}
@@ -116,8 +116,8 @@ export function AppShell({ nav, side, footer, title, crumb, actions, commands = 
         <SideNav nav={nav} side={side} footer={footer} onSearch={() => palette.setOpen(true)} collapsed={collapsed} onToggle={toggle} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col lg:min-h-0 lg:py-2 lg:pr-2">
-        <main className="flex min-h-0 flex-1 flex-col bg-card lg:overflow-hidden lg:rounded-xl lg:border" style={{ boxShadow: "0 1px 2px oklch(0 0 0 / 0.03)" }}>
-          <header className={cn("sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-card/90 px-3 backdrop-blur lg:rounded-t-xl lg:px-5", bare && "lg:hidden")}>
+        <main className="flex min-h-0 flex-1 flex-col bg-card lg:overflow-hidden lg:rounded-xl lg:border">
+          <header className={cn("sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3 lg:rounded-t-xl lg:px-5", bare && "lg:hidden")}>
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger render={<Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label={STAFF.menu} />}>
                 <Menu className="stroke-[1.5]" />
@@ -145,7 +145,7 @@ export function Panel({ title, action, children, className, inset }: { title?: R
     <section className={cn("flex flex-col gap-3", inset && "surface p-4", className)}>
       {(title || action) && (
         <div className="flex min-h-6 items-center justify-between gap-3">
-          <h2 className="text-[13px] tracking-normal text-muted-foreground">{title}</h2>
+          <h2 className="text-base font-medium tracking-normal text-foreground">{title}</h2>
           {action}
         </div>
       )}

@@ -17,5 +17,5 @@ export function Splash() {
   );
 }
 
-// Runs before first paint: skip the splash if it was already shown this session, or on caller-facing pages.
-export const SPLASH_GATE = `try{var p=location.pathname;if(sessionStorage.getItem("ichido.splash")||/^\\/(s|caller|h)(\\/|$)/.test(p)){document.documentElement.dataset.splash="off"}else{sessionStorage.setItem("ichido.splash","1")}}catch(e){document.documentElement.dataset.splash="off"}`;
+// Runs before first paint: skip the splash if it was already shown this session, or on working screens.
+export const SPLASH_GATE = `try{var p=location.pathname;if(sessionStorage.getItem("ichido.splash")||/^\\/(s|caller|h|operator|field|review|insights|account|admin)(\\/|$)/.test(p)){document.documentElement.dataset.splash="off"}else{sessionStorage.setItem("ichido.splash","1")}}catch(e){document.documentElement.dataset.splash="off"}`;

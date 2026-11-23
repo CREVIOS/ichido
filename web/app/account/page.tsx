@@ -56,11 +56,11 @@ function Account({ me }: { me: Me }) {
   return (
     <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} title={ACCOUNT.title}>
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-10 px-4 py-6 lg:px-6">
-        <div className="flex gap-4"><Link href={FIRST_SHIFT.desk[me.role]}>{FIRST_SHIFT.open}</Link>
+        <div className="flex flex-wrap gap-4 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_a]:underline"><Link href={FIRST_SHIFT.desk[me.role]}>{FIRST_SHIFT.open}</Link>
           {me.role === "operator" && <Link href="/training">{FIRST_SHIFT.training}</Link>}</div>
         <Panel title={ACCOUNT.sessions} action={<Button variant="ghost" size="sm" onClick={() => act(authClient.revokeOtherSessions())}>{ACCOUNT.revokeOthers}</Button>}>
           <p className="text-[13px] text-muted-foreground">{ACCOUNT.sessionsLead}</p>
-          <ul className="flex flex-col divide-y rounded-xl border" aria-label={ACCOUNT.sessions}>
+          <ul className="flex flex-col divide-y" aria-label={ACCOUNT.sessions}>
             {sessions.map((s) => (
               <li key={s.id} className="flex items-center gap-3 px-4 py-3">
                 <Laptop className="size-4 shrink-0 stroke-[1.5] text-muted-foreground" />
@@ -79,7 +79,7 @@ function Account({ me }: { me: Me }) {
         <Panel title={ACCOUNT.passkeys} action={<Button variant="ghost" size="sm" onClick={() => act(authClient.passkey.addPasskey({ name: AUTH.enrol.passkeyName }).then((r) => ({ error: r?.error ?? null })))}><Plus />{ACCOUNT.addPasskey}</Button>}>
           <p className="text-[13px] text-muted-foreground">{totp ? ACCOUNT.totpOn : ACCOUNT.totpOff}</p>
           {passkeys.length === 0 ? <Notice>{ACCOUNT.passkeysEmpty}</Notice> : (
-            <ul className="flex flex-col divide-y rounded-xl border" aria-label={ACCOUNT.passkeys}>
+            <ul className="flex flex-col divide-y" aria-label={ACCOUNT.passkeys}>
               {passkeys.map((k) => (
                 <li key={k.id} className="flex items-center gap-3 px-4 py-3">
                   <KeyRound className="size-4 shrink-0 stroke-[1.5] text-muted-foreground" />

@@ -92,13 +92,14 @@ function Inbox({ me }: { me: Me }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [move, dismiss]);
 
+  const [phoneDetail,setPhoneDetail] = useState(false);
   const count = (items ?? []).filter((i) => !gone.has(itemKey(i))).length;
   return (
     <AppShell bare nav={navFor(me.role)} footer={<MeFooter me={me} />} title={REVIEW.title}>
       <div className="grid bg-pane lg:h-[calc(100dvh-1rem-2px)] lg:grid-cols-[280px_minmax(0,1fr)] lg:overflow-hidden lg:rounded-xl">
-        <aside className="flex min-h-0 flex-col border-b-[0.5px] border-black/6 lg:border-r-[0.5px] lg:border-b-0">
+        <aside hidden={phoneDetail && !!current} className="flex min-h-0 lg:!flex flex-col border-b-[0.5px] border-black/6 lg:border-r-[0.5px] lg:border-b-0">
           <TitleBar icon={ScanText} title={REVIEW.title}>
-            <span className="num text-[11px] text-muted-foreground">{count || ""}</span>
+            <span className="num text-[11px] text-muted-foreground">{items ? count : "—"}</span>
             <DropdownMenu>
               <DropdownMenuTrigger className="ml-auto grid size-[22px] place-items-center rounded-[5px] text-foreground hover:bg-black/4 aria-expanded:bg-black/4" aria-label={REVIEW.menu}>
                 <ListFilter className={cn("size-4 stroke-[1.5]", filter && "text-brand-strong")} />
@@ -112,7 +113,7 @@ function Inbox({ me }: { me: Me }) {
               </DropdownMenuContent>
             </DropdownMenu>
           </TitleBar>
-          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 max-lg:max-h-[45dvh]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 ">
             {failed && <div className="p-2"><Notice tone="warn">{REVIEW.loadError}</Notice></div>}
             {items?.length === 0 && <p className="px-2 py-3 text-[12px] leading-5 text-muted-foreground">{REVIEW.empty}</p>}
             {REVIEW_KINDS.map((k) => {
@@ -122,14 +123,15 @@ function Inbox({ me }: { me: Me }) {
                 <section key={k} className="mb-2">
                   <h2 className="flex h-7 items-center px-2 text-[12px] tracking-normal text-muted-foreground">{REVIEW.groups[k]}</h2>
                   <div className="flex flex-col gap-0.5">
-                    {rows.map((i) => <Row key={itemKey(i)} item={i} on={i === current} unread={!seen.has(itemKey(i))} now={now} onPick={() => setSel(itemKey(i))} />)}
+                    {rows.map((i) => <Row key={itemKey(i)} item={i} on={i === current} unread={!seen.has(itemKey(i))} now={now} onPick={() => {setSel(itemKey(i));setPhoneDetail(true);}} />)}
                   </div>
                 </section>
               );
             })}
           </div>
         </aside>
-        <main className="flex min-h-[70dvh] min-w-0 flex-col lg:min-h-0">
+        <main className={cn("min-w-0 flex-col lg:flex",phoneDetail && current ? "flex" : "hidden")}>
+          <button type="button" className="min-h-11 self-start px-4 lg:hidden" onClick={() => setPhoneDetail(false)}>‹ {REVIEW.title}</button>
           {current
             ? <Detail key={itemKey(current)} item={current} pos={{ at, of: keys.length }} busy={busy} move={move} decide={decide} dismiss={dismiss} primaryRef={primaryRef} />
             : items && <div className="grid flex-1 place-items-center p-8"><p className="max-w-sm text-center text-[13px] text-muted-foreground">{list.length ? REVIEW.pick : REVIEW.empty}</p></div>}
@@ -143,7 +145,7 @@ function Row({ item, on, unread, now, onPick }: { item: ReviewItem; on: boolean;
   const Icon = KIND_ICON[item.kind];
   return (
     <button type="button" data-row onClick={onPick} aria-current={on || undefined}
-      className="flex w-full items-center gap-2.5 rounded-[5px] px-2.5 pt-[7px] pb-[5px] text-left transition-colors hover:bg-black/3 aria-[current=true]:bg-black/4">
+      className="flex min-h-14 w-full items-center gap-2.5 rounded-[5px] px-2.5 pt-[7px] pb-[5px] text-left transition-colors hover:bg-black/3 aria-[current=true]:bg-black/4">
       <Icon className="size-4 shrink-0 stroke-[1.5] text-foreground" aria-hidden />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-3">
