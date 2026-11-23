@@ -1,5 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { screenTurn } from "@/content/frontline-policy";
+import { frontlineNumber } from "@/content/numbers";
+import { frontlineTurn } from "@/lib/frontline";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { triage } from "@/lib/triage";
@@ -159,6 +162,18 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return { field: data };
   },
 
+  async frontline_monitor(a, b) {
+    const op = staff(a, "operator");
+    return { turns: await rpc("frontline_monitor", { p_uid: op.uid, p_session: op.session, p_incident: str(b, "incident") }) };
+  },
+  async frontline_qa_counts(a) {
+    staff(a, "manager");
+    const counts = await Promise.all(["ai", "queued", "human"].map(async (handler) => {
+      const { count } = await admin.from("desk").select("id", { head: true, count: "exact" }).eq("handler",handler).is("finished_at",null).throwOnError();
+      return [handler, count];
+    }));
+    return { counts: Object.fromEntries(counts) };
+  },
   async claim(a, b) {
     const op = staff(a, "operator");
     await rpc("cmd_claim", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident") });
@@ -200,8 +215,10 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const station = str(b, "station");
     if (!(await rpc<boolean>("note_pair_attempt", { p_uid: c.uid, p_station: station }))) fail(429, "rate_limited");
     // Same answer for a wrong, expired, used or wrong-station code.
-    return { incident: await rpc("redeem_pair", { p_uid: c.uid, p_station: station, p_digest: digest(str(b, "code")), p_lang: lang }) };
+    return { incident: await rpc("frontline_pair", { p_frontline: b.frontline === true, p_uid: c.uid, p_station: station, p_digest: digest(str(b, "code")), p_lang: lang }) };
   },
+
+  frontline_turn: (a, b) => frontlineTurn(caller(a), b),
 
   async draft(a, b) {
     const c = caller(a);
@@ -210,8 +227,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const lang = c.lang as Lang;
     const [{ data: cur }, { data: desk }] = await Promise.all([
       admin.from("draft").select("rev, card_back, cash_received").eq("incident", incident).single(),
-      admin.from("desk").select("fault").eq("id", incident).single(),
+      admin.from("desk").select("fault,handler").eq("id", incident).single(),
     ]);
+    if (!desk || desk.handler !== "legacy") fail(409, "conflict");
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
     if (text && looksLikeNumber(text)) return { withheld: true };
@@ -272,12 +290,20 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async teachback(a, b) {
     const c = caller(a);
     if (!c.incident) return fail(403, "forbidden");
-    const { data: card } = await admin.from("caller_card").select("reply_id, teachback_result").eq("id", c.incident).maybeSingle();
-    if (!card?.reply_id || card.teachback_result === "understood") fail(409, "conflict");
+    const { data: card } = await admin.from("caller_card").select("reply_id, teachback_result, handler").eq("id", c.incident).maybeSingle();
+    if (!card?.reply_id || card.teachback_result === "understood") return fail(409, "conflict");
     const text = str(b, "text").trim().slice(0, MAX_TEXT);
-    if (looksLikeNumber(text)) return { withheld: true };
+    if (card.handler !== "legacy") {
+      const checked = screenTurn(text);
+      if (checked.transfer) {
+        const { data: draft } = await admin.from("draft").select("rev").eq("incident",c.incident).single().throwOnError();
+        await frontlineTurn(c, { act: "text", text, request_id: crypto.randomUUID(), base_rev: draft.rev });
+        return { withheld: checked.withheld };
+      }
+      if (checked.withheld) return { withheld: true };
+    } else if (looksLikeNumber(text)) return { withheld: true };
     const ja = c.lang === "ja" ? text : await toJapanese(text);
-    await rpc("cmd_teachback", { p_uid: c.uid, p_text: text, p_ja: ja });
+    await rpc("cmd_teachback", { p_uid: c.uid, p_text: text, p_ja: ja && card.handler !== "legacy" && frontlineNumber(ja) ? null : ja });
     return {};
   },
 
@@ -329,7 +355,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   ...ALERT_COMMANDS,
 };
 
-const callerLimits: Record<string, number> = { rate: 5, set_lang: 10, teachback: 12, draft: 30 };
+const callerLimits: Record<string, number> = { frontline_turn: 30, rate: 5, set_lang: 10, teachback: 12, draft: 30 };
 
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/cmd");
@@ -355,8 +381,16 @@ export async function POST(req: Request): Promise<Response> {
       if (limited) return limited;
     }
     authorize(actor, COMMANDS[name]);   // lib/rbac.ts; a command missing there is refused
+    if (actor.kind === "caller" && actor.incident && ["confirm", "flag", "teachback"].includes(name)) {
+      const { data: desk } = await admin.from("desk").select("handler").eq("id", actor.incident).single().throwOnError();
+      if (desk.handler !== "legacy" && !(name === "teachback" && desk.handler === "human")) fail(409, "conflict");
+    }
     const out = await commands[name](actor, body);
-    if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
+    if (incident && BOT_SIGNALS.has(name)) {
+      const id = incident;
+      if (name === "human" || name === "frontline_turn" || name === "takeover") after(() => signalBot(id,name));
+      else await signalBot(id,name);
+    }
     after(flushAlerts);   // whatever this command made the database enqueue (lib/alerts.ts)
     log.info("cmd", { cmd, role, incident, session, status: 200, duration_ms: log.ms(), code: "withheld" in out ? "withheld" : undefined });
     return reply(200, out);

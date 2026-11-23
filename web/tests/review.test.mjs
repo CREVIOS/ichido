@@ -2,6 +2,7 @@
 // with a timeline event; guards, callers and other operators cannot act; accepting does only what the operator could do by hand.
 // The prepared suggestion and the machine translations are seeded with the service role (the bot and OpenAI write them in production).
 import test from "node:test";
+import { frontlineCase } from "./frontline-fixture.mjs";
 import assert from "node:assert/strict";
 import { setTimeout as wait } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
@@ -164,4 +165,11 @@ test("accepting sends the stored suggestion through the operator's own commands,
   assert.deepEqual(ev.data, {}, "the timeline never carries the note");
   assert.equal(await item(op, incident, "record"), undefined);
   await ok(cmd(g, "field", { incident, generation: job.generation, state: "correct_done" }));
+});
+
+test("unclaimed AI sessions never enter the operator's private approval queue", async (t) => {
+  const f = await frontlineCase(t);
+  await f.turn("start");
+  assert.deepEqual(await queue(f.op, f.incident), []);
+  assert.equal((await cmd(f.phone, "review", { incident: f.incident, kind: "suggestion", ref: "0", decision: "accepted" })).status, 403);
 });

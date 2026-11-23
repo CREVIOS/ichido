@@ -46,6 +46,8 @@ test("every pack's situations and reply rules are the database's, in six languag
   assert.ifError(error);
   assert.deepEqual(Object.fromEntries(sit.map((s) => [s.code, s.pack])), Object.fromEntries(Object.keys(FAULTS).map((f) => [f, packOfFault(f)])));
   const { data: rules } = await db.from("reply_rule").select("*");
+  assert.deepEqual(rules.filter((r) => r.autonomous).map((r) => r.intent), ["SHELTER_INFO"]);
+  assert.deepEqual(Object.keys(REPLY_RULES).filter((intent) => REPLY_RULES[intent].autonomous), ["SHELTER_INFO"]);
   const row = (pack, faults, needs, blocked) => [pack, sorted(faults), sorted(needs), sorted(blocked)];
   assert.deepEqual(Object.fromEntries(rules.map((r) => [r.intent, row(r.pack, r.faults, r.needs_flags, r.blocked_by)])),
     Object.fromEntries(Object.entries(REPLY_RULES).map(([k, r]) => [k, row(r.pack ?? "atm", r.faults, r.needsFlags, r.blockedBy)])));

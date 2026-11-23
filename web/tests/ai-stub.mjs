@@ -23,6 +23,7 @@ function structured(body) {
   if (!f || f.type !== "json_schema") return message("");   // free text (translation, training): no output
   const name = f.name;
   if (script[name] !== undefined) { const v = script[name]; delete script[name]; return message(typeof v === "string" ? v : JSON.stringify(v)); }
+  if (name === "frontline_risk") return message(JSON.stringify({ level: "none" }));
   if (name === "patch") return message(JSON.stringify({ card_back: "unchanged", cash_received: "unchanged", clarify: false }));
   if (name === "triage") {
     // A plausible reading for demos: the pack's symptom/need situation, a who/since tap, and one red flag to ask about.

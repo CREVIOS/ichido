@@ -34,9 +34,11 @@ export function staffIn(a: Actor, roles: Staff["role"][]): Staff {
   return a as Staff;
 }
 
+export const pairingCode = () => Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
+
 async function issueCode(a: Actor, b: Body, display: boolean) {
   const op = staffIn(a, ["operator"]);
-  const code = Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
+  const code = pairingCode();
   await rpc("issue_pair_code", { p_uid: op.uid, p_incident: str(b, "incident"), p_digest: digest(code), p_display: display ? code : null });
   return { code, expires_in: CODE_TTL_MS / 1000 };
 }

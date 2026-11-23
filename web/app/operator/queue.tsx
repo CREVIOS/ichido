@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Dot, useSidebar } from "@/components/kit";
 import { cn } from "@/lib/utils";
-import { DESK, LANG_NAME, SLA, isFault, STAFF_JA } from "@/content/catalogue";
+import { DESK, FRONT_DESK, LANG_NAME, SLA, isFault, STAFF_JA } from "@/content/catalogue";
 import type { Peer } from "@/lib/presence";
 import { TextOnlyBadge } from "./access";
 import { opsTags } from "./ops";
@@ -19,7 +19,8 @@ type Sla = { tone: "ok" | "warn" | "late"; left: number };
 
 // Which target applies to an open case, and how close it is: unclaimed → claim target; claimed without a reply → first-reply target.
 function slaOf(c: OpenDesk, targets: Targets, now: number): Sla | null {
-  const start = c.operator_id ? c.case_event[0]?.at : c.created_at;
+  if (c.handler === "ai") return null;
+  const start = c.queued_at ?? (c.operator_id ? c.case_event[0]?.at : c.created_at);
   const target = targets[c.operator_id ? "no_reply" : "unclaimed"];
   if (c.reply.length || !start || !target) return null;
   const left = Math.round(target - (now - Date.parse(start)) / 1000);
@@ -61,13 +62,17 @@ export function Queue({ open, done, targets, now, label, current, onPick }: {
   const ago = (t: string) => DESK.minutesAgo(Math.max(0, Math.round((now - Date.parse(t)) / 60000)));
   return (
     <div className="flex flex-col gap-4">
-      <QueueGroup title={DESK.queue} empty={DESK.empty}>
-        {open.map((c) => (
+      {[
+        { title: FRONT_DESK.queued, rows: open.filter((c) => c.handler === "queued") },
+        { title: FRONT_DESK.ai, rows: open.filter((c) => c.handler === "ai") },
+        { title: DESK.queue, rows: open.filter((c) => c.handler === "human" || c.handler === "legacy") },
+      ].map(({ title, rows }) => <QueueGroup key={title} title={title} empty={DESK.empty}>
+        {rows.map((c) => (
           <QueueRow key={c.id} on={c.id === current} onClick={() => onPick(c.id)} dot={c.status} sla={slaOf(c, targets, now)}
-            title={label[c.station] ?? c.station} meta={ago(c.created_at)}
-            sub={<>{c.text_only && <><TextOnlyBadge />{" "}</>}{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}{opsTags(c) && <span className="text-alert"> · {opsTags(c)}</span>}</>} />
+            title={label[c.station] ?? c.station} meta={ago(c.queued_at ?? c.created_at)}
+            sub={<>{c.priority != null && <>P{c.priority} · </>}{c.text_only && <><TextOnlyBadge />{" "}</>}{isFault(c.fault) ? STAFF_JA.fault[c.fault] : DESK.unknownFault}{c.lang && <> · {LANG_NAME[c.lang]}</>}{opsTags(c) && <span className="text-alert"> · {opsTags(c)}</span>}</>} />
         ))}
-      </QueueGroup>
+      </QueueGroup>)}
       {done.length > 0 && (
         <QueueGroup title={DESK.recent}>
           {done.map((c) => (

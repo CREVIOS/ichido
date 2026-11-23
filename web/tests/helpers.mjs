@@ -120,8 +120,9 @@ export async function cmd(who, name, body = {}) {
 
 export const ok = async (p) => { const r = await p; assert.equal(r.status, 200, JSON.stringify(r.body)); return r.body; };
 
-export const device = (key, secret = "local-device-secret") =>
-  fetch(`${APP}/api/device`, { method: "POST", headers: { "x-station": "TABLE-A", authorization: `Bearer ${secret}` }, body: key });
+export const deviceHeaders = (secret = "local-device-secret") => ({ "x-station": "TABLE-A", authorization: `Bearer ${secret}` });
+export const device = (key, secret) =>
+  fetch(`${APP}/api/device`, { method: "POST", headers: deviceHeaders(secret), body: key });
 
 export const newKey = () => randomBytes(16).toString("hex");
 

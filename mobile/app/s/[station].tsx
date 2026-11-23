@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { callerAuth, cmd, signOut } from "@/lib/supabase";
+import { Human } from "@/components/Human";
 import { Brand, Button, Card, Input, LangPicker, Notice, Screen, T, Tag } from "@/components/ui";
-import { LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
+import { ACCESS, UI, LANGS, MOBILE, STATION, errorText, type Lang } from "@content/catalogue";
 
 const CODE_LENGTH = 6;
 
@@ -24,7 +25,8 @@ export default function StationScreen() {
     }).catch(() => setStaffSession(false));
   }, []);
 
-  async function connect() {
+  const [alerted, setAlerted] = useState(false);
+  async function connect(human = false) {
     setBusy(true); setError("");
     try {
       const { data } = await callerAuth().getSession();
@@ -32,6 +34,7 @@ export default function StationScreen() {
         const { error } = await callerAuth().signInAnonymously();
         if (error) throw new Error("server");
       }
+      if (human) { await cmd("silent_alert", { station }); setAlerted(true); return; }
       await cmd("pair", { station, code, lang });
       router.replace("/caller");
     } catch (err) {
@@ -42,7 +45,8 @@ export default function StationScreen() {
   }
 
   return (
-    <Screen back backLabel={MOBILE.back[lang]} eyebrow={<Brand />} title={STATION.title[lang]}>
+    <Screen back backLabel={MOBILE.back[lang]} eyebrow={<Brand />} title={STATION.title[lang]}
+      pinned={staffSession ? <Human lang={lang} connected={false} /> : <Button kind="secondary" label={UI.human[lang]} onPress={() => connect(true)} busy={busy} />}>
       <Tag label="Help Point" value={station} />
       <LangPicker lang={lang} onChange={setLang} />
       {staffSession ? (
@@ -56,8 +60,9 @@ export default function StationScreen() {
             autoCapitalize="characters" autoCorrect={false} autoComplete="off" textContentType="oneTimeCode"
             style={{ fontSize: 30, lineHeight: 38, letterSpacing: 6, textAlign: "center", minHeight: 64 }}
             onSubmitEditing={() => code.length === CODE_LENGTH && connect()} />
+          {alerted && <Notice>{ACCESS.alertSent[lang]}</Notice>}
           {error ? <Notice tone="alert">{error}</Notice> : null}
-          <Button label={STATION.go[lang]} onPress={connect} busy={busy} disabled={code.length < CODE_LENGTH} block />
+          <Button label={STATION.go[lang]} onPress={() => connect()} busy={busy} disabled={code.length < CODE_LENGTH} block />
         </Card>
       )}
       <T v="label">{STATION.why[lang]}</T>

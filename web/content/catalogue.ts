@@ -5,6 +5,7 @@
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
 import { EXCLUSIVE_GROUPS, PACKS, contentPack, isUrgentTap, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
+import { FRONT_DESK } from "./frontline.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
@@ -219,6 +220,7 @@ export function eventText(kind: string, d: Record<string, string | undefined>, f
     case "guided": return "案内を確認しました（お客様が次の手順を説明）";
     case "bot_prepared": return BOT.prepared(replyOf(d.intent)?.code ?? "—");
     case "bot_routed": case "bot_remind": case "bot_closed": return BOT.event(kind, d);
+    case "frontline_transfer": return `${FRONT_DESK.transfer} · P${d.priority} · ${FRONT_DESK.reasons[d.reason ?? ""] ?? ""}`;
     default: return accessEventText(kind, d) ?? faultEventText(kind, d) ?? REVIEW.events[kind] ?? opsEventText(kind, d) ?? kind;
   }
 }
@@ -387,6 +389,7 @@ export const UI = {
   },
 } satisfies Record<string, L10n>;
 
+export * from "./frontline.ts";
 export * from "./staff.ts";
 export * from "./review.ts";
 export * from "./numbers.ts";
@@ -409,17 +412,17 @@ export const STATION = {
     vi: "Kết nối với quầy hỗ trợ", id: "Hubungkan ke layanan bantuan", ne: "सहायता केन्द्रसँग जोडिनुहोस्",
   },
   code: {
-    bn: "অপারেটর যে কোডটি বলেছেন", en: "The code the operator gave you", ja: "係の 人が いった コード",
-    vi: "Mã nhân viên đã đưa cho bạn", id: "Kode yang diberikan petugas", ne: "कर्मचारीले दिएको कोड",
+    bn: "হেল্প পয়েন্টের পর্দায় দেখানো বা কর্মীর দেওয়া কোড", en: "Code from the Help Point screen or a staff member", ja: "たすけを よぶ 画面か、係の 人の コード",
+    vi: "Mã trên màn hình điểm trợ giúp hoặc do nhân viên đưa", id: "Kode dari layar titik bantuan atau dari petugas", ne: "सहायता केन्द्रको स्क्रिनमा देखिएको वा कर्मचारीले दिएको कोड",
   },
   go: { bn: "যুক্ত হন", en: "Connect", ja: "つなぐ", vi: "Kết nối", id: "Hubungkan", ne: "जोडिनुहोस्" },
   why: {
-    bn: "এই স্টিকারে কোনো ব্যক্তিগত তথ্য নেই। অপারেটরের দেওয়া কোড ছাড়া কেউ আপনার কেস দেখতে পারবে না।",
-    en: "This sticker holds no personal information. Nobody can open your case without the code the operator gives you.",
-    ja: "この シールには あなたの 名前や そうだんの 中身は 書いて ありません。係の 人が つたえる コードが ないと そうだんの 中身は 見られません。",
-    vi: "Nhãn dán này không chứa thông tin cá nhân. Không ai mở được hồ sơ của bạn nếu không có mã do nhân viên đưa.",
-    id: "Stiker ini tidak berisi informasi pribadi. Tidak ada yang bisa membuka kasus Anda tanpa kode dari petugas.",
-    ne: "यो स्टिकरमा कुनै व्यक्तिगत जानकारी छैन। कर्मचारीले दिएको कोडबिना कसैले पनि तपाईंको केस खोल्न सक्दैन।",
+    bn: "স্ক্রিন থাকলে কোড পেতে হেল্প পয়েন্টের বোতাম চাপুন। কর্মীর কাছেও কোড চাইতে পারেন।",
+    en: "Press the button on a Help Point with a screen to see your code. You can also ask a staff member for a code.",
+    ja: "たすけを よぶ ところを おすと、画面に コードが でます。係の 人にも きけます。",
+    vi: "Nếu điểm trợ giúp có màn hình, nhấn nút để xem mã. Bạn cũng có thể hỏi nhân viên.",
+    id: "Jika titik bantuan memiliki layar, tekan tombol untuk melihat kode. Anda juga bisa meminta kode kepada petugas.",
+    ne: "स्क्रिन भएको सहायता केन्द्रमा कोड हेर्न बटन थिच्नुहोस्। कर्मचारीसँग पनि कोड माग्न सक्नुहुन्छ।",
   },
   staffSession: {
     bn: "এই ব্রাউজারে একজন কর্মী সাইন ইন করা আছেন। কলারের জন্য একটি প্রাইভেট উইন্ডো ব্যবহার করুন।",

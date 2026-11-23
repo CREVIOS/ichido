@@ -2,8 +2,7 @@
 #pragma once
 
 // Optional 0.96" SSD1306 128x64 I2C OLED (U8g2 library, BSD-2-Clause: arduino-cli lib install U8g2).
-// It shows the single-use pairing code only while the operator has pressed 端末に表示 for an open case, so a caller
-// who cannot hear or speak on the ATM handset can still connect; otherwise it shows the station state.
+// A physical press can issue a pairing code directly. Staff can also show a code for a text-only case.
 // Wiring: SDA -> GPIO21, SCL -> GPIO22, VCC -> 3V3, GND -> GND (address 0x3C). Delete this line to build without it.
 #define HAS_DISPLAY
 

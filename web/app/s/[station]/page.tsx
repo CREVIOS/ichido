@@ -4,19 +4,20 @@ import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { Human } from "@/app/caller/human";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, STATION, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, UI, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
 const noop = () => () => {};
 
 // Neutral landing behind the Help Point sticker: scanning alone reveals nothing.
 export default function StationPage() {
-  return <Suspense fallback={null}><StationForm /></Suspense>;
+  return <Suspense fallback={<Phone lang="bn"><Human lang="bn" open={false} /></Phone>}><StationForm /></Suspense>;
 }
 
 function StationForm() {
@@ -58,7 +59,7 @@ function StationForm() {
   const connect = (e: React.FormEvent) => {
     e.preventDefault();
     return withSession(async () => {
-      await cmd("pair", { station, code, lang });
+      await cmd("pair", { station, code, lang, frontline: true });
       // Load a new document so the caller microphone Permissions-Policy takes effect.
       location.replace("/caller");
     });
@@ -67,6 +68,7 @@ function StationForm() {
 
   return (
     <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="sticky top-1 z-10" onClick={alertSilently} disabled={busy}>{UI.human[lang]}</Button>}
       <Chip className="self-start">Help Point · <span className="mono">{station}</span></Chip>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (

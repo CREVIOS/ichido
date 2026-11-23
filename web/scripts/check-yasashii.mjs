@@ -1,4 +1,4 @@
-import { ACCESS, ANSWER, BANK_STATUS, CALLER_FLAGS, DISASTER, DISASTER_NOTICES, ERRORS, FACTS, FAULTS, FAULT_UI, FIELD_STATE, MOBILE, OPS_CALLER, RATING, REPLIES, STATION, STATUS, UI, VOICE, etaText, packCallerStrings } from "../content/catalogue.ts";
+import { FRONTLINE, ACCESS, ANSWER, BANK_STATUS, CALLER_FLAGS, DISASTER, DISASTER_NOTICES, ERRORS, FACTS, FAULTS, FAULT_UI, FIELD_STATE, MOBILE, OPS_CALLER, RATING, REPLIES, STATION, STATUS, UI, VOICE, etaText, packCallerStrings } from "../content/catalogue.ts";
 
 // Familiar banking and pairing terms, and the language name in the help-desk notice. Scenario packs add the official
 // card name (マイナンバー) and words with no plain-Japanese equivalent a shelter or station must use.
@@ -33,7 +33,7 @@ function* japanese(entries, path = "") {
 function checkCatalogue() {
   const slots = { branch: { ja: "駅前支店" }, hours: { ja: "平日 9時から 15時まで" } };
   const replies = Object.fromEntries(Object.entries(REPLIES).map(([key, r]) => [key, r.text(slots)]));
-  const entries = japanese({ ACCESS, DISASTER, DISASTER_NOTICES: Object.fromEntries(Object.entries(DISASTER_NOTICES).map(([k, n]) => [k, n.text])), UI, STATION, VOICE, ERRORS, FACTS, FAULTS, ANSWER, STATUS, FIELD_STATE, RATING, OPS_CALLER, MOBILE: { entry: { caller: MOBILE.entry.caller, staff: MOBILE.entry.staff }, station: MOBILE.station, back: MOBILE.back, speak: MOBILE.speak, stopSpeaking: MOBILE.stopSpeaking }, REPLIES: replies,
+  const entries = japanese({ FRONTLINE, ACCESS, DISASTER, DISASTER_NOTICES: Object.fromEntries(Object.entries(DISASTER_NOTICES).map(([k, n]) => [k, n.text])), UI, STATION, VOICE, ERRORS, FACTS, FAULTS, ANSWER, STATUS, FIELD_STATE, RATING, OPS_CALLER, MOBILE: { entry: { caller: MOBILE.entry.caller, staff: MOBILE.entry.staff }, station: MOBILE.station, back: MOBILE.back, speak: MOBILE.speak, stopSpeaking: MOBILE.stopSpeaking }, REPLIES: replies,
     ETA: { pending: { ja: etaText(null, "ja") }, provided: { ja: etaText("10-20", "ja") } },
     FAULT_UI, CALLER_FLAGS: Object.fromEntries(Object.entries(CALLER_FLAGS).map(([k, f]) => [k, f.label])),
     BANK_STATUS: Object.fromEntries(Object.entries(BANK_STATUS).map(([k, b]) => [k, { ja: b.caller("2026-12-01", "ja") }])),

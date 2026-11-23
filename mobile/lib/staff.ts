@@ -5,6 +5,7 @@ import { FAULTS, MOBILE, SLA, isFault, type Fact, type Lang, type Status, STAFF_
 export type Desk = {
   fraud_at?: string | null;
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
+  handler: string; queued_at: string | null;
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;
   remote_release: string | null; abandoned: boolean; created_at: string; finished_at: string | null;
 };
@@ -32,7 +33,8 @@ export type Sla = { tone: "ok" | "warn" | "late"; left: number };
 // Same rule as web/app/operator/queue.tsx, with targets from ichido.sla_target:
 // unclaimed → time since the fault; claimed without a reply → time since the claim.
 export function slaOf(c: OpenDesk, targets: Targets, now: number): Sla | null {
-  const start = c.operator_id ? c.case_event[0]?.at : c.created_at;
+  if (c.handler === "ai") return null;
+  const start = c.queued_at ?? (c.operator_id ? c.case_event[0]?.at : c.created_at);
   const target = targets[c.operator_id ? "no_reply" : "unclaimed"];
   if (c.reply.length || !start || !target) return null;
   const left = Math.round(target - (now - Date.parse(start)) / 1000);

@@ -12,8 +12,7 @@
 //           firmware download = white steady.
 //           There is deliberately no green "collect your card" signal.
 // Display : optional SSD1306 OLED (HAS_DISPLAY in config.h). Polls with X-Display: 1 and shows the state in words,
-//           the guard's progress, and the 6-character pairing code only while the server offers one (the operator
-//           pressed 端末に表示; it disappears when the caller pairs, the code is replaced or its 5 minutes run out).
+//           the guard's progress and a single-use code after a physical press or staffed issue. Pairing or expiry clears it.
 // Heartbeat: every 60 s, POST /api/device/heartbeat with uptime, free heap, Wi-Fi RSSI, firmware version
 //           and the last fault-ack and poll round trips, so the desk can see the device is alive.
 // Setup   : hold the button for 8 s while powering on. The device opens a password-protected Wi-Fi setup

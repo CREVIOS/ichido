@@ -54,13 +54,12 @@ export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: 
         : draft.words && <p className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
       {!P.atm && draft.triage && <TriageReadBack lang={lang} card={card} triage={draft.triage} onError={fail} />}
       <Button size="lg" className="h-11" disabled={busy || !ready} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
-      {card.needs_human ? <Notice tone="info">{textOnly ? ACCESS.humanAsked[lang] : P.humanAsked(lang)}</Notice>
-        : <Button variant="secondary" size="lg" onClick={() => cmd("human").catch(fail)}>{UI.human[lang]}</Button>}
+
     </>
   );
 }
 
-function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; busy: boolean; onAnswer: (k: string, v: Fact) => void }) {
+export function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; busy: boolean; onAnswer: (k: string, v: Fact) => void }) {
   return (
     <section className="flex flex-col gap-5">
       <div className="flex items-center justify-between">

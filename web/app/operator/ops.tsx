@@ -16,6 +16,10 @@ const fail = (e: Error) => { toast.error(staffError(e.message)); };
 
 // During a mass incident the queue puts whoever has waited longest since they last heard from us first.
 export function incidentOrder(open: OpenDesk[]): OpenDesk[] {
+  if (open.some((c) => c.handler === "queued")) {
+    return [...open].sort((a,b) => (a.priority ?? 3) - (b.priority ?? 3)
+      || Date.parse(a.queued_at ?? a.created_at) - Date.parse(b.queued_at ?? b.created_at));
+  }
   if (!open.some((c) => c.mass_incident)) return open;
   const since = (c: OpenDesk) => Date.parse(c.reply[0]?.sent_at ?? c.created_at);
   return [...open].sort((a, b) => since(a) - since(b));
@@ -133,7 +137,7 @@ export function PromiseCard({ d, run }: { d: Desk; run: Run }) {
 
 // Another operator holds the case: a supervisor (any operator) can take it over.
 export function TakeoverPanel({ d, run, title, body }: { d: Desk; run: Run; title: string; body: string }) {
-  const take = () => run("takeover", { incident: d.id }).then((ok) => { if (ok) toast.success(OPS.takeover.toast); });
+  const take = () => run("takeover", { incident: d.id, epoch: d.handler_epoch }).then((ok) => { if (ok) toast.success(OPS.takeover.toast); });
   return (
     <Panel title={title}>
       <p className="text-[14px]">{body}</p>

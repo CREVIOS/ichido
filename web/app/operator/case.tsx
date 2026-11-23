@@ -6,8 +6,9 @@ import type { Me } from "@/components/StaffGate";
 import { Chip, Dot, Fact, MoreMenu, Notice, Panel, StatusLabel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ACCESS_STAFF, ACTOR, BOT, CALLER_FLAGS, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, PACKS, PACK_DESK, REMOTE_RELEASE, eventText, isFault, packOfFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
+import { FRONT_DESK, ACCESS_STAFF, ACTOR, BOT, CALLER_FLAGS, DESK, REVIEW, FACT_STAFF, LANG_NAME, OPS, PACKS, PACK_DESK, REMOTE_RELEASE, eventText, isFault, packOfFault, summaryDraft, type Lang, STAFF_JA } from "@/content/catalogue";
 import { Pill } from "@/components/charts";
+import { FrontlineMonitor } from "./frontline";
 import { DispatchCard, PairCard, ReplyCard } from "./actions";
 import { SuggestCard } from "./suggest";
 import { HandoffPanel } from "./handoff";
@@ -86,6 +87,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         {d.text_only && !closed && <TextOnlyBanner />}
         {!closed && <UrgentBanner flags={card?.flags ?? []} />}
         <CaseHeader d={d} closed={closed} mine={mine} run={run} />
+        {!closed && d.handler !== "legacy" && <FrontlineMonitor key={d.id} desk={d} />}
         <CallerWords d={d} card={card} lang={lang} paired={paired} canJudge={!closed && mine} run={run} />
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
@@ -115,7 +117,7 @@ function Actions({ reference, work, d, me, mine, closed, paired, lang, replies, 
     <Panel title={DESK.unclaimed}>
       <p className="text-[14px]">{DESK.unclaimedBody}</p>
       {routed && <Notice tone="info">{routed.uid === me ? BOT.routedMe : BOT.routed(String(routed.operator))}</Notice>}
-      <Button size="lg" onClick={() => run("claim", { incident: d.id })}>{DESK.claim}</Button>
+      <Button size="lg" onClick={() => run(d.handler === "legacy" ? "claim" : "takeover", { incident: d.id, epoch: d.handler_epoch })}>{d.handler === "legacy" ? DESK.claim : FRONT_DESK.takeover}</Button>
     </Panel>
   );
   if (!mine) return <TakeoverPanel d={d} run={run} title={DESK.otherOperator} body={DESK.otherOperatorBody} />;

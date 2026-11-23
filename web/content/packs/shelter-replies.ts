@@ -62,7 +62,7 @@ export const SHELTER_REPLIES: Record<string, PackReply> = {
     }),
   },
   SHELTER_INFO: {
-    code: "S-5", title: "情報の入手先（掲示板・職員の案内・この画面の承認済み通知）", rule: { faults: ["shelter_info"], ...calm },
+    code: "S-5", title: "情報の入手先（掲示板・職員の案内・この画面の承認済み通知）", rule: { autonomous: true, faults: ["shelter_info"], ...calm },
     text: () => ({
       ja: "おしらせは ひなんじょの けいじばんに はり、係の 人が つたえます。この ひなんじょに おしらせが ある ときは、この 画面にも でます。わからない ときは 係の 人に きいて ください。",
       en: "Official updates are posted on the shelter's notice board and announced by staff. When this shelter has an approved notice, it also appears on this screen. Ask the staff if you are not sure.",

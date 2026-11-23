@@ -68,7 +68,7 @@ export const OPS_COMMANDS: Record<string, (a: Actor, b: Body) => Promise<object>
 
   async takeover(a, b) {
     const op = operator(a);
-    await rpc("cmd_takeover", { p_uid: op.uid, p_name: op.name, p_incident: id(b, "incident") });
+    await rpc("frontline_takeover", { p_epoch: Number.isInteger(b.epoch) ? b.epoch : null, p_uid: op.uid, p_name: op.name, p_incident: id(b, "incident") });
     return {};
   },
 };

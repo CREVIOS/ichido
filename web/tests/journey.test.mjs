@@ -1,7 +1,7 @@
 // End-to-end: npm run test:fresh (resets the local DB, then runs against APP, default http://localhost:3123).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { staff, caller, cmd, ok, device, newKey, closeOpen, openPairedCase } from "./helpers.mjs";
+import { APP, staff, caller, cmd, ok, device, deviceHeaders, newKey, closeOpen, openPairedCase } from "./helpers.mjs";
 import { LANGS, pick, readBackText, replyOf } from "../content/catalogue.ts";
 
 test("typed journey: alert → corrected report → approved reply → guard → teach-back", async () => {
@@ -131,4 +131,25 @@ test("pairing accepts the six caller languages only", async () => {
   assert.deepEqual([...LANGS].sort(), ["bn", "en", "id", "ja", "ne", "vi"]);
   assert.equal(pick({ en: "fallback" }, "ne"), "fallback", "a station without a Nepali key shows English");
   await closeOpen(op);
+});
+
+test("an authenticated display press supplies a stable code and hides it on redemption", async (t) => {
+  const op = await staff("operator@ichido.demo");
+  await closeOpen(op);
+  const headers = { ...deviceHeaders(), "x-display": "1" };
+  const url = APP + "/api/device";
+  const press = (body) => fetch(url, { method: "POST", headers, body });
+  const code = async () => (await (await fetch(url, { headers })).text()).match(/^code=(\w+)$/m)?.[1];
+  const key = newKey();
+  assert.equal((await press(key)).status, 204);
+  const first = await code();
+  assert.equal(first.length, 6);
+  assert.equal((await press(key)).status, 204);
+  assert.equal((await press(newKey())).status, 204);
+  assert.equal(await code(), first);
+  const phone = await caller();
+  const { incident } = await ok(cmd(phone, "pair", { station: "TABLE-A", code: first, lang: "ja", frontline: true }));
+  t.after(async () => { await ok(cmd(op, "takeover", { incident })); await ok(cmd(op, "abandon", { incident })); });
+  assert.equal((await press(key)).status, 204);
+  assert.equal(await code(), undefined);
 });

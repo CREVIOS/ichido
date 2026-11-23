@@ -10,7 +10,7 @@ export type Filters = {
   search: string;
 };
 export const allCases: Filters = { status: "all", lang: "all", period: "all", search: "" };
-export type HistoryRow = Pick<Desk, "id" | "station" | "fault" | "status" | "lang" | "created_at" | "finished_at" | "abandoned"> & {
+export type HistoryRow = Pick<Desk, "id" | "station" | "fault" | "status" | "lang" | "created_at" | "queued_at" | "finished_at" | "abandoned"> & {
   atm: { label: { ja: string } };
   reply: { sent_at: string }[];
   case_event: { actor_name: string | null }[];
@@ -37,10 +37,10 @@ export async function readHistory(db: SupabaseClient, filters: Filters, limit: n
   while (rows.length < limit) {
     const size = Math.min(500, limit - rows.length);
     const q = db.from("desk").select(`
-      id, station, fault, status, lang, created_at, finished_at, abandoned,
+      id, station, fault, status, lang, created_at, queued_at, finished_at, abandoned,
       atm:station!desk_station_fkey!inner(label), reply(sent_at), case_event(actor_name)
     `).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(size)
-      .order("sent_at", { referencedTable: "reply" }).limit(1, { referencedTable: "reply" })
+      .eq("reply.author", "human").order("sent_at", { referencedTable: "reply" }).limit(1, { referencedTable: "reply" })
       .eq("case_event.kind", "claimed").order("id", { referencedTable: "case_event" }).limit(1, { referencedTable: "case_event" });
     if (filters.status === "open") q.is("finished_at", null);
     if (filters.status === "done") q.not("finished_at", "is", null).eq("abandoned", false);
@@ -64,7 +64,7 @@ export async function readHistory(db: SupabaseClient, filters: Filters, limit: n
 
 export function firstReplySeconds(row: HistoryRow) {
   const first = row.reply[0];
-  return first ? Math.max(0, Math.round((Date.parse(first.sent_at) - Date.parse(row.created_at)) / 1000)) : null;
+  return first ? Math.max(0, Math.round((Date.parse(first.sent_at) - Date.parse(row.queued_at ?? row.created_at)) / 1000)) : null;
 }
 
 export function replySegments(seconds: number | null) {

@@ -1,4 +1,5 @@
 "use client";
+import { Human } from "./human";
 import { Fragment, useState } from "react";
 import { Check } from "lucide-react";
 import { cmd } from "@/lib/supabase";
@@ -19,11 +20,12 @@ export async function tapFlag(flags: readonly string[], flag: string, on: boolea
   await cmd("flag", { flag, on });
 }
 
-export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
+export function CallerFlags({ card, lang, submit }: { card: CallerCase; lang: Lang; submit?: (flag: string, on: boolean) => Promise<void> }) {
   const [note, setNote] = useState("");
   const tap = async (flag: string, on: boolean) => {
     try {
-      await tapFlag(card.flags, flag, on);
+      if (submit) await submit(flag, on);
+      else await tapFlag(card.flags, flag, on);
       setNote("");
     } catch (e) { setNote(errorText((e as Error).message, lang)); }
   };
@@ -73,6 +75,7 @@ export function FollowUp({ f, prefs, onPrefs }: { f: FollowUpCase; prefs: Prefs;
   const told = f.reply && replyOf(f.reply.intent)?.text(f.reply.slots)[lang];
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={setLang} />}>
+      <Human lang={lang} />
       <PrefsBar prefs={prefs} onChange={onPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted-foreground">{pick(f.station?.label, lang)} · {pick(FAULTS[f.fault], lang)}</span>

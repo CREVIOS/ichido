@@ -1,4 +1,5 @@
 "use client";
+import { Human } from "./human";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
@@ -6,6 +7,7 @@ import { Phone } from "@/components/phone";
 import { Notice, StatusLabel } from "@/components/kit";
 import { LangSelect, preferredLang } from "@/components/lang-select";
 import { ACCESS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
+import { Conversation } from "./conversation";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
 import { DisasterNotice } from "./disaster";
@@ -41,41 +43,45 @@ export default function CallerPage() {
     if (!c) return;
     const [d, r, s] = await Promise.all([
       db.from("draft").select("*").eq("incident", c.id).maybeSingle(),
-      db.from("reply").select("id, intent, slots, sent_at").eq("incident", c.id).order("sent_at"),
+      db.from("reply").select("id, intent, slots, sent_at, author").eq("incident", c.id).order("sent_at"),
       db.from("station").select("label").eq("id", c.station).maybeSingle(),
     ]);
     setDraft(d.data as Draft); setReplies((r.data ?? []) as Reply[]); setStation(s.data as Station);
   }, []);
   useLive(["caller_card", "draft", "reply"], load, true, { incident: card?.id });
 
-  if (card === undefined) return null;
+  const detected = useSyncExternalStore(noop, preferredLang, () => "bn" as Lang);
+  if (card === undefined) return <Phone lang={detected}><Human lang={detected} /></Phone>;
   if (card === null) return follow ? <FollowUp f={follow} prefs={prefs} onPrefs={setPrefs} /> : <NotConnected staff={staffSession} />;
 
   const lang: Lang = card.lang ?? "bn";
   if (card.fraud) return <FraudScreen lang={lang} />;
   // The current guidance only: a reply withdrawn after a fault-type change no longer shows.
   const latest = replies.find((r) => r.id === card.reply_id);
-  const confirmed = card.confirmed_rev != null || replies.length > 0;
   const open = card.status !== "guided";
+  const frontline = card.handler !== "legacy" && open;
+  const confirmed = card.confirmed_rev != null || (!frontline && replies.length > 0);
   // A non-ATM pack's caller answers with taps inside the intake; the ATM's taps sit below the read-back.
   const P = callerPack(card.fault);
 
   return (
     <Phone lang={lang} large={prefs.large} right={<LangSelect value={lang} onChange={(l) => cmd("set_lang", { lang: l }).then(load).catch(() => undefined)} />}>
+      <Human lang={lang} />
       <PrefsBar prefs={prefs} onChange={setPrefs} lang={lang} />
       <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)} · {pick(FAULTS[card.fault], lang)}</span>
+        <span className="text-[13px] text-muted-foreground">{pick(station?.label, lang)}{(!frontline || confirmed) && <> · {pick(FAULTS[card.fault], lang)}</>}</span>
         <StatusLabel status={card.status} lang={lang} text={P.status(card.status, lang)} />
       </div>
       {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
       {card.notice && <CallerNotice code={card.notice} lang={lang} />}
       <DisasterNotice station={card.station} lang={lang} />
-      {!confirmed && draft && <Intake lang={lang} draft={draft} card={card} />}
-      {confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
+      {frontline && draft && <Conversation key={card.id} card={card} draft={draft} lang={lang} refresh={load} />}
+      {!frontline && !confirmed && draft && <Intake lang={lang} draft={draft} card={card} />}
+      {!frontline && confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
       {latest && <Guidance lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
-      {open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
+      {!frontline && open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
       {P.atm && (card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
-      <ShowStaff card={card} lang={lang} />
+      {(!frontline || confirmed) && <ShowStaff card={card} lang={lang} />}
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]}</p>
     </Phone>
   );
@@ -99,6 +105,7 @@ function NotConnected({ staff }: { staff: boolean }) {
   const lang = chosen ?? detected;
   return (
     <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
+      <Human lang={lang} open={false} />
       <h1 className="text-[24px] leading-snug">{(staff ? STATION.staffSession : UI.notConnected)[lang]}</h1>
     </Phone>
   );

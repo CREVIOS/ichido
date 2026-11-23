@@ -1,5 +1,6 @@
 // A caller can switch language while the case is open; the operator sees the change on the timeline.
 import test from "node:test";
+import { frontlineCase } from "./frontline-fixture.mjs";
 import assert from "node:assert/strict";
 import { staff, caller, cmd, ok, openPairedCase, closeOpen } from "./helpers.mjs";
 
@@ -16,4 +17,14 @@ test("a caller switches language mid-case, only to a supported language, only wh
   assert.ok(events.some((e) => e.kind === "lang_changed" && e.data.from === "bn" && e.data.to === "vi"));
   await ok(cmd(op, "abandon", { incident }));
   assert.ok([403, 409].includes((await cmd(a, "set_lang", { lang: "en" })).status), "not after the case closes");
+});
+
+test("switching a frontline caller's language preserves the original submitted locale", async (t) => {
+  const f = await frontlineCase(t, "bn");
+  await f.turn("start");
+  await ok(cmd(f.phone, "set_lang", { lang: "ne" }));
+  await f.turn("text", { text: "म कर्मचारीसँग कुरा गर्न चाहन्छु" });
+  const turns = await f.monitor();
+  assert.equal(turns.find((r) => r.wording === "greeting").locale, "bn");
+  assert.equal(turns.find((r) => r.wording === "text").locale, "ne");
 });

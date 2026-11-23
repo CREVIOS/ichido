@@ -17,6 +17,9 @@ bool sendFault(const String &eventId) {
   if (!begin(http, tls, "/api/device")) return false;
   http.addHeader("Content-Type", "text/plain");
   unsigned long t0 = millis();
+#ifdef HAS_DISPLAY
+  http.addHeader("X-Display", "1");
+#endif
   int code = http.POST(eventId);
   http.end();
   Serial.printf("fault -> %d\n", code);

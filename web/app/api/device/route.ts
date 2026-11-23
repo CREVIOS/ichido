@@ -4,7 +4,7 @@ import { requestLog, errorFields } from "@/lib/log";
 import { isFault } from "@/content/catalogue";
 import { defaultFault } from "@/lib/faults";
 import { startBot } from "@/lib/bot";
-import { displayLines } from "@/lib/access";
+import { digest, displayLines, pairingCode } from "@/lib/access";
 import { flushAlerts } from "@/lib/alerts";
 import { after } from "next/server";
 
@@ -29,7 +29,12 @@ export async function POST(req: Request): Promise<Response> {
   }
   // Only for the log: whether this is a retry of an event the server already recorded.
   const { data: seen } = await priv().from("device_event").select("incident").eq("station", station).eq("event_key", key).maybeSingle();
-  const { data: incident, error } = await admin.rpc("record_fault", { p_station: station, p_key: key, p_source: "device", p_fault: fault });
+  const args = { p_station: station, p_key: key, p_fault: fault };
+  const display = req.headers.get("x-display") === "1";
+  const code = display ? pairingCode() : "";
+  const { data: incident, error } = display
+    ? await admin.rpc("cmd_display_press", { ...args, p_code: code, p_digest: digest(code) })
+    : await admin.rpc("record_fault", { ...args, p_source: "device" });
   if (error) {
     log.error("device_fault", { station, fault, status: 500, duration_ms: log.ms(), ...errorFields(error) });
     return reply(500, { error: "not recorded" });

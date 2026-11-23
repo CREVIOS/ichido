@@ -1,5 +1,6 @@
 // Concurrency and recovery: the cases Codex's review found could go wrong.
 import test from "node:test";
+import { frontlineCase } from "./frontline-fixture.mjs";
 import assert from "node:assert/strict";
 import { staff, caller, cmd, ok, device, newKey, openPairedCase, closeOpen } from "./helpers.mjs";
 
@@ -72,4 +73,12 @@ test("pairing guesses are rate-limited", async () => {
   for (let i = 0; i < 7; i++) statuses.push((await cmd(guesser, "pair", { station: "TABLE-A", code: "ZZZZZZ", lang: "bn" })).status);
   assert.ok(statuses.includes(429), statuses.join(","));
   await closeOpen(op);
+});
+
+test("retrying a submitted frontline message records it once", async (t) => {
+  const f = await frontlineCase(t);
+  await f.turn("start");
+  const body = { act: "text", text: "A human please", request_id: crypto.randomUUID(), base_rev: 0 };
+  await Promise.all([ok(cmd(f.phone, "frontline_turn", body)), ok(cmd(f.phone, "frontline_turn", body))]);
+  assert.equal((await f.monitor()).filter((r) => r.words === body.text).length, 1);
 });
