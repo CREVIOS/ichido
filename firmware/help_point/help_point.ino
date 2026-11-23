@@ -51,7 +51,7 @@
 #include <U8g2lib.h>
 #endif
 
-#define FW_VERSION "1.4.0"
+#define FW_VERSION "1.4.1"
 
 #ifndef PORTAL_PASSWORD
 #define PORTAL_PASSWORD ""
@@ -115,12 +115,12 @@ void drawScreen(const char *title, const String &l1, const String &l2 = "", cons
   if (code.length()) {
     oled.setFont(u8g2_font_logisoso22_tr);
     oled.drawStr((128 - oled.getStrWidth(code.c_str())) / 2, 44, code.c_str());
-    oled.setFont(u8g2_font_6x12_tr);
-    oled.drawStr(0, 62, l1.c_str());
+    oled.setFont(u8g2_font_b12_t_japanese1);
+    oled.drawUTF8(0, 62, l1.c_str());
   } else {
-    oled.setFont(u8g2_font_helvR10_tr);
-    oled.drawStr(0, 34, l1.c_str());
-    oled.drawStr(0, 52, l2.c_str());
+    oled.setFont(u8g2_font_b12_t_japanese1);
+    oled.drawUTF8(0, 34, l1.c_str());
+    oled.drawUTF8(0, 52, l2.c_str());
   }
   oled.sendBuffer();
 }
@@ -160,18 +160,19 @@ void setRgb(bool r, bool g, bool b) {
 void showDisplay(bool stale) {
   const char *title = "Ichido Help Point";
   if (state == "fraud") return drawScreen("STOP", "End the call", "Do not use ATM");
-  if (stale) return drawScreen(title, "Offline", "Reconnecting...");
+  if (!pendingEvent.isEmpty()) return drawScreen(title, "おしました", stale ? "まだ とどきません" : "おくっています");
+  if (stale) return drawScreen(title, "つながりません", "かかりの ひとへ");
   long left = (long)(codeUntilMs - millis()) / 1000;
   if (pairCode.length() && left > 0) {
     char line[32];
-    snprintf(line, sizeof line, "Type on phone  %ld:%02ld", left / 60, left % 60);
+    snprintf(line, sizeof line, "とどきました %ld:%02ld", left / 60, left % 60);
     return drawScreen("Your code", line, "", pairCode);
   }
   if (guardState == "on_way") return drawScreen(title, "Staff are on", "the way");
   if (guardState == "arrived") return drawScreen(title, "Staff have", "arrived");
   if (state == "field") return drawScreen(title, "Staff visit", "requested");
-  if (state == "received") return drawScreen(title, "Alert sent", "Operator notified");
-  if (state == "review") return drawScreen(title, "Operator is", "checking");
+  if (state == "received") return drawScreen(title, "とどきました", "まって ください");
+  if (state == "review") return drawScreen(title, "かかりの ひとが", "しらべています");
   if (state == "guided") return drawScreen(title, "Guidance", "confirmed");
   drawScreen(title, "Press the button", "for help");
 }
@@ -198,9 +199,10 @@ void readButton() {
   unsigned long at = pressedAtMs;
   if (at == 0 || at == lastAcceptedPressMs || at - lastAcceptedPressMs < DEBOUNCE_MS) return;
   lastAcceptedPressMs = at;
-  if (!pendingEvent.isEmpty() || digitalRead(PIN_BUTTON) != LOW) return;
+  if (!pendingEvent.isEmpty()) return;
   pendingEvent = newEventId();
   store.putString("pending", pendingEvent);   // persisted before the first send
+  showState();
   retryDelayMs = RETRY_MIN_MS;
   lastRetryMs = 0;
 }
@@ -211,6 +213,10 @@ void retryPending() {
   if (sendFault(pendingEvent)) {
     pendingEvent = "";
     store.remove("pending");
+    if (state != "fraud") state = "received";
+    pairCode = ""; guardState = "";
+    haveState = true; lastFreshMs = millis();
+    showState();
   } else {
     retryDelayMs = min(retryDelayMs * 2, RETRY_MAX_MS);
   }
