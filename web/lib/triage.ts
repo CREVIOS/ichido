@@ -1,5 +1,5 @@
 import "server-only";
-import { EXCLUSIVE_GROUPS, packTaps, type Pack } from "@/content/catalogue";
+import { CALLER_FLAGS, EXCLUSIVE_GROUPS, packTaps, type Pack } from "@/content/catalogue";
 import { MODEL, respond } from "@/lib/extract";
 
 // Pack triage: maps a hospital, city-office, station or shelter caller's words to catalogue codes only — one of the
@@ -18,7 +18,7 @@ export type Triage = { situation: string | null; taps: string[]; ask: string[]; 
 
 function schema(p: Pack) {
   const all = packTaps(p);
-  const urgent = all.filter((t) => p.taps[t]?.urgent);
+  const urgent = all.filter((t) => CALLER_FLAGS[t]?.urgent);
   return {
     type: "object", additionalProperties: false, required: ["situation", "taps", "ask", "clarify"],
     properties: {
@@ -33,7 +33,7 @@ function schema(p: Pack) {
 // What the model may describe: codes with their staff meaning (Japanese), never the caller-facing wording.
 const catalogue = (p: Pack) => ({
   situations: Object.fromEntries(Object.entries(p.situations).map(([k, s]) => [k, s.staff])),
-  taps: Object.fromEntries(packTaps(p).map((t) => [t, { meaning: p.taps[t].staff, group: p.taps[t].group ?? null, urgent: Boolean(p.taps[t].urgent) }])),
+  taps: Object.fromEntries(packTaps(p).map((t) => [t, { meaning: CALLER_FLAGS[t].staff, group: CALLER_FLAGS[t].group ?? null, urgent: Boolean(CALLER_FLAGS[t].urgent) }])),
 });
 
 // Never trust the model: only this pack's codes, red flags only as questions, one answer per one-answer group.
@@ -43,13 +43,13 @@ export function clean(p: Pack, raw: unknown): Omit<Triage, "model"> {
   const list = (x: unknown) => (Array.isArray(x) ? [...new Set(x.filter((t): t is string => typeof t === "string" && all.includes(t)))] : []);
   const groups = new Set<string>();
   const taps = list(r.taps).filter((t) => {
-    const g = p.taps[t].group;
-    if (p.taps[t].urgent || (g && EXCLUSIVE_GROUPS.has(g) && groups.has(g))) return false;
+    const g = CALLER_FLAGS[t].group;
+    if (CALLER_FLAGS[t].urgent || (g && EXCLUSIVE_GROUPS.has(g) && groups.has(g))) return false;
     if (g) groups.add(g);
     return true;
   });
   const situation = typeof r.situation === "string" && Object.hasOwn(p.situations, r.situation) ? r.situation : null;
-  return { situation, taps: taps.slice(0, 8), ask: list(r.ask).filter((t) => p.taps[t].urgent).slice(0, 3), clarify: r.clarify === true };
+  return { situation, taps: taps.slice(0, 8), ask: list(r.ask).filter((t) => CALLER_FLAGS[t].urgent).slice(0, 3), clarify: r.clarify === true };
 }
 
 // Null when no model is configured: the caller answers with taps, as without AI.
@@ -64,7 +64,3 @@ export async function triage(text: string, lang: string, p: Pack): Promise<Triag
   if (!out) throw new Error("triage returned no content");
   return { ...clean(p, JSON.parse(out)), model: MODEL() };
 }
-
-// The tap that states a situation in the caller's own words (each pack's "need" taps point to one).
-export const situationTap = (p: Pack, situation: string | null) =>
-  situation ? packTaps(p).find((t) => p.taps[t].suggests === situation) ?? null : null;

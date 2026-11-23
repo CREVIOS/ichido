@@ -28,7 +28,7 @@ test("only operators and managers reach the MCP tools, and the tools only read",
   assert.equal((await rpc(a, "tools/list")).status, 401, "callers are not MCP clients");
 
   const tools = (await rpc(op, "tools/list")).body.result.tools;
-  assert.deepEqual(tools.map((t) => t.name).sort(), ["get_case", "insights", "list_open_cases", "station_health", "suggest_next_step"]);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ["field_jobs_open", "get_case", "insights", "list_open_cases", "search_cases", "station_detail", "station_health", "suggest_next_step"]);
   assert.ok(tools.every((t) => t.annotations?.readOnlyHint), "every tool is read-only");
 
   await closeOpen(op);

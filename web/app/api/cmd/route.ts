@@ -11,7 +11,7 @@ import { signSpeech } from "@/lib/speech";
 import { closeVoice } from "@/lib/livekit";
 import { actorFrom, authorize, admin, priv, fail, reply, event, rpc, HttpError, type Actor } from "@/lib/server";
 import { COMMANDS } from "@/lib/rbac";
-import { requestLog, errorFields } from "@/lib/log";
+import { requestLog, errorFields, entry, ship } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
 import { accessCommands, str, digest } from "@/lib/access";
@@ -207,7 +207,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (!atm && (b.card_back !== undefined || b.cash_received !== undefined)) fail(400, "bad_request");
     const patch = text && atm ? await extract(text, lang, { card_back: cur!.card_back, cash_received: cur!.cash_received }) : null;
     // A failed triage leaves the caller with the taps, as without a model.
-    const read = text && pack ? await triage(text, lang, pack).catch(() => null) : null;
+    const read = text && pack ? await triage(text, lang, pack).catch(async (e) => { await ship([entry("warn", "triage_failed", { incident, ...errorFields(e) })]); return null; }) : null;
     const pickFact = (k: (typeof FACT_KEYS)[number]): Fact | null => {
       const v = b[k];
       if (v === "yes" || v === "no" || v === "unknown") return v;
