@@ -87,14 +87,18 @@ function bearer(req: Request) {
   return /^Bearer ([^\s]+)$/i.exec(req.headers.get("authorization") ?? "")?.[1] ?? "";
 }
 
-export function deviceStation(req: Request): string | null {
-  const id = req.headers.get("x-station") ?? "";
+// The request's bearer equals a configured secret (constant time; an unset secret never matches).
+export function bearerIs(req: Request, expected: unknown): boolean {
   const given = bearer(req);
-  const secrets: Record<string, unknown> = JSON.parse(process.env.DEVICE_SECRETS_JSON ?? "{}");
-  const expected = Object.hasOwn(secrets, id) ? secrets[id] : null;
   const hash = (value: string) => createHash("sha256").update(value).digest();
   const match = timingSafeEqual(hash(given), hash(typeof expected === "string" ? expected : ""));
-  return match && given && typeof expected === "string" ? id : null;
+  return match && Boolean(given) && typeof expected === "string";
+}
+
+export function deviceStation(req: Request): string | null {
+  const id = req.headers.get("x-station") ?? "";
+  const secrets: Record<string, unknown> = JSON.parse(process.env.DEVICE_SECRETS_JSON ?? "{}");
+  return bearerIs(req, Object.hasOwn(secrets, id) ? secrets[id] : null) ? id : null;
 }
 
 export class HttpError extends Error {

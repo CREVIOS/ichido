@@ -3,6 +3,16 @@
 
 import type { L10n } from "./catalogue.ts";
 import { SHELTER_NOTICES } from "./packs/shelter.ts";
+import { JMA_TERMS as JMA } from "./jma-terms.ts";
+
+// An official JMA term (content/jma-terms.ts) as the opening sentence of a notice, in English, Vietnamese, Indonesian
+// or Nepali. The dictionary has no Bengali or easy Japanese: those are our own drafts (Bengali awaiting native review).
+type JmaLang = "en" | "vi" | "id" | "ne";
+const lead = (term: string, lang: JmaLang) => {
+  const t = term.replace(/\s+/g, " ").trim();
+  const s = lang === "id" ? t[0].toUpperCase() + t.slice(1) : t;
+  return /[.।]$/.test(s) ? s : `${s}${lang === "ne" ? "।" : "."}`;
+};
 
 // Text-only path (caller).
 
@@ -66,10 +76,35 @@ export const DISASTER_NOTICES: Record<string, { title: string; text: L10n }> = {
     text: {
       ja: "地震の ため、銀行は 非常の ときの やりかたで うごいて います。この ATM は とまる ことが あります。カードは 銀行の きまりに そって あつかいます。下の つかえる Help Point か、うごく まどぐちを つかって ください。銀行が きめた まどぐちにも れんらく できます。",
       bn: "ভূমিকম্পের কারণে ব্যাংক জরুরি ব্যবস্থায় কাজ করছে। এই এটিএম বন্ধ হয়ে যেতে পারে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। নিচের চালু থাকা Help Point বা ভ্রাম্যমাণ শাখা ব্যবহার করুন, অথবা ব্যাংকের অফিসিয়াল যোগাযোগের মাধ্যম ব্যবহার করুন।",
-      en: "Because of the earthquake, the bank is using its emergency arrangements. This ATM may stop working. Your card is handled under the bank's own procedure. Use a working Help Point or mobile branch listed below, or the bank's official contact channel.",
-      vi: "Do động đất, ngân hàng đang áp dụng quy trình khẩn cấp. Cây ATM này có thể ngừng hoạt động. Thẻ được xử lý theo quy trình riêng của ngân hàng. Hãy dùng Help Point hoặc chi nhánh lưu động đang hoạt động bên dưới, hoặc kênh liên hệ chính thức của ngân hàng.",
-      id: "Karena gempa bumi, bank sedang menjalankan prosedur darurat. ATM ini bisa berhenti berfungsi. Kartu ditangani sesuai prosedur bank sendiri. Gunakan Help Point atau kantor cabang keliling yang masih berfungsi di bawah, atau saluran kontak resmi bank.",
-      ne: "भूकम्पका कारण बैंकले आपतकालीन व्यवस्था लागू गरेको छ। यो एटीएम बन्द हुन सक्छ। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। तल दिइएका चालु Help Point वा घुम्ती शाखा प्रयोग गर्नुहोस्, वा बैंकको आधिकारिक सम्पर्क माध्यम प्रयोग गर्नुहोस्।",
+      en: `${lead(JMA.earthquake.en, "en")} The bank is using its emergency arrangements. This ATM may stop working. Your card is handled under the bank's own procedure. Use a working Help Point or mobile branch listed below, or the bank's official contact channel.`,
+      vi: `${lead(JMA.earthquake.vi, "vi")} Ngân hàng đang áp dụng quy trình khẩn cấp. Cây ATM này có thể ngừng hoạt động. Thẻ được xử lý theo quy trình riêng của ngân hàng. Hãy dùng Help Point hoặc chi nhánh lưu động đang hoạt động bên dưới, hoặc kênh liên hệ chính thức của ngân hàng.`,
+      id: `${lead(JMA.earthquake.id, "id")} Bank sedang menjalankan prosedur darurat. ATM ini bisa berhenti berfungsi. Kartu ditangani sesuai prosedur bank sendiri. Gunakan Help Point atau kantor cabang keliling yang masih berfungsi di bawah, atau saluran kontak resmi bank.`,
+      ne: `${lead(JMA.earthquake.ne, "ne")} बैंकले आपतकालीन व्यवस्था लागू गरेको छ। यो एटीएम बन्द हुन सक्छ। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। तल दिइएका चालु Help Point वा घुम्ती शाखा प्रयोग गर्नुहोस्, वा बैंकको आधिकारिक सम्पर्क माध्यम प्रयोग गर्नुहोस्।`,
+    },
+  },
+  // Proposed automatically from a JMA tsunami bulletin (lib/hazard.ts); shown only once staff confirm.
+  tsunami_warning: {
+    title: "津波警報・大津波警報（非常取扱い）",
+    text: {
+      ja: "つなみの けいほう（津波警報）が でました。うみや 川の ちかくに いる 人は、すぐに たかい ところや じょうぶで たかい たてものへ にげて ください。この ATM の まえに いないで ください。カードは 銀行の きまりに そって あつかいます。あんぜんに なってから れんらく して ください。下に ちかくの ひなんばしょが あります。",
+      // Bengali: our draft, awaiting native review (not in the JMA dictionary).
+      bn: "সুনামি সতর্কবার্তা জারি হয়েছে। উপকূল বা নদীর কাছে থাকলে এখনই উঁচু জায়গা বা মজবুত উঁচু ভবনে চলে যান। এই এটিএমের কাছে থাকবেন না। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে; নিরাপদ হওয়ার পরে যোগাযোগ করুন। কাছের নির্ধারিত আশ্রয়স্থল নিচে দেওয়া আছে।",
+      en: `${lead(JMA.tsunamiWarning.en, "en")} ${lead(JMA.evacuateHighGround.en, "en")} Do not stay at this ATM. Your card is handled under the bank's own procedure; contact the bank once you are safe. Designated evacuation sites nearby are listed below.`,
+      vi: `${lead(JMA.tsunamiWarning.vi, "vi")} ${lead(JMA.evacuateHighGround.vi, "vi")} Đừng ở lại cây ATM này. Thẻ được xử lý theo quy trình riêng của ngân hàng; hãy liên hệ ngân hàng sau khi đã an toàn. Các địa điểm lánh nạn được chỉ định ở gần được liệt kê bên dưới.`,
+      id: `${lead(JMA.tsunamiWarning.id, "id")} ${lead(JMA.evacuateHighGround.id, "id")} Jangan tetap berada di ATM ini. Kartu ditangani sesuai prosedur bank sendiri; hubungi bank setelah Anda aman. Tempat evakuasi resmi terdekat tercantum di bawah.`,
+      ne: `${lead(JMA.tsunamiWarning.ne, "ne")} ${lead(JMA.evacuateHighGround.ne, "ne")} यो एटीएममा नबस्नुहोस्। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ; सुरक्षित भएपछि बैंकलाई सम्पर्क गर्नुहोस्। नजिकका तोकिएका सुरक्षित ठाउँहरू तल दिइएका छन्।`,
+    },
+  },
+  tsunami_advisory: {
+    title: "津波注意報（非常取扱い）",
+    text: {
+      ja: "つなみ ちゅういほう（津波注意報）が でました。うみの 中や うみの ちかくから すぐに はなれて ください。この ATM は とまる ことが あります。カードは 銀行の きまりに そって あつかいます。下に ちかくの ひなんばしょが あります。",
+      // Bengali: our draft, awaiting native review (not in the JMA dictionary).
+      bn: "সুনামি সতর্কতা জারি হয়েছে। সমুদ্রে থাকলে এখনই উঠে আসুন এবং উপকূল থেকে দূরে সরে যান। এই এটিএম বন্ধ হয়ে যেতে পারে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। কাছের নির্ধারিত আশ্রয়স্থল নিচে দেওয়া আছে।",
+      en: `${lead(JMA.tsunamiAdvisory.en, "en")} ${lead(JMA.leaveCoast.en, "en")} This ATM may stop working. Your card is handled under the bank's own procedure. Designated evacuation sites nearby are listed below.`,
+      vi: `${lead(JMA.tsunamiAdvisory.vi, "vi")} ${lead(JMA.leaveCoast.vi, "vi")} Cây ATM này có thể ngừng hoạt động. Thẻ được xử lý theo quy trình riêng của ngân hàng. Các địa điểm lánh nạn được chỉ định ở gần được liệt kê bên dưới.`,
+      id: `${lead(JMA.tsunamiAdvisory.id, "id")} ${lead(JMA.leaveCoast.id, "id")} ATM ini bisa berhenti berfungsi. Kartu ditangani sesuai prosedur bank sendiri. Tempat evakuasi resmi terdekat tercantum di bawah.`,
+      ne: `${lead(JMA.tsunamiAdvisory.ne, "ne")} ${lead(JMA.leaveCoast.ne, "ne")} यो एटीएम बन्द हुन सक्छ। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। नजिकका तोकिएका सुरक्षित ठाउँहरू तल दिइएका छन्।`,
     },
   },
   typhoon: {
@@ -120,6 +155,24 @@ export const DISASTER = {
     id: "Saat ini belum diketahui Help Point terdekat yang berfungsi. Gunakan saluran kontak resmi bank.",
     ne: "अहिले नजिकै कुनै चालु Help Point थाहा छैन। बैंकको आधिकारिक सम्पर्क माध्यम प्रयोग गर्नुहोस्।",
   },
+  // GSI designated evacuation sites (指定緊急避難場所) for the hazard: designated, not necessarily open.
+  shelters: {
+    bn: "কাছের নির্ধারিত আশ্রয়স্থল", en: "Designated evacuation sites nearby", ja: "ちかくの ひなんばしょ",
+    vi: "Địa điểm lánh nạn được chỉ định gần đây", id: "Tempat evakuasi resmi terdekat", ne: "नजिकका तोकिएका सुरक्षित ठाउँ",
+  },
+  sheltersNote: {
+    bn: "এগুলো শহরের নির্ধারিত জায়গা। এখন খোলা আছে কিনা তা শহর ও আশ্রয়কেন্দ্রের কর্মীদের ঘোষণায় দেখে নিন।",
+    en: "These are the city's designated sites. Whether a site is open now is announced by the city and shelter staff.",
+    ja: "市が きめた ばしょです。いま あいて いるかは、市や ひなんじょの 係の 人の おしらせで たしかめて ください。",
+    vi: "Đây là các địa điểm do thành phố chỉ định. Địa điểm nào đang mở cửa sẽ được thành phố và nhân viên nơi sơ tán thông báo.",
+    id: "Ini adalah tempat yang ditetapkan oleh kota. Apakah tempat itu sedang dibuka diumumkan oleh kota dan petugas pengungsian.",
+    ne: "यी सहरले तोकेका ठाउँ हुन्। अहिले खुला छ कि छैन भन्ने कुरा सहर र आश्रयस्थलका कर्मचारीले जानकारी दिन्छन्।",
+  },
+  // Place data credit, shown under the list (the names are official Japanese names).
+  sheltersSource: {
+    bn: "উৎস: জিএসআই (国土地理院)", en: "Source: GSI Japan (国土地理院)", ja: "でどころ：こくど ちりいん（国土地理院）",
+    vi: "Nguồn: GSI Nhật Bản (国土地理院)", id: "Sumber: GSI Jepang (国土地理院)", ne: "स्रोत: GSI जापान (国土地理院)",
+  },
 } satisfies Record<string, L10n>;
 
 // Distance in kilometres, the same in every language.
@@ -160,8 +213,39 @@ export const DISASTER_STAFF = {
   history: "最近の切り替え",
   entered: "開始",
   left: "解除",
-  legend: { online: "稼働中", offline: "応答なし・未接続", disaster: "災害モード", mobile: "移動店舗" },
+  legend: { online: "稼働中", offline: "応答なし・未接続", disaster: "災害モード", mobile: "移動店舗", shelter: "指定緊急避難場所" },
   select: "選択",
+  shelters: "指定緊急避難場所を表示",
+  shelterPopup: (hazards: string) => `対応する災害：${hazards}`,
+  shelterNote: "指定された場所です。開設状況は自治体・避難所の発表をご確認ください。",
+  shelterStay: "指定避難所を兼ねる",
+  shelterSource: "出典：国土地理院（指定緊急避難場所データ）",
+  hazard: {
+    flood: "洪水", landslide: "崖崩れ・土石流・地滑り", storm_surge: "高潮", earthquake: "地震", tsunami: "津波",
+    fire: "大規模な火事", inland_flood: "内水氾濫", volcano: "火山現象",
+  } as Record<string, string>,
+};
+
+// Proposals from the official feeds (JMA 防災情報XML, P2P地震情報): staff confirm or dismiss them.
+const SHINDO_JA: Record<string, string> = { "5-": "5弱", "5+": "5強", "6-": "6弱", "6+": "6強" };
+const shindo = (s: string) => SHINDO_JA[s] ?? s;
+export const DISASTER_PROPOSAL = {
+  title: "公式情報による災害モードの提案",
+  lead: "気象庁の発表が対象ステーションに影響する可能性があります。内容を確認のうえ、承認済みの告知で災害モードに設定するか、見送ってください。設定するまでお客様の画面は変わりません。",
+  what: (kind: string, severity: string): string => ({
+    earthquake: `地震（長崎県内で最大震度${shindo(severity)}）`,
+    eew: `緊急地震速報（予想震度${shindo(severity)}以上）`,
+    tsunami: ({ advisory: "津波注意報", warning: "津波警報", major_warning: "大津波警報" } as Record<string, string>)[severity] ?? "津波",
+    warning: "特別警報",
+  } as Record<string, string>)[kind] ?? kind,
+  notice: "設定する告知",
+  stations: (n: number) => `対象ステーション ${n}件`,
+  until: (t: string) => `${t} まで有効`,
+  confirm: "確認して設定",
+  dismiss: "見送る",
+  toastConfirm: (n: number) => (n ? `${n}件を災害モードに設定しました` : "変更はありません（すでに設定済みです）"),
+  toastDismiss: "提案を見送りました",
+  source: "出典：気象庁（防災情報XML、P2P地震情報経由）",
 };
 
 // Timeline sentences for the events above (see eventText in catalogue.ts).

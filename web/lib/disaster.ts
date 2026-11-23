@@ -24,6 +24,19 @@ async function setArea(who: ReturnType<typeof staffIn>, stations: string[], noti
   return { changed };
 }
 
+async function decide(a: Parameters<Command>[0], b: Body, confirm: boolean) {
+  const who = staffIn(a, ["operator", "manager", "admin"]);
+  if (!Number.isSafeInteger(b.proposal) || (b.proposal as number) <= 0) fail(400, "bad_request");
+  const { data: p } = await admin.from("disaster_proposal").select("notice").eq("id", b.proposal).maybeSingle();
+  const changed = await rpc<string[]>("cmd_disaster_proposal", { p_uid: who.uid, p_name: who.name, p_id: b.proposal, p_confirm: confirm });
+  const logged = [
+    entry("info", confirm ? "disaster_proposal_confirmed" : "disaster_proposal_dismissed", { route: "/api/cmd", role: who.role, proposal: b.proposal as number, code: p?.notice, count: changed.length }),
+    ...changed.map((station) => entry("info", "disaster_entered", { route: "/api/cmd", role: who.role, station, code: p?.notice })),
+  ];
+  after(() => ship(logged));
+  return { changed };
+}
+
 export const disasterCommands: Record<string, Command> = {
   async disaster_set(a, b) {
     const who = staffIn(a, ["operator", "manager", "admin"]);
@@ -34,6 +47,11 @@ export const disasterCommands: Record<string, Command> = {
   async disaster_clear(a, b) {
     return setArea(staffIn(a, ["operator", "manager", "admin"]), stationList(b), null);
   },
+
+  // A proposal from the official feeds (lib/disaster-feeds.ts): confirming runs cmd_disaster for its stations with
+  // its notice, exactly as disaster_set does; dismissing leaves every station as it is. Either way it is decided once.
+  disaster_proposal_confirm: (a, b) => decide(a, b, true),
+  disaster_proposal_dismiss: (a, b) => decide(a, b, false),
 
   // Caller: the notice for their station, if it is in a disaster area, and where to go instead.
   async disaster_info(a) {

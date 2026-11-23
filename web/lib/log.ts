@@ -40,6 +40,11 @@ export type Fields = {
   fw_target?: string;       // firmware version the server offers (/api/device/firmware)
   ack_ms?: number;
   poll_ms?: number;
+  // disaster feeds (lib/disaster-feeds.ts): feed source, alert and proposal ids, counts
+  source?: string;
+  alert?: number;
+  proposal?: number;
+  count?: number;
   // unhandled errors (see errorFields)
   error?: string;
   error_code?: string;

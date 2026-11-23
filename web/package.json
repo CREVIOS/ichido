@@ -9,7 +9,8 @@
     "lint": "eslint",
     "check:ja": "node scripts/check-yasashii.mjs",
     "test": "node --env-file=.env.local --test --test-concurrency=1 tests/*.test.mjs",
-    "seed:staff": "node --env-file=.env.local ../scripts/seed-staff.mjs",
+    "feeds": "node --env-file=.env.local scripts/poll-feeds.mjs",
+    "seed:staff":"node --env-file=.env.local ../scripts/seed-staff.mjs",
     "test:fresh": "supabase db reset --local --workdir .. && npm run seed:staff && npm test"
   },
   "dependencies": {

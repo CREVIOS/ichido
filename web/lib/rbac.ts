@@ -63,4 +63,5 @@ export const COMMANDS: Record<string, Access> = {
   training_dispatch: "training:use", training_end: "training:use",
   field: "field:act",
   disaster_set: "stations:disaster", disaster_clear: "stations:disaster",
+  disaster_proposal_confirm: "stations:disaster", disaster_proposal_dismiss: "stations:disaster",
 };
