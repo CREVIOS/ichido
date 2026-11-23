@@ -17,3 +17,4 @@ supabase/.temp/
 .playwright-mcp/
 scripts/*.json
 !scripts/staff.example.json
+scripts/.data/

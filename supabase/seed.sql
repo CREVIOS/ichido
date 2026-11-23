@@ -44,3 +44,7 @@ insert into public.light (station) values ('HOSP-A'), ('CITY-A'), ('RAIL-A'), ('
 
 -- Local only: the test suite pairs at TABLE-A many times within five minutes. Production keeps the default of 30.
 update ichido.ops_setting set value = 500 where key = 'pair_station_limit';
+
+-- JMA areas of the demo stations (migration 20261124020000_disaster_feeds.sql): all in Nagasaki City, west coast.
+update public.station set jma_areas = array['pref:長崎県', 'eq:長崎県南西部', 'city:長崎市', 'tsunami:長崎県西方']
+  where id in ('TABLE-A', 'HOSP-A', 'CITY-A', 'RAIL-A', 'SHELTER-A');
