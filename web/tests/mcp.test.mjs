@@ -28,7 +28,7 @@ test("only operators and managers reach the MCP tools, and the tools only read",
   assert.equal((await rpc(a, "tools/list")).status, 401, "callers are not MCP clients");
 
   const tools = (await rpc(op, "tools/list")).body.result.tools;
-  assert.deepEqual(tools.map((t) => t.name).sort(), ["get_case", "insights", "list_open_cases", "station_health", "suggest_next_step"]);
+  assert.deepEqual(tools.map((t) => t.name).sort(), ["get_case", "insights", "list_open_cases", "nearest_shelters", "station_health", "suggest_next_step"]);
   assert.ok(tools.every((t) => t.annotations?.readOnlyHint), "every tool is read-only");
 
   await closeOpen(op);
@@ -40,5 +40,8 @@ test("only operators and managers reach the MCP tools, and the tools only read",
   assert.equal(detail.case.confirmed_rev, null, "unconfirmed drafts stay invisible");
   assert.ok(!JSON.stringify(detail).includes("draft"), "no draft data");
   assert.ok(JSON.parse((await call(op, "insights", { days: 7 })).content[0].text).funnel);
+  // Designated evacuation sites near a station, for the hazard, nearest first (the demo seed has some near TABLE-A).
+  const sites = JSON.parse((await call(op, "nearest_shelters", { hazard: "tsunami", station: "TABLE-A", limit: 3 })).content[0].text);
+  assert.ok(sites.length > 0 && sites.every((s, i) => s.hazards.includes("tsunami") && (i === 0 || s.distance_m >= sites[i - 1].distance_m)));
   await ok(cmd(op, "abandon", { incident }));
 });
