@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, packOfFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { triage } from "@/lib/triage";

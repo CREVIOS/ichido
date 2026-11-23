@@ -8,6 +8,7 @@ import { can, isRole, type Permission, type Role } from "@/lib/rbac";
 import { CountBadge, Notice, useSidebar, type NavItem } from "@/components/kit";
 import { useReviewQueue } from "@/lib/review";
 import { Mark } from "@/components/mark";
+import { StaffRole } from "@/components/assistant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -121,7 +122,7 @@ export function StaffGate({ need, title, children }: { need?: Permission; title:
   useEffect(() => { void refresh(); }, [refresh]);
 
   if (status === undefined) return null;
-  if (status.at === "in" && (!need || can(status.me.role, need))) return <>{children(status.me)}</>;
+  if (status.at === "in" && (!need || can(status.me.role, need))) return <StaffRole.Provider value={status.me.role}>{children(status.me)}</StaffRole.Provider>;
   if (status.at === "in") {
     return (
       <SignInLayout heading={title} error="">

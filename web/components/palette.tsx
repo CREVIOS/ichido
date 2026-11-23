@@ -2,8 +2,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
-import { STAFF } from "@/content/catalogue";
+import { Sparkles } from "lucide-react";
+import { ASSISTANT, STAFF } from "@/content/catalogue";
 import type { NavItem } from "@/components/kit";
+import { AssistantPanel, openAssistant, useAssistantEnabled } from "@/components/assistant";
 
 export type PaletteItem = { group: string; label: string; hint?: string; onSelect: () => void };
 
@@ -19,12 +21,20 @@ export function Palette({ nav, items, open, onOpenChange }: { nav: NavItem[]; it
   }, [open, onOpenChange]);
   const groups = [...new Set(items.map((i) => i.group))];
   const run = (f: () => void) => { onOpenChange(false); f(); };
+  const assistant = useAssistantEnabled();
   return (
+    <>
+    <AssistantPanel />
     <CommandDialog open={open} onOpenChange={onOpenChange} title={STAFF.palette.title} description={STAFF.palette.hint}>
       <Command>
       <CommandInput placeholder={STAFF.palette.placeholder} />
       <CommandList>
         <CommandEmpty>{STAFF.palette.empty}</CommandEmpty>
+        {assistant && (
+          <CommandGroup heading={ASSISTANT.title}>
+            <CommandItem onSelect={() => run(openAssistant)}><Sparkles className="stroke-[1.5]" />{ASSISTANT.title}</CommandItem>
+          </CommandGroup>
+        )}
         <CommandGroup heading={STAFF.palette.pages}>
           {nav.map((n) => <CommandItem key={n.href} onSelect={() => run(() => router.push(n.href))}><n.icon className="stroke-[1.5]" />{n.label}</CommandItem>)}
         </CommandGroup>
@@ -38,6 +48,7 @@ export function Palette({ nav, items, open, onOpenChange }: { nav: NavItem[]; it
       </CommandList>
       </Command>
     </CommandDialog>
+    </>
   );
 }
 

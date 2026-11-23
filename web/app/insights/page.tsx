@@ -5,9 +5,12 @@ import { sb } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, MeFooter, navFor, type Me } from "@/components/StaffGate";
 import { AppShell, Notice } from "@/components/kit";
+import { openAssistant, useAssistantEnabled } from "@/components/assistant";
+import { Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { INSIGHTS, staffError } from "@/content/catalogue";
+import { ASSISTANT, INSIGHTS, staffError } from "@/content/catalogue";
 import { METRICS, type Insights, type MetricKey } from "./metrics";
 
 const PERIODS = [7, 14, 30];
@@ -35,7 +38,7 @@ function Board({ me }: { me: Me }) {
   const m = METRICS[sel];
 
   return (
-    <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} crumb={INSIGHTS.title} title={INSIGHTS.metrics[sel].title}>
+    <AppShell nav={navFor(me.role)} footer={<MeFooter me={me} />} crumb={INSIGHTS.title} title={INSIGHTS.metrics[sel].title} actions={<AskButton />}>
       <div className="grid min-h-full lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="flex flex-col gap-2.5 border-b bg-background/60 p-4 lg:border-r lg:border-b-0">
           {(Object.keys(METRICS) as MetricKey[]).map((k) => (
@@ -78,4 +81,10 @@ function FilterChip({ icon, label, children }: { icon: React.ReactNode; label: s
       {children}
     </span>
   );
+}
+
+// Ask Ichido about these figures (hidden when the server has no model).
+function AskButton() {
+  if (!useAssistantEnabled()) return null;
+  return <Button variant="ghost" size="sm" onClick={openAssistant}><Sparkles className="stroke-[1.5]" />{ASSISTANT.title}</Button>;
 }

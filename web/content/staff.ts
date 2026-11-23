@@ -363,14 +363,12 @@ export const ASSISTANT = {
   off: "AIアシスタントは未設定です（OPENAI_API_KEY）。",
   failed: "回答を取得できませんでした。もう一度お試しください。",
   limited: "質問が多すぎます。1分ほどおいてお試しください。",
-  maps: "出典：Google マップ",
   mode: { remote: "リモートMCP", local: "MCP（サーバー内）" } as Record<string, string>,
   total: (ms: number) => `合計 ${(ms / 1000).toFixed(1)}秒`,
   examples: ["今週カード未排出が多かった拠点は？", "いま対応中の案件と担当者は？", "Which field jobs are still open?"],
   tools: {
     list_open_cases: "対応中の案件", get_case: "案件の詳細", station_health: "拠点の機器状態", insights: "集計",
     suggest_next_step: "AI提案", search_cases: "案件の検索", station_detail: "拠点の詳細", field_jobs_open: "未完了の現地対応",
-    search_places: "Google マップ：場所", compute_routes: "Google マップ：経路", lookup_weather: "Google マップ：天気",
   } as Record<string, string>,
 };
 
