@@ -16,6 +16,12 @@ const NUMBER_WORDS = new Set([
   // Nepali
   "शून्य", "सुन्ना", "एक", "दुई", "तीन", "चार", "पाँच", "छ", "सात", "आठ", "नौ",
 ]);
+// Treat even short standalone number fragments as sensitive in a multi-turn conversation.
+export function frontlineNumber(text: string): boolean {
+  if (looksLikeNumber(text) || /\p{Nd}|[〇零一二三四五六七八九]{2}/u.test(text)) return true;
+  const words = text.normalize("NFC").toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
+  return words.some((w, i) => NUMBER_WORDS.has(w) && (words.length === 1 || NUMBER_WORDS.has(words[i + 1]) || ID_WORDS.test(text)));
+}
 // Words for an ID, insurance, residence-card, My Number, passport or account number in the caller languages: with three
 // or more digits anywhere in the text, the text is withheld even when the digits are split up.
 const ID_WORDS = /number|no\.|card|insurance|passport|account|my ?number|番号|記号|保険|在留|マイナンバー|パスポート|口座|ばんごう|নম্বর|কার্ড|বিমা|পাসপোর্ট|số|thẻ|bảo hiểm|hộ chiếu|tài khoản|nomor|kartu|asuransi|paspor|rekening|नम्बर|कार्ड|बीमा|राहदानी|खाता/i;

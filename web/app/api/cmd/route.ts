@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { frontlineTurn } from "@/lib/frontline";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { triage } from "@/lib/triage";
@@ -146,6 +147,18 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return { field: data };
   },
 
+  async frontline_monitor(a, b) {
+    const op = staff(a, "operator");
+    return { turns: await rpc("frontline_monitor", { p_uid: op.uid, p_session: op.session, p_incident: str(b, "incident") }) };
+  },
+  async frontline_qa_counts(a) {
+    staff(a, "manager");
+    const counts = await Promise.all(["ai", "queued", "human"].map(async (handler) => {
+      const { count } = await admin.from("desk").select("id", { head: true, count: "exact" }).eq("handler",handler).is("finished_at",null).throwOnError();
+      return [handler, count];
+    }));
+    return { counts: Object.fromEntries(counts) };
+  },
   async claim(a, b) {
     const op = staff(a, "operator");
     await rpc("cmd_claim", { p_uid: op.uid, p_name: op.name, p_incident: str(b, "incident") });
@@ -190,6 +203,8 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     return { incident: await rpc("frontline_pair", { p_frontline: b.frontline === true, p_uid: c.uid, p_station: station, p_digest: digest(str(b, "code")), p_lang: lang }) };
   },
 
+  frontline_turn: (a, b) => frontlineTurn(caller(a), b),
+
   async draft(a, b) {
     const c = caller(a);
     if (!c.incident || !c.lang) fail(403, "forbidden");
@@ -197,8 +212,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const lang = c.lang as Lang;
     const [{ data: cur }, { data: desk }] = await Promise.all([
       admin.from("draft").select("rev, card_back, cash_received").eq("incident", incident).single(),
-      admin.from("desk").select("fault").eq("id", incident).single(),
+      admin.from("desk").select("fault,handler").eq("id", incident).single(),
     ]);
+    if (!desk || desk.handler === "ai") fail(409, "conflict");
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
     if (text && looksLikeNumber(text)) return { withheld: true };
@@ -315,7 +331,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   ...ALERT_COMMANDS,
 };
 
-const callerLimits: Record<string, number> = { rate: 5, set_lang: 10, teachback: 12, draft: 30 };
+const callerLimits: Record<string, number> = { frontline_turn: 30, rate: 5, set_lang: 10, teachback: 12, draft: 30 };
 
 export async function POST(req: Request): Promise<Response> {
   const log = requestLog("/api/cmd");
@@ -341,6 +357,10 @@ export async function POST(req: Request): Promise<Response> {
       if (limited) return limited;
     }
     authorize(actor, COMMANDS[name]);   // lib/rbac.ts; a command missing there is refused
+    if (actor.kind === "caller" && actor.incident && ["confirm", "flag", "teachback"].includes(name)) {
+      const { data: desk } = await admin.from("desk").select("handler").eq("id", actor.incident).single().throwOnError();
+      if (desk.handler === "ai") fail(409, "conflict");
+    }
     const out = await commands[name](actor, body);
     if (incident && BOT_SIGNALS.has(name)) await signalBot(incident, name);
     after(flushAlerts);   // whatever this command made the database enqueue (lib/alerts.ts)

@@ -330,7 +330,7 @@ export const FAULT_REPLIES: Record<string, FaultReply> = {
 // pack defaults to the ATM; no faults = any situation of the pack. A forgotten or deliberately kept card can never
 // get the "card is inside, you can wait" reply, whatever the machine alert said.
 const CARD = ["card_retained", "card_forgotten", "card_kept", "card_unreadable"];
-type Rule = { pack?: PackId; faults?: string[]; needsFlags?: string[]; blockedBy?: string[] };
+type Rule = { autonomous?: boolean; pack?: PackId; faults?: string[]; needsFlags?: string[]; blockedBy?: string[] };
 export const REPLY_RULES: Record<string, Rule> = {
   HANDSET: {},
   OFFICIAL_CHANNEL: {},

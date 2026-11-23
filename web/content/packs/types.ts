@@ -10,7 +10,7 @@ export type Tap = { label: L10n; staff: string; suggests?: string; urgent?: bool
 
 // faults: the situations the reply fits (omitted = any situation of its pack). needsFlags: at least one of these
 // taps. blockedBy: never while any of these is on. Enforced in SQL by ichido.reply_rule.
-export type Rule = { pack?: PackId; faults?: string[]; needsFlags?: string[]; blockedBy?: string[] };
+export type Rule = { autonomous?: boolean; pack?: PackId; faults?: string[]; needsFlags?: string[]; blockedBy?: string[] };
 export type PackReply = { code: string; title: string; text: (s: ReplySlots) => L10n; offersChoice?: boolean; rule: Rule };
 
 // Who serves a pack's cases. The field role and /field serve every pack, with this wording.

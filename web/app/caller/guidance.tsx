@@ -59,7 +59,7 @@ export function Guidance({ lang, card, reply, rate = 1 }: { lang: Lang; card: Ca
           </div>
         </div>
       )}
-      <TeachBack lang={lang} card={card} onNote={setNote} />
+      {card.handler !== "ai" && <TeachBack lang={lang} card={card} onNote={setNote} />}
     </>
   );
 }

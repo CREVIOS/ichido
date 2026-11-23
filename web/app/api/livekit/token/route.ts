@@ -28,9 +28,9 @@ export async function POST(req: Request): Promise<Response> {
     return reply(403, { error: "forbidden" });
   };
   if (a.kind !== "caller" || !a.incident || !a.lang || !a.expires || !a.voiceRoom) return refuse(a.kind === "caller" ? "unpaired" : "not_caller");
-  const { data: open } = await admin.from("desk").select("id,text_only").eq("id", a.incident).is("finished_at", null).maybeSingle();
+  const { data: open } = await admin.from("desk").select("id,text_only,handler").eq("id", a.incident).is("finished_at", null).maybeSingle();
   if (!open) return refuse("case_closed", a.incident);
-  if (open.text_only) return refuse("text_only", a.incident);
+  if (open.text_only || open.handler !== "legacy") return refuse("text_only", a.incident);
   const limited = await limitKey("voice", a.uid, 10, 60);
   if (limited) return limited;
   // Nepali has no speech recognition: the caller types.

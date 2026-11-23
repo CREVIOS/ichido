@@ -42,7 +42,7 @@ function useDesk(sel: string) {
     const db = sb();
     const [o, h, s, t] = await Promise.all([
       db.from("desk").select("*, escalation(reason), reply(id, sent_at), case_event(at)").is("finished_at", null)
-        .eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
+        .eq("reply.author", "human").eq("case_event.kind", "claimed").order("at", { referencedTable: "case_event" })
         .limit(1, { referencedTable: "case_event" }).order("sent_at", { referencedTable: "reply", ascending: false })
         .limit(1, { referencedTable: "reply" }).order("created_at").abortSignal(signal),
       db.from("desk").select("*").not("finished_at", "is", null).order("finished_at", { ascending: false }).limit(HISTORY).abortSignal(signal),
@@ -123,7 +123,7 @@ function Console({ me }: { me: Me }) {
           </DropdownMenuContent>
         </DropdownMenu>}
         {watching.length > 0 && <span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:inline-flex"><Dot s="live" />{DESK.alsoViewing(watching.join("・"))}</span>}
-        <CaseAlerts open={open} labels={label} />
+        <CaseAlerts open={open?.filter((d) => d.handler !== "ai") ?? null} labels={label} />
         <BotReminders open={open} labels={label} me={me.uid} />
         <PromiseAlerts open={open} labels={label} me={me.uid} />
         <MoreMenu label={DESK.manualFault} items={stations.flatMap((s) => [

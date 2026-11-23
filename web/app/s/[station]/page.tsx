@@ -58,7 +58,7 @@ function StationForm() {
   const connect = (e: React.FormEvent) => {
     e.preventDefault();
     return withSession(async () => {
-      await cmd("pair", { station, code, lang });
+      await cmd("pair", { station, code, lang, frontline: true });
       // Load a new document so the caller microphone Permissions-Policy takes effect.
       location.replace("/caller");
     });

@@ -59,7 +59,7 @@ export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: 
   );
 }
 
-function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; busy: boolean; onAnswer: (k: string, v: Fact) => void }) {
+export function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: Draft; busy: boolean; onAnswer: (k: string, v: Fact) => void }) {
   return (
     <section className="flex flex-col gap-5">
       <div className="flex items-center justify-between">

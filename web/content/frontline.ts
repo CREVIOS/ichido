@@ -31,6 +31,7 @@ export const FRONTLINE = {
   connected: { en: "An operator has joined your case.", ja: "係の 人が つながりました。", bn: "একজন কর্মী আপনার কেসে যুক্ত হয়েছেন।", vi: "Một nhân viên đã tham gia hỗ trợ bạn.", id: "Petugas sudah bergabung.", ne: "एक जना कर्मचारी तपाईंको केसमा जोडिनुभएको छ।" },
   fallback: { en: "I need a person’s help with this.", ja: "これは 係の 人に ききます。", bn: "এ বিষয়ে একজন কর্মীর সাহায্য দরকার।", vi: "Việc này cần nhân viên hỗ trợ.", id: "Saya perlu bantuan petugas untuk ini.", ne: "यसका लागि कर्मचारीको सहायता चाहिन्छ।" },
   inPerson: { en: "Show this screen to a staff member or scan the Help Point sticker to request help by text.", ja: "この 画面を 係の 人に みせて ください。たすけを よぶ シールを よむと、文字でも たのめます。", bn: "কর্মীকে এই স্ক্রিন দেখান বা লিখে সাহায্য চাইতে হেল্প পয়েন্টের স্টিকার স্ক্যান করুন।", vi: "Hãy cho nhân viên xem màn hình này hoặc quét nhãn Help Point để yêu cầu hỗ trợ bằng chữ.", id: "Tunjukkan layar ini kepada petugas atau pindai stiker Help Point untuk meminta bantuan lewat teks.", ne: "कर्मचारीलाई यो स्क्रिन देखाउनुहोस् वा लेखेर मद्दत माग्न हेल्प पोइन्टको स्टिकर स्क्यान गर्नुहोस्।" },
+  change: { en: "Change my answer", ja: "こたえを なおす", bn: "আমার উত্তর বদলান", vi: "Sửa câu trả lời", id: "Ubah jawaban saya", ne: "मेरो उत्तर सच्याउने" },
   answered: { en: "Yes, that answered my question", ja: "はい、わかりました", bn: "হ্যাঁ, আমার প্রশ্নের উত্তর পেয়েছি", vi: "Có, tôi đã nhận được câu trả lời", id: "Ya, pertanyaan saya terjawab", ne: "हो, मैले उत्तर पाएँ" },
 } satisfies Record<string, L10n>;
 

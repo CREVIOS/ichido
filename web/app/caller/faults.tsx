@@ -20,11 +20,12 @@ export async function tapFlag(flags: readonly string[], flag: string, on: boolea
   await cmd("flag", { flag, on });
 }
 
-export function CallerFlags({ card, lang }: { card: CallerCase; lang: Lang }) {
+export function CallerFlags({ card, lang, submit }: { card: CallerCase; lang: Lang; submit?: (flag: string, on: boolean) => Promise<void> }) {
   const [note, setNote] = useState("");
   const tap = async (flag: string, on: boolean) => {
     try {
-      await tapFlag(card.flags, flag, on);
+      if (submit) await submit(flag, on);
+      else await tapFlag(card.flags, flag, on);
       setNote("");
     } catch (e) { setNote(errorText((e as Error).message, lang)); }
   };

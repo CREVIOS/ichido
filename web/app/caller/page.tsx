@@ -7,6 +7,7 @@ import { Phone } from "@/components/phone";
 import { Notice, StatusLabel } from "@/components/kit";
 import { LangSelect, preferredLang } from "@/components/lang-select";
 import { ACCESS, FAULTS, STATION, UI, callerPack, pick, type Lang } from "@/content/catalogue";
+import { Conversation } from "./conversation";
 import { Intake, Waiting } from "./intake";
 import { Guidance } from "./guidance";
 import { DisasterNotice } from "./disaster";
@@ -15,6 +16,7 @@ import { PrefsBar, speechRate, usePrefs } from "./prefs";
 import { CallerNotice, FraudScreen } from "./ops";
 import type { CallerCase, Draft, Reply, Station } from "./types";
 
+const openCase = (card: CallerCase) => card.status !== "guided";
 const noop = () => () => {};
 
 export default function CallerPage() {
@@ -56,6 +58,7 @@ export default function CallerPage() {
   if (card.fraud) return <FraudScreen lang={lang} />;
   // The current guidance only: a reply withdrawn after a fault-type change no longer shows.
   const latest = replies.find((r) => r.id === card.reply_id);
+  const frontline = card.handler !== "legacy" && openCase(card);
   const confirmed = card.confirmed_rev != null || replies.length > 0;
   const open = card.status !== "guided";
   // A non-ATM pack's caller answers with taps inside the intake; the ATM's taps sit below the read-back.
@@ -72,10 +75,11 @@ export default function CallerPage() {
       {card.text_only && <Notice tone="info">{ACCESS.textOnly[lang]}</Notice>}
       {card.notice && <CallerNotice code={card.notice} lang={lang} />}
       <DisasterNotice station={card.station} lang={lang} />
-      {!confirmed && draft && <Intake lang={lang} draft={draft} card={card} />}
-      {confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
+      {frontline && draft && <Conversation key={card.id} card={card} draft={draft} lang={lang} refresh={load} />}
+      {!frontline && !confirmed && draft && <Intake lang={lang} draft={draft} card={card} />}
+      {!frontline && confirmed && !latest && <Waiting lang={lang} textOnly={card.text_only} fault={card.fault} />}
       {latest && <Guidance lang={lang} card={card} reply={latest} rate={speechRate(prefs)} />}
-      {open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
+      {!frontline && open && (P.atm || confirmed) && <CallerFlags card={card} lang={lang} />}
       {P.atm && (card.bank_status || !open) && <BankStatus status={card.bank_status} due={card.bank_due} lang={lang} />}
       <ShowStaff card={card} lang={lang} />
       <p className="text-[12px] leading-5 text-muted-foreground">{UI.helpDesk[lang]}</p>

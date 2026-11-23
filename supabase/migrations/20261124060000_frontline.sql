@@ -140,5 +140,240 @@ revoke all on function ichido.frontline_owner(), ichido.frontline_card(), ichido
   public.frontline_takeover(uuid,text,uuid,integer) from public, anon, authenticated;
 grant execute on function public.cmd_display_press(text,text,text,text,text), public.frontline_pair(uuid,text,text,text,boolean),
   public.frontline_takeover(uuid,text,uuid,integer) to service_role;
+
+alter table ichido.binding add column if not exists frontline_started boolean not null default false;
+alter table ichido.reply_rule add column if not exists autonomous boolean not null default false;
+update ichido.reply_rule set autonomous = true where intent = 'SHELTER_INFO' and pack = 'shelter' and not autonomous;
+alter table public.reply alter column operator_id drop not null,
+  add column if not exists author text not null default 'human' check (author in ('ai','human'));
+do $$ begin
+  if not exists (select from pg_constraint where conrelid='public.reply'::regclass and conname='reply_author_owner') then
+    alter table public.reply add constraint reply_author_owner check ((author = 'ai') = (operator_id is null));
+  end if;
+end $$;
+
+create table if not exists public.frontline_turn (
+  seq bigint generated always as identity primary key,
+  incident uuid not null references public.desk on delete cascade,
+  generation uuid not null,
+  request_id uuid not null,
+  speaker text not null check (speaker in ('caller','ai','human')),
+  locale text not null check (locale in ('bn','vi','id','ne','en','ja')),
+  channel text not null default 'text' check (channel in ('text','tap','voice')),
+  words text check (length(words) <= 500 and speaker='caller'),
+  wording text not null,
+  facts jsonb not null default '{}',
+  rev integer not null, epoch integer not null,
+  reply_id uuid references public.reply on delete cascade,
+  delivery text not null default 'committed',
+  policy_version text not null default 'frontline-1',
+  at timestamptz not null default now(),
+  unique (incident,generation,request_id,speaker)
+);
+create index if not exists frontline_session on public.frontline_turn(incident,generation,seq);
+alter table public.frontline_turn enable row level security;
+revoke all on public.frontline_turn from public, anon, authenticated, service_role;
+grant select on public.frontline_turn to authenticated, service_role;
+create or replace trigger frontline_immutable before update or delete on public.frontline_turn
+for each row execute function ichido.case_event_append_only();
+
+create or replace function ichido.owns_generation(i uuid,g uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select ichido.owns(i) and exists (select from ichido.binding where incident=i and uid=auth.uid() and voice_room=g and expires>now())
+$$;
+revoke all on function ichido.owns_generation(uuid,uuid) from public,anon;
+grant execute on function ichido.owns_generation(uuid,uuid) to authenticated;
+drop policy if exists frontline_caller on public.frontline_turn;
+create policy frontline_caller on public.frontline_turn for select to authenticated using (ichido.owns_generation(incident,generation));
+
+create or replace function ichido.frontline_greeting() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,rev,epoch)
+    select d.id,new.voice_room,gen_random_uuid(),'ai',new.lang,'greeting',dr.rev,d.handler_epoch
+    from public.desk d join public.draft dr on dr.incident=d.id where d.id=new.incident and d.handler='ai';
+  return null;
+end $$;
+create or replace trigger frontline_greeting after insert on ichido.binding for each row execute function ichido.frontline_greeting();
+
+-- Reserve the submitted revision before inference. A second submission invalidates the first candidate.
+create or replace function public.frontline_submit(p_uid uuid,p_generation uuid,p_request uuid,p_rev int,
+  p_act text,p_words text,p_facts jsonb,p_priority int,p_reason text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare d public.desk; b ichido.binding; dr public.draft; prior public.frontline_turn; n bigint; flags_now text[];
+begin
+  d := ichido.caller_case(p_uid);
+  select * into strict b from ichido.binding where incident=d.id and uid=p_uid;
+  if b.voice_room <> p_generation or d.handler='legacy' then perform ichido.fail('forbidden'); end if;
+  select * into strict dr from public.draft where incident=d.id;
+  select * into prior from public.frontline_turn where incident=d.id and generation=p_generation and request_id=p_request and speaker='caller';
+  if found then
+    return jsonb_build_object('rev',prior.rev,'epoch',prior.epoch,'replay',true,'act',prior.wording);
+  end if;
+  if p_act='start' then
+    update ichido.binding set frontline_started=true where incident=d.id;
+  elsif not b.frontline_started then perform ichido.fail('forbidden');
+  end if;
+  if p_act not in ('start','text','withheld','facts','tap','confirm','change','unsure') then perform ichido.fail('bad_request'); end if;
+  if p_priority is null and p_act <> 'start' and p_rev is distinct from dr.rev then perform ichido.fail('conflict'); end if;
+  if p_act not in ('start','text','withheld') and d.handler <> 'ai' and d.confirmed_rev is not null then perform ichido.fail('conflict'); end if;
+  if p_act in ('change','text','tap','facts','unsure') and d.handler='ai' and d.confirmed_rev is not null then
+    update public.desk set confirmed_rev=null,caller_words=null,caller_words_ja=null,triage=null,card_back='unknown',cash_received='unknown' where id=d.id;
+    update public.caller_card set confirmed_rev=null,reply_id=null,teachback=null,teachback_ja=null,teachback_result=null where id=d.id;
+  end if;
+  if p_act in ('text','facts','tap','change','unsure') and (d.handler='ai' or d.confirmed_rev is null) then
+    update public.draft set rev=rev+1, words=case when p_act='text' then p_words else words end,
+      card_back=coalesce((p_facts->>'card_back')::public.fact,card_back),
+      cash_received=coalesce((p_facts->>'cash_received')::public.fact,cash_received),
+      needs_clarification=false,triage=null where incident=d.id returning * into dr;
+    if p_act='tap' then
+      perform public.cmd_flag(p_uid,other,false) from jsonb_array_elements_text(p_facts->'off') as x(other);
+      perform public.cmd_flag(p_uid,p_facts->>'flag',(p_facts->>'on')::boolean);
+    end if;
+  elsif p_act='confirm' then
+    select flags into flags_now from public.caller_card where id=d.id;
+    if flags_now = array['need_news'] and exists(select from ichido.situation where code=d.fault and pack='shelter') then
+      update public.desk set fault='shelter_info' where id=d.id returning * into d;
+      update public.caller_card set fault=d.fault where id=d.id;
+    end if;
+    perform public.cmd_confirm(p_uid,p_rev);
+  end if;
+  insert into public.frontline_turn(incident,generation,request_id,speaker,locale,channel,words,wording,facts,rev,epoch)
+    values(d.id,p_generation,p_request,'caller',b.lang,case when p_act in ('text','withheld') then 'text' else 'tap' end,
+      p_words,p_act,p_facts,dr.rev,d.handler_epoch) returning seq into n;
+  if d.handler='ai' and p_priority is null then
+    if (select count(*) from public.frontline_turn where incident=d.id and generation=p_generation and speaker='ai') >= 6 then
+      p_priority:=2; p_reason:='limit';
+    elsif p_act in ('change','unsure') and (select count(*) from public.frontline_turn where incident=d.id and generation=p_generation and wording in ('change','unsure')) >= 2 then
+      p_priority:=2; p_reason:='unclear';
+    end if;
+  end if;
+  if p_priority is not null then perform ichido.queue_frontline(d.id,p_priority,p_reason); end if;
+  select flags into flags_now from public.caller_card where id=d.id;
+  return jsonb_build_object('seq',n,'rev',dr.rev,'epoch',d.handler_epoch,'locale',b.lang,'fault',d.fault,
+    'handler',(select handler from public.desk where id=d.id),'flags',flags_now,'card_back',dr.card_back,'cash_received',dr.cash_received);
+end $$;
+
+-- Only the caller's current, confirmed notice-board request has an autonomous manual entry.
+create or replace function ichido.autonomous_allowed() returns trigger
+language plpgsql set search_path = '' as $$
+declare d public.desk; fl text[];
+begin
+  if new.author='ai' then
+    select * into strict d from public.desk where id=new.incident for update;
+    select flags into fl from public.caller_card where id=d.id;
+    if d.handler <> 'ai' or d.finished_at is not null or d.confirmed_rev is null or d.clarifying or
+       d.fraud_at is not null or d.priority is not null or new.intent <> 'SHELTER_INFO' or
+       fl is distinct from array['need_news'] or
+       not exists (select from ichido.reply_rule where intent=new.intent and autonomous and pack='shelter') or
+       not ichido.reply_ok(new.intent,d.fault,fl) then perform ichido.fail('conflict'); end if;
+  end if;
+  return new;
+end $$;
+create or replace trigger frontline_eligible before insert on public.reply for each row execute function ichido.autonomous_allowed();
+
+create or replace function public.frontline_finish(p_uid uuid,p_generation uuid,p_request uuid,p_wording text,p_patch jsonb,
+  p_triage jsonb,p_priority int,p_reason text,p_manual text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare d public.desk; t public.frontline_turn; dr public.draft; r uuid;
+begin
+  d:=ichido.caller_case(p_uid);
+  if not exists(select from ichido.binding where incident=d.id and uid=p_uid and voice_room=p_generation) then perform ichido.fail('forbidden'); end if;
+  select * into strict t from public.frontline_turn where incident=d.id and generation=p_generation and request_id=p_request and speaker='caller';
+  if exists(select from public.frontline_turn where incident=d.id and generation=p_generation and request_id=p_request and speaker='ai') then return false; end if;
+  if p_priority is not null then perform ichido.queue_frontline(d.id,p_priority,p_reason); return false; end if;
+  select * into dr from public.draft where incident=d.id;
+  if d.handler <> 'ai' or d.handler_epoch <> t.epoch or dr.rev <> t.rev or d.lang <> t.locale then return false; end if;
+  if p_wording not in ('readback','SHELTER_INFO','withheld') then perform ichido.fail('bad_request'); end if;
+  if p_wording='SHELTER_INFO' then
+    if t.wording <> 'confirm' or d.confirmed_rev is distinct from t.rev then perform ichido.fail('conflict'); end if;
+    insert into public.reply(incident,intent,manual_version,author) values(d.id,p_wording,p_manual,'ai') returning id into r;
+    update public.caller_card set reply_id=r where id=d.id;
+  else
+    if d.confirmed_rev is not null then return false; end if;
+    update public.draft set rev=rev+1,card_back=coalesce((p_patch->>'card_back')::public.fact,card_back),
+      cash_received=coalesce((p_patch->>'cash_received')::public.fact,cash_received),
+      triage=p_triage where incident=d.id returning * into dr;
+  end if;
+  insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,facts,rev,epoch,reply_id)
+    values(d.id,p_generation,p_request,'ai',t.locale,p_wording,
+      jsonb_strip_nulls(jsonb_build_object('triage',p_triage,'card_back',dr.card_back,'cash_received',dr.cash_received)),dr.rev,t.epoch,r);
+  return true;
+end $$;
+revoke all on function ichido.frontline_greeting(),ichido.autonomous_allowed(),
+  public.frontline_submit(uuid,uuid,uuid,int,text,text,jsonb,int,text),
+  public.frontline_finish(uuid,uuid,uuid,text,jsonb,jsonb,int,text,text) from public,anon,authenticated;
+grant execute on function public.frontline_submit(uuid,uuid,uuid,int,text,text,jsonb,int,text),
+  public.frontline_finish(uuid,uuid,uuid,text,jsonb,jsonb,int,text,text) to service_role;
+
+
+create table if not exists public.frontline_translation (
+  seq bigint primary key references public.frontline_turn on delete cascade, ja text not null check (length(ja)<=1000)
+);
+alter table public.frontline_translation enable row level security;
+revoke all on public.frontline_translation from public,anon,authenticated,service_role;
+grant select,insert on public.frontline_translation to service_role;
+
+create table if not exists ichido.frontline_monitor (
+  incident uuid not null references public.desk on delete cascade,
+  generation uuid not null, staff_id uuid not null, session_id uuid not null, at timestamptz not null default now(),
+  primary key(incident,generation,staff_id,session_id)
+);
+alter table ichido.frontline_monitor enable row level security;
+revoke all on ichido.frontline_monitor from public,anon,authenticated,service_role;
+
+create or replace function public.frontline_monitor(p_uid uuid,p_session uuid,p_incident uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare g uuid;
+begin
+  if not exists(select from auth_ba."session" s join auth_ba."user" u on u.id=s."userId"
+    join ichido.staff st on st.uid=u.id where s.id=p_session and u.id=p_uid and not u.banned
+      and st.role='operator' and s.aal='aal2' and s."expiresAt">now()) then perform ichido.fail('forbidden'); end if;
+  select b.voice_room into g from ichido.binding b join public.desk d on d.id=b.incident
+    where b.incident=p_incident and b.expires>now() and d.handler<>'legacy' and d.finished_at is null;
+  if not found then return '[]'::jsonb; end if;
+  insert into ichido.frontline_monitor(incident,generation,staff_id,session_id) values(p_incident,g,p_uid,p_session)
+    on conflict do nothing;
+  return (select coalesce(jsonb_agg(jsonb_build_object('seq',t.seq,'speaker',t.speaker,'locale',t.locale,
+    'words',t.words,'ja',j.ja,'wording',t.wording,'facts',t.facts,'rev',t.rev,'at',t.at) order by t.seq),'[]')
+    from public.frontline_turn t left join public.frontline_translation j using(seq)
+    where t.incident=p_incident and t.generation=g);
+end $$;
+
+create or replace function ichido.frontline_transition() returns trigger
+language plpgsql set search_path='' as $$
+begin
+  insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,rev,epoch)
+    select new.id,b.voice_room,gen_random_uuid(),case new.handler when 'human' then 'human' else 'ai' end,b.lang,
+      case new.handler when 'human' then 'connected' else 'queued' end,dr.rev,new.handler_epoch
+    from ichido.binding b join public.draft dr using(incident) where b.incident=new.id and b.expires>now();
+  return null;
+end $$;
+create or replace trigger frontline_transition after update on public.desk for each row
+when (new.handler in ('human','queued') and new.handler<>old.handler) execute function ichido.frontline_transition();
+
+create or replace function ichido.frontline_human_reply() returns trigger
+language plpgsql set search_path='' as $$
+begin
+  insert into public.frontline_turn(incident,generation,request_id,speaker,locale,wording,rev,epoch,reply_id)
+    select d.id,b.voice_room,new.id,'human',b.lang,new.intent,d.confirmed_rev,d.handler_epoch,new.id
+    from public.desk d join ichido.binding b on b.incident=d.id
+    where d.id=new.incident and d.handler='human' and b.expires>now();
+  return null;
+end $$;
+create or replace trigger frontline_human_reply after insert on public.reply for each row
+when (new.author='human') execute function ichido.frontline_human_reply();
+
+revoke all on function public.frontline_monitor(uuid,uuid,uuid), ichido.frontline_transition(),ichido.frontline_human_reply()
+  from public,anon,authenticated;
+grant execute on function public.frontline_monitor(uuid,uuid,uuid) to service_role;
+create or replace trigger live_insert after insert on public.frontline_turn referencing new table as new_rows
+  for each statement execute function ichido.live_send('incident','incident');
+create or replace trigger live_insert after insert on public.frontline_translation referencing new table as new_rows
+  for each statement execute function ichido.live_send();
+drop policy if exists frontline_staff_topic on realtime.messages;
+create policy frontline_staff_topic on realtime.messages for select to authenticated
+  using (extension='broadcast' and realtime.topic() in ('live:frontline_turn','live:frontline_translation') and ichido.has_role('operator'));
+
 notify pgrst, 'reload schema';
 commit;
