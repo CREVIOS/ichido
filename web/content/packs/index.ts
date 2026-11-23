@@ -49,14 +49,16 @@ export const PACK_RULES: Record<string, Rule> = all((p) => Object.fromEntries(Ob
 export const PACK_RECIPIENTS: Record<string, string> = Object.assign({}, ...PACK_IDS.map((id) => PACKS[id].recipients));
 export const isUrgentTap = (flag: string) => Boolean(PACK_TAPS[flag]?.urgent);
 
-// The taps a pack's caller sees: the pack's common taps, then the details of the current situation and of any
-// situation their own taps point to (so "I can't explain my symptoms" shows who / where / since when at once).
+// A station default is not a stated need. Expand details for the selected need or a corrected situation.
 export function packTapsFor(p: Pack, fault: string, flags: readonly string[]): string[] {
-  const situations = [fault, ...flags.map((f) => p.taps[f]?.suggests).filter((s): s is string => Boolean(s))];
-  return [...new Set([...p.common, ...situations.flatMap((s) => p.bySituation[s] ?? [])])];
+  const selected = flags.map(f => p.taps[f]?.suggests).filter((s): s is string => Boolean(s));
+  const needs = p.common.filter(f => p.taps[f]?.group === "need");
+  const details = flags.includes("diet_allergy") ? ["allergy_me","allergy_child","allergy_other"] : (selected.length || fault === p.device || flags.includes("need_other") ? selected : [fault]).flatMap(s => p.bySituation[s] ?? []);
+  return [...new Set([...needs, "need_other", ...p.common, ...details])].filter(f =>
+    !f.startsWith("allergy_") || flags.includes("diet_allergy"));
 }
 // Every tap a pack accepts from its callers (the server refuses others).
-export const packTaps = (p: Pack) => [...new Set([...p.common, ...Object.values(p.bySituation).flat()])];
+export const packTaps = (p: Pack) => [...new Set(["need_other", ...p.common, ...Object.values(p.bySituation).flat()])];
 
 // Caller wording for a non-ATM case: what is never asked, the assistant's limits, where to find a person, and what
 // the responder is doing. catalogue.ts callerPack() returns the ATM's own wording for ATM cases.

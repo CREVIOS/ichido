@@ -41,12 +41,12 @@ export const OPS_CALLER = {
       ne: "अघिको निर्देशन फेरिएको छ। अर्को सन्देश पर्खनुहोस्।",
     },
     mass_leave: {
-      ja: "いま、たくさんの ATM が とまって います。かえっても いいです。銀行から れんらくします。カードは 銀行の きまりに そって あつかいます。",
-      bn: "এখন অনেক এটিএমে সমস্যা হচ্ছে। আপনি এখন চলে যেতে পারেন। ব্যাংক আপনার সাথে যোগাযোগ করবে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে।",
-      en: "Many ATMs have a problem right now. You can leave now. The bank will contact you. The card is handled under the bank's own procedure.",
-      vi: "Hiện nhiều máy ATM đang gặp sự cố. Bạn có thể ra về ngay bây giờ. Ngân hàng sẽ liên lạc với bạn. Thẻ được xử lý theo quy trình riêng của ngân hàng.",
-      id: "Saat ini banyak ATM sedang bermasalah. Anda boleh pulang sekarang. Bank akan menghubungi Anda. Kartu ditangani sesuai prosedur bank sendiri.",
-      ne: "अहिले धेरै एटीएममा समस्या छ। तपाईं अहिले जान सक्नुहुन्छ। बैंकले तपाईंलाई सम्पर्क गर्नेछ। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ।",
+      ja: "いま、たくさんの ATM が とまって います。かえっても いいです。あとで この 画面で おしらせを みて ください。カードは 銀行の きまりに そって あつかいます。",
+      bn: "এখন অনেক এটিএমে সমস্যা হচ্ছে। আপনি এখন চলে যেতে পারেন। নতুন খবরের জন্য এই কেসটি এখানে দেখুন। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে।",
+      en: "Many ATMs have a problem right now. You can leave now. Check this case here for updates. The card is handled under the bank's own procedure.",
+      vi: "Hiện nhiều máy ATM đang gặp sự cố. Bạn có thể ra về ngay bây giờ. Hãy xem lại hồ sơ tại đây để biết tin mới. Thẻ được xử lý theo quy trình riêng của ngân hàng.",
+      id: "Saat ini banyak ATM sedang bermasalah. Anda boleh pulang sekarang. Periksa kasus ini di sini untuk kabar terbaru. Kartu ditangani sesuai prosedur bank sendiri.",
+      ne: "अहिले धेरै एटीएममा समस्या छ। तपाईं अहिले जान सक्नुहुन्छ। नयाँ जानकारीका लागि यहीँ केस हेर्नुहोस्। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ।",
     },
     still_working: {
       ja: "係の 人が まだ たいおう して います。まって くれて ありがとう。",

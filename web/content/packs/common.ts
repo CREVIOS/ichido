@@ -1,6 +1,7 @@
 // Caller wording every non-ATM pack shares. Bengali, Vietnamese, Indonesian and Nepali are drafts awaiting native
 // review; Japanese is easy Japanese (npm run check:ja).
 import type { FieldState, L10n, Lang } from "../catalogue.ts";
+import { JOURNEY } from "../caller-journey.ts";
 import type { Tap } from "./types.ts";
 
 // A reply slot (the station's place and hours) in one language, English when a translation is missing.
@@ -88,10 +89,11 @@ export const GROUP_TITLE: Record<string, L10n> = {
   lostwhere: { ja: "どこで なくしましたか", en: "Where did you lose it?", bn: "কোথায় হারিয়েছেন?", vi: "Bạn mất ở đâu?", id: "Hilang di mana?", ne: "कहाँ हरायो?" },
   party: { ja: "だれと いっしょですか", en: "Who is with you?", bn: "আপনার সঙ্গে কে আছেন?", vi: "Ai đi cùng bạn?", id: "Siapa yang bersama Anda?", ne: "तपाईंसँग को हुनुहुन्छ?" },
 };
-export const EXCLUSIVE_GROUPS = new Set(["who", "since", "pain", "party"]);
+export const EXCLUSIVE_GROUPS = new Set(["need","who", "since", "pain", "party"]);
 
 // Taps more than one pack offers. (`helper`, a family member helping, comes from content/faults.ts.)
 export const SHARED_TAPS: Record<string, Tap> = {
+  need_other: { group: "need", staff: "その他の相談", label: JOURNEY.other },
   need_interpreter: {
     staff: "通訳を希望",
     label: {

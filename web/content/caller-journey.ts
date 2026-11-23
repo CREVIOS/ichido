@@ -22,3 +22,11 @@ export const JOURNEY = {
 } satisfies Record<string, L10n>;
 
 export type EndReason = "expired" | "abandoned" | "replaced";
+
+// Published by the Nagasaki International Association at https://www.nia.or.jp/index.php/page/consultation
+export const CONSULTATION = { phone: "095-820-3377", email: "soudan@nia.or.jp" };
+export const allergyFacts = (flags: string[]) => flags.includes("diet_allergy")
+  ? flags.filter(f => ["diet_allergy","allergy_me","allergy_child","allergy_other"].includes(f)) : [];
+export function receipt(station: string, id: string) {
+  return `Ichido · ${station} · ${id.slice(0,8)}`;
+}

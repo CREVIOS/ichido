@@ -292,12 +292,12 @@ export const FAULT_REPLIES: Record<string, FaultReply> = {
   CASH_IN_JAM: {
     code: "C-3", title: "入金時の紙幣詰まり（銀行が現金と記録を確認、待つ／帰るを選択）", offersChoice: true,
     text: () => ({
-      ja: "入れた お金は ATM の 中に あります。銀行が お金と 記録を しらべて、こうざの お金を なおします。ATM から でた 紙が あれば、すてないで ください。ここで まっても、かえっても いいです。かえった ときは 銀行から れんらくします。",
-      en: "The cash you put in is inside the machine. The bank counts it, checks the record and corrects your balance. Please keep the slip if the machine gave you one. You can wait here, or you can leave. If you leave, the bank will contact you.",
-      bn: "আপনি যে টাকা জমা দিয়েছেন তা মেশিনের ভেতরে আছে। ব্যাংক টাকা গুনে, রেকর্ড দেখে আপনার ব্যালান্স ঠিক করবে। মেশিন কোনো রসিদ দিয়ে থাকলে সেটি রেখে দিন। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে।",
-      vi: "Số tiền bạn nạp vào đang ở trong máy. Ngân hàng sẽ đếm tiền, kiểm tra dữ liệu và điều chỉnh số dư cho bạn. Nếu máy có in phiếu, hãy giữ lại. Bạn có thể chờ ở đây, hoặc có thể ra về. Nếu bạn ra về, ngân hàng sẽ liên lạc với bạn.",
-      id: "Uang yang Anda setor ada di dalam mesin. Bank menghitungnya, memeriksa catatan, dan membetulkan saldo Anda. Jika mesin mengeluarkan struk, simpanlah. Anda bisa menunggu di sini, atau Anda bisa pulang. Jika Anda pulang, bank akan menghubungi Anda.",
-      ne: "तपाईंले हालेको पैसा मेसिनभित्र छ। बैंकले पैसा गनेर, रेकर्ड जाँचेर तपाईंको मौज्दात मिलाउँछ। मेसिनले रसिद दिएको भए त्यसलाई राख्नुहोस्। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। जानुभयो भने बैंकले तपाईंलाई सम्पर्क गर्नेछ।",
+      ja: "入れた お金は ATM の 中に あります。銀行が お金と 記録を しらべて、こうざの お金を なおします。ATM から でた 紙が あれば、すてないで ください。ここで まっても、かえっても いいです。あとで この 画面で おしらせを みて ください。",
+      en: "The cash you put in is inside the machine. The bank counts it, checks the record and corrects your balance. Please keep the slip if the machine gave you one. You can wait here, or you can leave. Check this case here for updates.",
+      bn: "আপনি যে টাকা জমা দিয়েছেন তা মেশিনের ভেতরে আছে। ব্যাংক টাকা গুনে, রেকর্ড দেখে আপনার ব্যালান্স ঠিক করবে। মেশিন কোনো রসিদ দিয়ে থাকলে সেটি রেখে দিন। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। নতুন খবরের জন্য এই কেসটি এখানে দেখুন।",
+      vi: "Số tiền bạn nạp vào đang ở trong máy. Ngân hàng sẽ đếm tiền, kiểm tra dữ liệu và điều chỉnh số dư cho bạn. Nếu máy có in phiếu, hãy giữ lại. Bạn có thể chờ ở đây, hoặc có thể ra về. Hãy xem lại hồ sơ tại đây để biết tin mới.",
+      id: "Uang yang Anda setor ada di dalam mesin. Bank menghitungnya, memeriksa catatan, dan membetulkan saldo Anda. Jika mesin mengeluarkan struk, simpanlah. Anda bisa menunggu di sini, atau Anda bisa pulang. Periksa kasus ini di sini untuk kabar terbaru.",
+      ne: "तपाईंले हालेको पैसा मेसिनभित्र छ। बैंकले पैसा गनेर, रेकर्ड जाँचेर तपाईंको मौज्दात मिलाउँछ। मेसिनले रसिद दिएको भए त्यसलाई राख्नुहोस्। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। नयाँ जानकारीका लागि यहीँ केस हेर्नुहोस्।",
     }),
   },
   LIMIT_REFUSED: {
@@ -314,12 +314,12 @@ export const FAULT_REPLIES: Record<string, FaultReply> = {
   PASSBOOK_HELD: {
     code: "D-1", title: "機械障害により通帳を保管中（待つ／帰るを選択）", offersChoice: true,
     text: (s) => ({
-      ja: `通帳は ATM の 中に あります。ここで まっても、かえっても いいです。かえった ときは 銀行から れんらくします。通帳は 銀行の きまりに そって あつかいます。${p(s.branch, "ja")} の まどぐちでも きけます。あいて いるのは ${p(s.hours, "ja")} です。`,
-      en: `Your passbook is inside the machine. You can wait here, or you can leave. If you leave, the bank will contact you. The passbook is handled under the bank's own procedure. The ${p(s.branch, "en")} counter (${p(s.hours, "en")}) can also help.`,
-      bn: `আপনার পাসবই মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে। পাসবইয়ের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${p(s.branch, "bn")}-এর কাউন্টারেও (${p(s.hours, "bn")}) জানতে পারবেন।`,
-      vi: `Sổ tài khoản của bạn đang ở trong máy. Bạn có thể chờ ở đây, hoặc có thể ra về. Nếu bạn ra về, ngân hàng sẽ liên lạc với bạn. Sổ được xử lý theo quy trình riêng của ngân hàng. Quầy giao dịch của ${p(s.branch, "vi")} (${p(s.hours, "vi")}) cũng có thể giúp bạn.`,
-      id: `Buku tabungan Anda ada di dalam mesin. Anda bisa menunggu di sini, atau Anda bisa pulang. Jika Anda pulang, bank akan menghubungi Anda. Buku tabungan ditangani sesuai prosedur bank sendiri. Loket ${p(s.branch, "id")} (${p(s.hours, "id")}) juga dapat membantu.`,
-      ne: `तपाईंको पासबुक मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। जानुभयो भने बैंकले तपाईंलाई सम्पर्क गर्नेछ। पासबुकको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${p(s.branch, "ne")} को काउन्टरमा (${p(s.hours, "ne")}) पनि सोध्न सक्नुहुन्छ।`,
+      ja: `通帳は ATM の 中に あります。ここで まっても、かえっても いいです。あとで この 画面で おしらせを みて ください。通帳は 銀行の きまりに そって あつかいます。${p(s.branch, "ja")} の まどぐちでも きけます。あいて いるのは ${p(s.hours, "ja")} です。`,
+      en: `Your passbook is inside the machine. You can wait here, or you can leave. Check this case here for updates. The passbook is handled under the bank's own procedure. The ${p(s.branch, "en")} counter (${p(s.hours, "en")}) can also help.`,
+      bn: `আপনার পাসবই মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। নতুন খবরের জন্য এই কেসটি এখানে দেখুন। পাসবইয়ের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${p(s.branch, "bn")}-এর কাউন্টারেও (${p(s.hours, "bn")}) জানতে পারবেন।`,
+      vi: `Sổ tài khoản của bạn đang ở trong máy. Bạn có thể chờ ở đây, hoặc có thể ra về. Hãy xem lại hồ sơ tại đây để biết tin mới. Sổ được xử lý theo quy trình riêng của ngân hàng. Quầy giao dịch của ${p(s.branch, "vi")} (${p(s.hours, "vi")}) cũng có thể giúp bạn.`,
+      id: `Buku tabungan Anda ada di dalam mesin. Anda bisa menunggu di sini, atau Anda bisa pulang. Periksa kasus ini di sini untuk kabar terbaru. Buku tabungan ditangani sesuai prosedur bank sendiri. Loket ${p(s.branch, "id")} (${p(s.hours, "id")}) juga dapat membantu.`,
+      ne: `तपाईंको पासबुक मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। नयाँ जानकारीका लागि यहीँ केस हेर्नुहोस्। पासबुकको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${p(s.branch, "ne")} को काउन्टरमा (${p(s.hours, "ne")}) पनि सोध्न सक्नुहुन्छ।`,
     }),
   },
   ...PACK_REPLIES,

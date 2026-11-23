@@ -5,11 +5,11 @@
 import { BOT, DESK, HANDOFF, STAFF_JA } from "./staff.ts";
 import { CALLER_FLAGS, FAULT_NAMES, FAULT_REPLIES, REPLY_RULES, faultEventText } from "./faults.ts";
 import { EXCLUSIVE_GROUPS, PACKS, contentPack, isUrgentTap, packCaller, packOfFault, packStaffField, type PackId } from "./packs/index.ts";
-import { FRONT_DESK } from "./frontline.ts";
+import { ASSIST, FRONT_DESK } from "./frontline.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
-export const MANUAL_VERSION = "retained-card/v1";
+export const MANUAL_VERSION = "retained-card/v2";
 
 // Picker order: Bengali first (the first community we built with), then the three largest foreign-worker
 // nationalities in Nagasaki Prefecture (Vietnam, Indonesia, Nepal; end-Oct 2025), then English and easy Japanese.
@@ -136,12 +136,12 @@ export const REPLIES: Record<string, Reply> = {
     offersChoice: true,
     needsHeld: true,
     text: (s) => ({
-      ja: `カードは ATM の 中に あります。ここで まっても、かえっても いいです。かえった ときは 銀行から れんらくします。カードは 銀行の きまりに そって あつかいます。${s.branch?.ja} の まどぐちでも きけます。あいて いるのは ${s.hours?.ja} です。`,
-      bn: `আপনার কার্ড মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। চলে গেলে ব্যাংক আপনার সাথে যোগাযোগ করবে। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${pick(s.branch, "bn")}-এর কাউন্টারেও (${pick(s.hours, "bn")}) জানতে পারবেন।`,
-      en: `Your card is inside the machine. You can wait here, or you can leave. If you leave, the bank will contact you. The card is handled under the bank's own procedure. The ${pick(s.branch, "en")} counter (${pick(s.hours, "en")}) can also help.`,
-      vi: `Thẻ của bạn đang ở trong máy. Bạn có thể chờ ở đây, hoặc có thể ra về. Nếu bạn ra về, ngân hàng sẽ liên lạc với bạn. Thẻ được xử lý theo quy trình riêng của ngân hàng. Quầy giao dịch của ${pick(s.branch, "vi")} (${pick(s.hours, "vi")}) cũng có thể giúp bạn.`,
-      id: `Kartu Anda ada di dalam mesin. Anda bisa menunggu di sini, atau Anda bisa pulang. Jika Anda pulang, bank akan menghubungi Anda. Kartu ditangani sesuai prosedur bank sendiri. Loket ${pick(s.branch, "id")} (${pick(s.hours, "id")}) juga dapat membantu.`,
-      ne: `तपाईंको कार्ड मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। जानुभयो भने बैंकले तपाईंलाई सम्पर्क गर्नेछ। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${pick(s.branch, "ne")} को काउन्टरमा पनि सोध्न सक्नुहुन्छ (${pick(s.hours, "ne")})।`,
+      ja: `カードは ATM の 中に あります。ここで まっても、かえっても いいです。あとで この 画面で おしらせを みて ください。カードは 銀行の きまりに そって あつかいます。${s.branch?.ja} の まどぐちでも きけます。あいて いるのは ${s.hours?.ja} です。`,
+      bn: `আপনার কার্ড মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। নতুন খবরের জন্য এই কেসটি এখানে দেখুন। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${pick(s.branch, "bn")}-এর কাউন্টারেও (${pick(s.hours, "bn")}) জানতে পারবেন।`,
+      en: `Your card is inside the machine. You can wait here, or you can leave. Check this case here for updates. The card is handled under the bank's own procedure. The ${pick(s.branch, "en")} counter (${pick(s.hours, "en")}) can also help.`,
+      vi: `Thẻ của bạn đang ở trong máy. Bạn có thể chờ ở đây, hoặc có thể ra về. Hãy xem lại hồ sơ tại đây để biết tin mới. Thẻ được xử lý theo quy trình riêng của ngân hàng. Quầy giao dịch của ${pick(s.branch, "vi")} (${pick(s.hours, "vi")}) cũng có thể giúp bạn.`,
+      id: `Kartu Anda ada di dalam mesin. Anda bisa menunggu di sini, atau Anda bisa pulang. Periksa kasus ini di sini untuk kabar terbaru. Kartu ditangani sesuai prosedur bank sendiri. Loket ${pick(s.branch, "id")} (${pick(s.hours, "id")}) juga dapat membantu.`,
+      ne: `तपाईंको कार्ड मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। नयाँ जानकारीका लागि यहीँ केस हेर्नुहोस्। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${pick(s.branch, "ne")} को काउन्टरमा पनि सोध्न सक्नुहुन्छ (${pick(s.hours, "ne")})।`,
     }),
   },
   HANDSET: {
@@ -198,6 +198,8 @@ export function eventText(kind: string, d: Record<string, string | undefined>, f
   }
   switch (kind) {
     case "fault": return `障害通知：${isFault(d.fault) ? STAFF_JA.fault[d.fault] : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
+    case "assisted_intake": return `${ASSIST.title} · ${ASSIST[d.source as "handset" | "in_person"]} · ${ASSIST.consent}`;
+    case "assisted_delivery": return `${ASSIST.finish} · ${ASSIST[d.source as "handset" | "in_person"]}`;
     case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
     case "claimed": return "担当者が対応を開始";
     case "escalated": return `エスカレーション（レベル${d.level}）：${DESK.escalationReason[d.reason ?? ""] ?? "対応期限を超過"}`;
@@ -369,19 +371,20 @@ export const UI = {
     id: "Ponsel ini belum terhubung ke kasus apa pun. Mintalah kode kepada petugas, lalu pindai Help Point lagi.",
     ne: "यो फोन कुनै केससँग जोडिएको छैन। कर्मचारीसँग कोड मागेर Help Point फेरि स्क्यान गर्नुहोस्।",
   },
-  // The prefecture's desk is confirmed to cover Vietnamese; Indonesian and Nepali are not claimed until checked.
+  // Updated consultation hours. Non-English changes await native review.
   helpDesk: {
-    bn: "আরও সাহায্য: নাগাসাকি প্রিফেকচারের বিদেশি বাসিন্দা পরামর্শ কেন্দ্র — বাংলাসহ ২২টি ভাষায়, সোম–শুক্র ৯:০০–১৬:০০ (জাপান সময়)।",
-    en: "More help: Nagasaki Prefecture's foreign residents' consultation desk — 22 languages including Bengali, weekdays 9:00–16:00 (Japan time).",
-    ja: "長崎県には 外国から 来た 人の そうだん まどぐちも あります。ベンガル語など 22の ことばで 話せます。げつようびから きんようびの 9時から 16時までです（日本の 時間）。",
-    vi: "Hỗ trợ thêm: Quầy tư vấn cho người nước ngoài của tỉnh Nagasaki — 22 ngôn ngữ, có tiếng Việt, thứ Hai–thứ Sáu 9:00–16:00 (giờ Nhật).",
-    id: "Bantuan lain: Layanan konsultasi warga asing Prefektur Nagasaki — 22 bahasa, Senin–Jumat 9:00–16:00 (waktu Jepang).",
-    ne: "थप सहयोग: नागासाकी प्रिफेक्चरको विदेशी बासिन्दा परामर्श केन्द्र — २२ भाषामा, सोम–शुक्र ९:००–१६:०० (जापान समय)।",
+    bn: "আরও সাহায্য: নাগাসাকি প্রিফেকচারের বিদেশি বাসিন্দা পরামর্শ কেন্দ্র — বাংলাসহ ২২টি ভাষায়, সোম–শুক্র ৯:০০–১৬:০০ (জাপান সময়)। সরকারি ছুটির দিন ও ২৯ ডিসেম্বর–৩ জানুয়ারি বন্ধ।",
+    en: "More help: Nagasaki Prefecture's foreign residents' consultation desk — 22 languages including Bengali, weekdays 9:00–16:00 (Japan time), except public holidays and December 29–January 3.",
+    ja: "長崎県には 外国から 来た 人の そうだん まどぐちも あります。ベンガル語など 22の ことばで 話せます。げつようびから きんようびの 9時から 16時までです（日本の 時間）。しゅくじつと 12月29日から 1月3日は 休みです。",
+    vi: "Hỗ trợ thêm: Quầy tư vấn cho người nước ngoài của tỉnh Nagasaki — 22 ngôn ngữ, có tiếng Việt, thứ Hai–thứ Sáu 9:00–16:00 (giờ Nhật), trừ ngày lễ và 29/12–3/1.",
+    id: "Bantuan lain: Layanan konsultasi warga asing Prefektur Nagasaki — 22 bahasa, Senin–Jumat 9:00–16:00 (waktu Jepang), kecuali hari libur dan 29 Desember–3 Januari.",
+    ne: "थप सहयोग: नागासाकी प्रिफेक्चरको विदेशी बासिन्दा परामर्श केन्द्र — २२ भाषामा, सोम–शुक्र ९:००–१६:०० (जापान समय)। सार्वजनिक बिदा र डिसेम्बर २९ देखि जनवरी ३ सम्म बन्द।",
   },
 } satisfies Record<string, L10n>;
 
 export * from "./frontline.ts";
 export * from "./caller-journey.ts";
+export * from "./sent-reply.ts";
 export * from "./staff.ts";
 export * from "./review.ts";
 export * from "./numbers.ts";

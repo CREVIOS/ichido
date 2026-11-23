@@ -73,7 +73,8 @@ for (const p of CONTENT_PACKS) {
     const { data: card } = await who.c.from("caller_card").select("fault, station").eq("id", incident).single();
     assert.equal(card.fault, defaultSituation(p.kinds[0]));
     assert.equal(packOfFault(card.fault), p.id);
-    assert.ok(flagsFor(card.fault).includes(path.tap), "the caller sees the pack's own taps");
+    const need = Object.keys(p.taps).find(f => p.taps[f].suggests === card.fault);
+    assert.ok(flagsFor(card.fault, [need]).includes(path.tap), "the caller sees the pack's own taps");
 
     // The ATM's facts and taps are not this pack's; confirming needs at least one tap.
     assert.equal((await cmd(who, "draft", { base_rev: 0, card_back: "no" })).status, 400);

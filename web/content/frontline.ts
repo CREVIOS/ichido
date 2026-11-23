@@ -44,3 +44,13 @@ export const FRONT_DESK = {
   translation: "機械翻訳", transfer: "引き継ぎ", joined: "担当者が参加", takeover: "担当する",
   reasons: { human_request: "本人の希望", suspected_risk: "危険の可能性", staff_needed: "職員による確認", staffed_entry: "職員による受付", limit: "対応上限", unclear: "再確認が必要", provider: "自動応答が利用できません", withheld: "番号を非表示" } as Record<string,string>,
 };
+
+
+// Staff interface. Consent and delivery are recorded as staff observations.
+export const ASSIST = {
+  title: "電話・対面での受付", source: "伝達方法", handset: "備え付けの電話", in_person: "対面",
+  consent: "本人に記録の同意を得て、選んだ内容を読み返し、確認した", save: "確認した内容を記録",
+  teach: "本人の言葉で確認した次の行動（番号は記入しない）", finish: "この案内を伝え、理解を確認して完了",
+  channel: "確認済みの連絡方法", phone: "電話", email: "メール", select: "選んでください",
+  ack: "この食物アレルギーを確認", acknowledged: "食物アレルギーを確認済み", stickerMissing: "印刷には設置団体と所在地の登録が必要です。",
+};
