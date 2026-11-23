@@ -7,7 +7,7 @@ const NE_DIGITS = "०१२३४५६७८९";
 const NUMBER_WORDS = new Set([
   "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
   "শূন্য", "এক", "দুই", "তিন", "চার", "পাঁচ", "ছয়", "সাত", "আট", "নয়",
-  "ゼロ", "れい", "いち", "に", "さん", "よん", "し", "ご", "ろく", "なな", "しち", "はち", "きゅう", "く",
+  "ゼロ", "ぜろ", "まる", "〇", "れい", "いち", "に", "さん", "よん", "し", "ご", "ろく", "なな", "しち", "はち", "きゅう", "く",
   "零", "一", "二", "三", "四", "五", "六", "七", "八", "九",
   // Vietnamese, with the spoken variants (linh/lẻ for zero, tư for four, lăm for five)
   "không", "linh", "lẻ", "một", "mốt", "hai", "ba", "bốn", "tư", "năm", "lăm", "sáu", "bảy", "tám", "chín",
@@ -18,9 +18,10 @@ const NUMBER_WORDS = new Set([
 ]);
 // Treat even short standalone number fragments as sensitive in a multi-turn conversation.
 export function frontlineNumber(text: string): boolean {
-  if (looksLikeNumber(text) || /\p{Nd}|[〇零一二三四五六七八九]{2}/u.test(text)) return true;
-  if (/(?:ぜろ|れい|いち|に|さん|よん|ご|ろく|なな|しち|はち|きゅう){2,}/u.test(text.normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 96)))) return true;
-  const words = text.normalize("NFC").toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
+  if (looksLikeNumber(text) || /\p{N}|[〇零一二三四五六七八九]{2}/u.test(text)) return true;
+  const normalized = text.normalize("NFKC").replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 96));
+  if (/(?:ぜろ|まる|れい|いち|に|さん|よん|しち|し|ご|ろく|なな|はち|きゅう|く){2,}/u.test(normalized)) return true;
+  const words = normalized.toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
   return words.some((w) => NUMBER_WORDS.has(w));
 }
 // Words for an ID, insurance, residence-card, My Number, passport or account number in the caller languages: with three

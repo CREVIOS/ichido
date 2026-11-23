@@ -29,7 +29,7 @@ test("Vietnamese, Indonesian and Nepali: digit runs and four number words are wi
 });
 
 test("frontline screens short spoken and typed fragments before they can accumulate", () => {
-  for (const fragment of ["12", "३", "four", "my PIN starts with two", "এক দুই", "một", "satu", "दुई", "いちにさんよん", "イチニサン"]) {
+  for (const fragment of ["12", "३", "four", "my PIN starts with two", "এক দুই", "một", "satu", "दुई", "いちにさんよん", "イチニサン", "イチ", "〇"]) {
     assert.ok(frontlineNumber(fragment), fragment);
   }
 });
