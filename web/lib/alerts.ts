@@ -72,31 +72,46 @@ async function sendExpo(s: Sub, m: Message): Promise<"ok" | "gone" | "failed"> {
   return ticket?.details?.error === "DeviceNotRegistered" ? "gone" : "failed";
 }
 
-async function deliver(o: Outbox) {
-  const accepted: string[] = [];
-  const settle = (retry: boolean) => rpc("alert_settle", { p_id: o.id, p_lease: o.lease, p_accepted: accepted, p_retry: retry });
-  if (o.kind === "field_job") {
-    const { data } = await admin.from("field_job").select("generation").eq("incident", o.incident)
-      .eq("assignee", o.target).eq("case_closed", false).is("acknowledged_at", null).maybeSingle().throwOnError();
-    if (!data || o.generation !== data.generation) return settle(false);
+async function deliver(rows: Outbox[]) {
+  const ids = [...new Set(rows.map((o) => o.station).filter(Boolean))] as string[];
+  const { data: stations } = ids.length ? await admin.from("station").select("id, label").in("id", ids).throwOnError() : { data: [] };
+  const labels = new Map((stations ?? []).map((s) => [s.id as string, (s.label as { ja?: string })?.ja ?? PUSH_UNKNOWN_PLACE]));
+  const place = (id: string | null) => (id && labels.get(id)) || PUSH_UNKNOWN_PLACE;
+  for (const o of rows) {
+    const accepted: string[] = [];
+    let retry = o.kind === "field_job" && !o.delivered.length;
+    try {
+      if (o.kind === "field_job" && !(await awaitingWorker(o))) { retry = false; continue; }
+      const { uids, roles } = recipients(o);
+      if (!uids.length && !roles.length) continue;
+      const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
+      if (!subs.length) continue;
+      const { data: staffRoles } = await admin.schema("ichido").from("staff").select("uid, role").in("uid", [...new Set(subs.map((s) => s.uid))]);
+      if (!staffRoles) throw new Error("push_roles_unavailable");
+      const roleOf = new Map(staffRoles.map((r) => [r.uid as string, r.role as string]));
+      const pending = subs.filter((s) => !o.delivered.includes(s.id));
+      const results = await Promise.allSettled(pending.map(async (s) => {
+        const m = message(o,place(o.station),roleOf.get(s.uid) ?? "");
+        if (!m) return;
+        const result = await (s.platform === "web" ? sendWeb(s,m) : sendExpo(s,m));
+        if (result === "gone") await admin.from("push_subscription").delete().eq("id",s.id).eq("endpoint",s.endpoint).throwOnError();
+        if (result === "ok") accepted.push(s.id);
+        if (result === "failed") throw new Error("provider_refused");
+      }));
+      retry = results.some((r) => r.status === "rejected") || (retry && !accepted.length);
+    } catch (e) {
+      retry = true;
+      await ship([entry("warn","alert_failed",{ code:o.kind,incident:o.incident ?? undefined,...errorFields(e) })]);
+    } finally {
+      await rpc("alert_settle",{ p_id:o.id,p_lease:o.lease,p_accepted:accepted,p_retry:retry });
+    }
   }
-  const { uids, roles } = recipients(o);
-  const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
-  const pending = subs.filter((s) => !o.delivered.includes(s.id));
-  if (!pending.length) return settle(o.kind === "field_job" && !o.delivered.length);
-  const [{ data: station }, { data: staff }] = await Promise.all([
-    admin.from("station").select("label").eq("id", o.station).maybeSingle().throwOnError(),
-    admin.schema("ichido").from("staff").select("uid,role").in("uid", pending.map((s) => s.uid)).throwOnError(),
-  ]);
-  const results = await Promise.allSettled(pending.map(async (s) => {
-    const m = message(o, station?.label?.ja ?? PUSH_UNKNOWN_PLACE, staff?.find((u) => u.uid === s.uid)?.role ?? "");
-    if (!m) return;
-    const result = await (s.platform === "web" ? sendWeb(s, m) : sendExpo(s, m));
-    if (result === "gone") await admin.from("push_subscription").delete().eq("id", s.id).eq("endpoint", s.endpoint).throwOnError();
-    if (result === "ok") accepted.push(s.id);
-    if (result === "failed") throw new Error("provider_refused");
-  }));
-  await settle(results.some((r) => r.status === "rejected") || (o.kind === "field_job" && !o.delivered.length && !accepted.length));
+}
+
+async function awaitingWorker(o: Outbox) {
+  const { data } = await admin.from("field_job").select("generation").eq("incident",o.incident)
+    .eq("assignee",o.target).eq("case_closed",false).is("acknowledged_at",null).maybeSingle().throwOnError();
+  return data && data.generation === o.generation;
 }
 
 // Drain the outbox. Never throws: an alert is a convenience on top of the console, which is the source of truth.
@@ -105,7 +120,7 @@ export async function flushAlerts(): Promise<void> {
     for (let round = 0; round < 5; round++) {
       const rows = await rpc<Outbox[]>("alert_take", { p_limit: 10 });
       if (!rows.length) return;
-      await Promise.all(rows.map(deliver));
+      await deliver(rows);
       if (rows.length < 10) return;
     }
   } catch (e) {
