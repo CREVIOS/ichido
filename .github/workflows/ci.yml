@@ -77,6 +77,13 @@ jobs:
       - name: Show web log on failure
         if: failure()
         run: test ! -f "$RUNNER_TEMP/ichido-dev.log" || tail -100 "$RUNNER_TEMP/ichido-dev.log"
+      - name: Show Realtime state on failure
+        if: failure()
+        run: |
+          docker logs supabase_realtime_ichido 2>&1 | grep -viE "ping|billing" | tail -120
+          docker exec supabase_db_ichido psql -U postgres -c "select slot_name, active from pg_replication_slots" \
+            -c "select topic, event, private, inserted_at from realtime.messages order by inserted_at limit 15" \
+            -c "select inhrelid::regclass from pg_inherits where inhparent = 'realtime.messages'::regclass"
 
   agent:
     runs-on: ubuntu-latest
