@@ -35,7 +35,6 @@ function Detail({ k, initialDays }: { k: MetricKey; initialDays: number }) {
       <View style={{ gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Icon icon={CalendarDays} size={14} tone="muted" /><T v="label" tone="muted">{INSIGHTS.range}</T>
-          <T v="label" tone="faint">·</T><T v="label" tone="muted">{INSIGHTS.interval}</T><T v="label" tone="ink">{INSIGHTS.everyDay}</T>
         </View>
         <Segments value={days} options={PERIODS.map((p) => ({ key: p, label: INSIGHTS.period(p) }))} onChange={setDays} />
       </View>

@@ -1,11 +1,11 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { sb } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Bars, Donut, Lines } from "@/components/charts";
 import { T } from "@/components/ui";
 import { chart, color, tier } from "@/theme";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, staffError, type Lang, type PackId, type ShiftCounts } from "@content/catalogue";
+import { shiftReadError, DESK, FUNNEL, INSIGHTS, unansweredLabel, LANG_NAME, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, staffError, type Lang, type PackId, type ShiftCounts } from "@content/catalogue";
 
 // Mirrors web/app/insights/metrics.tsx: the same metrics, copy and RPCs, drawn with react-native-gifted-charts.
 export type Insights = ShiftCounts & {
@@ -35,10 +35,11 @@ export function useInsights(days: number) {
     const current = ++version.current;
     const r = await sb().rpc("shift_insights",{ p_days:days });
     if (current !== version.current) return;
-    setError(r.error ? staffError(r.error.message) : "");
+    setError(r.error ? shiftReadError(INSIGHTS.period(days),new Date(),staffError(r.error.message)) : "");
     if (r.data) setData({ ...r.data,targets:{ no_reply:r.data.target } });
   }, [days]);
-  useLive(["desk","reply","caller_card","case_event","field_job","partner_work"],load);
+  useEffect(() => { void load(); },[load]);
+  useLive(["desk","reply","caller_card","case_event","field_job"],load);
   return { data:data?.period === days ? data : null, last:data, error, load };
 }
 
@@ -104,7 +105,7 @@ export const METRICS = {
     },
   },
   reply: {
-    card: (d: Insights) => <Big>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>,
+    card: (d: Insights) => <Big sub={unansweredLabel(d.unanswered)}>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>,
     detail: (d: Insights) => (
       <View style={{ gap: 16 }}>
         <Big large sub={INSIGHTS.firstReplyNote}>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>

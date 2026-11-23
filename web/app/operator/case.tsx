@@ -40,7 +40,7 @@ function useCase(id: string) {
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags, bank_status, bank_due").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
-      db.from("field_job").select("assignee, state, eta, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
+      db.from("field_job").select("assignee, state, eta, accepted_at, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
       db.from("bot_step").select("step, status, code, due_at, data, at").eq("incident", id),
       db.from("escalation").select("reason").eq("incident", id),
       db.from("bot_suggestion").select("rev, suggestion").eq("incident", id).maybeSingle(),
@@ -84,7 +84,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
         <Timeline events={events} fault={d.fault} />
-        {d.operator_id && <HandoffPanel key={d.id} d={d} mine={mine} />}
+        {d.operator_id && <HandoffPanel key={d.id} d={d} uid={me.uid} />}
         {d.operator_id && atm && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
@@ -104,7 +104,7 @@ function Actions({ work, d, me, mine, closed, paired, lang, replies, job, guards
   work: string[]; d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
 }) {
   const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
-  if (closed) return <><Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>{mine && job && job.state !== "done" && <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />}</>;
+  if (closed) return <><Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>{mine && !d.abandoned && job && job.state !== "done" && <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />}</>;
   if (!d.operator_id) return (
     <Panel title={DESK.unclaimed}>
       <p className="text-[14px]">{DESK.unclaimedBody}</p>

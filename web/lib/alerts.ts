@@ -83,7 +83,7 @@ async function deliver(o: Outbox) {
   const { uids, roles } = recipients(o);
   const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
   const pending = subs.filter((s) => !o.delivered.includes(s.id));
-  if (!pending.length) return settle(false);
+  if (!pending.length) return settle(o.kind === "field_job" && !o.delivered.length);
   const [{ data: station }, { data: staff }] = await Promise.all([
     admin.from("station").select("label").eq("id", o.station).maybeSingle().throwOnError(),
     admin.schema("ichido").from("staff").select("uid,role").in("uid", pending.map((s) => s.uid)).throwOnError(),
@@ -96,7 +96,7 @@ async function deliver(o: Outbox) {
     if (result === "ok") accepted.push(s.id);
     if (result === "failed") throw new Error("provider_refused");
   }));
-  await settle(results.some((r) => r.status === "rejected"));
+  await settle(results.some((r) => r.status === "rejected") || (o.kind === "field_job" && !o.delivered.length && !accepted.length));
 }
 
 // Drain the outbox. Never throws: an alert is a convenience on top of the console, which is the source of truth.
@@ -126,8 +126,10 @@ const short = (v: unknown, max: number) => (typeof v === "string" && v.length > 
 
 export const ALERT_COMMANDS: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   async push_key(a) {
-    receiver(a);
-    return { key: vapidPublicKey() };
+    const s = receiver(a);
+    const { data } = await admin.from("push_subscription").select("endpoint").eq("uid",s.uid)
+      .eq("session_id",s.session).eq("platform","web").maybeSingle().throwOnError();
+    return { key: vapidPublicKey(), endpoint: data?.endpoint ?? null };
   },
   async push_subscribe(a, b) {
     const s = receiver(a);

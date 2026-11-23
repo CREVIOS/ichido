@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Big } from "@/components/kit";
 import { DailyArea, Donut, FunnelBars, HourBars, ReplyLine } from "@/components/insight-charts";
-import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId, type ShiftCounts } from "@/content/catalogue";
+import { DESK, FUNNEL, INSIGHTS, LANG_NAME, OPS, unansweredLabel, PACKS, PACK_DESK, PACK_IDS, RATING, RATINGS, type Lang, type PackId, type ShiftCounts } from "@/content/catalogue";
 
 export type Insights = ShiftCounts & {
   since: string;
@@ -66,7 +66,7 @@ export const METRICS = {
     ),
   },
   reply: {
-    card: (d: Insights) => centre(d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)),
+    card: (d: Insights) => centre(d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s),unansweredLabel(d.unanswered)),
     detail: (d: Insights) => (
       <div className="flex flex-col gap-6">
         <Big>{d.median_first_reply_s == null ? "—" : INSIGHTS.duration(d.median_first_reply_s)}</Big>

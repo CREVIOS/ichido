@@ -1,3 +1,4 @@
+import { PACKS } from "@/content/catalogue";
 import { APIError } from "better-auth/api";
 import { auth, pool, sendInvite } from "@/lib/auth";
 import { actorFrom, fail, reply, staffWith, HttpError, type Staff } from "@/lib/server";
@@ -27,9 +28,9 @@ const notSelf = (a: Staff, id: string) => { if (a.uid === id) fail(409, "conflic
 async function deliverInvite(a: Staff, u: { id: string; name: string; email: string }) {
   try {
     await sendInvite(u);
-  } catch (error) {
+  } catch {
     await audit(a,"invite_failed",u.id);
-    throw error;
+    fail(502,"invite_failed");
   }
   await audit(a,"invite_sent",u.id);
 }
@@ -88,10 +89,11 @@ const ACTIONS: Record<string, Action> = {
     async run(a,b) {
       const id = uuid(b,"userId");
       if (typeof b.station !== "string" || typeof b.available !== "boolean") fail(400,"bad_request");
-      const changed = await pool.query(`update ichido.staff s set duty_station=st.id,duty_function=ichido.pack_of(st.kind),available=$3
-        from public.station st where s.uid=$1 and s.role='field' and st.id=$2`,[id,b.station,b.available]);
+      if (b.dutyFunction !== null && (typeof b.dutyFunction !== "string" || !Object.hasOwn(PACKS,b.dutyFunction))) fail(400,"bad_request");
+      const changed = await pool.query(`update ichido.staff s set duty_station=st.id,duty_function=$4,available=$3
+        from public.station st where s.uid=$1 and s.role='field' and st.id=$2`,[id,b.station,b.available,b.dutyFunction]);
       if (!changed.rowCount) fail(400,"bad_request");
-      await audit(a,"duty_changed",id,{ station:b.station, available:b.available });
+      await audit(a,"duty_changed",id,{ station:b.station, dutyFunction:b.dutyFunction, available:b.available });
       return {};
     },
   },

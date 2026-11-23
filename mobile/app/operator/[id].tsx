@@ -5,11 +5,12 @@ import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Button, Card, Fact, Inset, Menu, Notice, Pill, Row, Screen, T, Tag } from "@/components/ui";
+import { PartnerWork } from "@/components/PartnerWork";
 import { SuggestCard, type Run } from "@/components/SuggestCard";
 import { type Desk, errorJa, faultJa, hhmm } from "@/lib/staff";
 import {
-  SHIFT, OPS, FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, STATUS, callerPack, intentsOf, packOfFault, packStaffField,
-  eventText, summaryDraft, pick, replyOf, replyBlock, FAULT_DESK,
+  SHIFT, OPS, FACT_STAFF, CALLER_FLAGS, REPLIES, LANG_NAME, REMOTE_RELEASE, ACTOR, MANUAL_VERSION, MOBILE, callerPack, intentsOf, packOfFault, packStaffField,
+  eventText, summaryDraft, replyOf, replyBlock, FAULT_DESK,
   type Lang, type FieldState, type L10n, STAFF_JA,
 } from "@content/catalogue";
 
@@ -21,7 +22,7 @@ type CallerCard = {
 };
 type Event = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
 type Reply = { id: string; intent: string; slots: { branch?: L10n; hours?: L10n }; sent_at: string };
-type Job = { acknowledged_at?: string | null; declined_at?: string | null; provider_at?: string | null; help_at?: string | null; assignee: string; state: FieldState; eta: string | null };
+type Job = { accepted_at: string | null; acknowledged_at?: string | null; declined_at?: string | null; provider_at?: string | null; help_at?: string | null; assignee: string; state: FieldState; eta: string | null };
 type Guard = { uid: string; display_name: string };
 
 export default function CaseScreen() {
@@ -48,7 +49,7 @@ function CaseView({ me }: { me: Me }) {
       db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
-      db.from("field_job").select("assignee, state, eta, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
+      db.from("field_job").select("assignee, state, eta, accepted_at, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
     ]);
     const desk = k.data as Desk | null;
     setD(desk); setCard(c.data as CallerCard); setEvents((e.data ?? []) as Event[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
@@ -119,11 +120,13 @@ function CaseView({ me }: { me: Me }) {
           {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
           <SuggestCard d={d} run={run} />
           <ReplyCard work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
-          {job && <Notice>{job.declined_at ? SHIFT.declined : job.acknowledged_at ? SHIFT.accepted : SHIFT.unack}{job.provider_at && ` · ${SHIFT.provider}`}{job.help_at && ` · ${SHIFT.helpNeeded}`}</Notice>}
+          {job && <Notice>{job.declined_at ? SHIFT.declined : job.accepted_at ? SHIFT.accepted : job.acknowledged_at ? SHIFT.ack : SHIFT.unack}{job.provider_at && ` · ${SHIFT.provider}`}{job.help_at && ` · ${SHIFT.helpNeeded}`}</Notice>}
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
       )}
 
+      {closed && mine && job && job.state !== "done" && !d.abandoned && <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />}
+      {d.operator_id && <PartnerWork incident={d.id} fault={d.fault} uid={me.uid} />}
       <Timeline events={events} fault={d.fault} />
       {closed && d.status === "guided" && (
         <Card title={O.record} action={<Tag value={O.recordDraft} />}>
@@ -280,6 +283,7 @@ function DispatchCard({ d, job, guards, card, lang, run }: { d: Desk; job: Job |
         <T v="label">{O.dispatchBody}</T>
       )}
       <View style={{ gap: 8 }}>
+        {!others.length && (!job || job.declined_at) && <T v="small">{SHIFT.noWorker}</T>}
         {others.map((g) => <Button key={g.uid} kind="secondary" label={O.assign(g.display_name, Boolean(job))} onPress={() => run("assign", { incident: d.id, assignee: g.uid })} block />)}
       </View>
       {card && card.field_state !== "none" && <T v="small">{O.callerScreen(callerPack(d.fault).field(card.field_state, lang))}</T>}

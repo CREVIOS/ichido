@@ -26,7 +26,7 @@ export function eligibleReplies(d: DeskFacts, flags: string[]) {
 export const TOOL_DECLARATIONS = [
   { name: "get_case", description: "The case: fault, status, what the caller confirmed (card_back, cash_received), remote release result, caller language, choice, guard job state, minutes open, whether a suspected phone-fraud alert was raised and whether fraud mode is already active." },
   { name: "list_replies", description: "The bank's approved replies with their code, Japanese title, and whether each is eligible for this case right now (and why not)." },
-  { name: "list_guards", description: "Security guards who can be dispatched, with how many open jobs each has." },
+  { name: "list_guards", description: "Available responders qualified for this station and service, without another unfinished job." },
   { name: "get_pack_rules", description: "For a hospital, city-office, station or shelter case: each of the pack's approved replies with the situations it fits and the caller taps it needs or is blocked by (urgent taps allow only the urgent reply)." },
   { name: "station_status", description: "The ATM's Help Point device health and how many cases this station had in the last 7 days." },
 ];
@@ -62,7 +62,7 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
     case "list_guards": {
       const { data, error } = await db.rpc("available_responders", { p_incident: ctx.incident });
       if (error) throw error;
-      return (data ?? []).map((g: { uid: string; display_name: string }) => ({ uid: g.uid, name: g.display_name, open_jobs: 0 }));
+      return (data ?? []).map((g: { uid: string; display_name: string }) => ({ uid: g.uid, name: g.display_name }));
     }
     case "get_pack_rules": {
       const p = contentPack(d.fault);

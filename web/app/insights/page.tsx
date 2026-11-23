@@ -9,7 +9,7 @@ import { openAssistant, useAssistantEnabled } from "@/components/assistant";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { shiftCaption, shiftOutcomes, ASSISTANT, INSIGHTS, staffError } from "@/content/catalogue";
+import { shiftCaption, shiftOutcomes, ASSISTANT, INSIGHTS, shiftReadError, staffError } from "@/content/catalogue";
 import { METRICS, type Insights, type MetricKey } from "./metrics";
 
 const PERIODS = [0, 7, 14, 30];
@@ -26,7 +26,7 @@ function Board({ me }: { me: Me }) {
   const load = useCallback(async (signal: AbortSignal) => {
     const r = await sb().rpc("shift_insights",{ p_days:days }).abortSignal(signal);
     if (signal.aborted) return;
-    setError(r.error ? staffError(r.error.message) : "");
+    setError(r.error ? shiftReadError(INSIGHTS.period(days),new Date(),staffError(r.error.message)) : "");
     if (r.data) setData({ ...r.data,targets:{ no_reply:r.data.target } });
   },[days]);
   useLive(["desk","reply","caller_card","case_event","field_job"],load);
@@ -47,7 +47,6 @@ function Board({ me }: { me: Me }) {
         <div className="flex min-w-0 flex-col gap-6 p-5 lg:sticky lg:top-0 lg:self-start lg:p-8">
           {error && <Notice tone="warn">{error}</Notice>}
 
-          <h2 className="text-[26px] leading-tight tracking-[-0.03em]">{INSIGHTS.metrics[sel].title}</h2>
           <div className="grid gap-3 border-b pb-6 text-[14px] sm:grid-cols-[100px_minmax(0,1fr)]">
             <span className="flex items-center gap-1.5 text-muted-foreground"><Code className="size-3.5 stroke-[1.5]" />{INSIGHTS.definition}</span>
             <span className="leading-6 text-foreground">{INSIGHTS.metrics[sel].def}</span>

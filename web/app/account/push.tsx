@@ -23,10 +23,10 @@ export function PushPanel() {
 
   useEffect(() => {
     if (!supported) return;
-    void cmd<{ key: string | null }>("push_key").then(async (r) => {
+    void cmd<{ key: string | null; endpoint: string | null }>("push_key").then(async (r) => {
       setKey(r.key);
       const reg = await navigator.serviceWorker.getRegistration("/");
-      setOn(Boolean(await reg?.pushManager.getSubscription()) && Notification.permission === "granted");
+      setOn(Boolean(r.endpoint && (await reg?.pushManager.getSubscription())?.endpoint === r.endpoint) && Notification.permission === "granted");
     }).catch(() => setKey(null));
   }, [supported]);
 

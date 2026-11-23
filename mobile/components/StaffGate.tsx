@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth";
 import { registerPush } from "@/lib/push";
 import { can, isRole, type Permission, type Role } from "@rbac";
 import { Button, Input, Mark, Notice, Screen, T } from "@/components/ui";
-import { AUTH, STAFF, authError } from "@content/catalogue";
+import { AUTH, SHIFT, STAFF, authError } from "@content/catalogue";
 
 export type { Role };
 export type Me = { uid: string; role: Role; name: string; push?: string; signOut: () => Promise<void> };
@@ -23,8 +23,7 @@ async function resolve(): Promise<Status> {
   enterStaffSession();
   const r = await cmd<{ role: string; name?: string }>("me").catch(() => null);
   if (!r || !isRole(r.role)) return { at: "out" };
-  const push = await registerPush(r.role);
-  return { at: "in", who: { push, uid: data.user.id, role: r.role, name: r.name ?? "" } };
+  return { at: "in", who: { uid: data.user.id, role: r.role, name: r.name ?? "" } };
 }
 
 // Mirrors web/components/StaffGate.tsx: password, then the authenticator code (or a backup code); on first sign-in
@@ -41,10 +40,19 @@ export function StaffGate({ need, title, children }: { need: Permission; title: 
 
   const refresh = useCallback(() => resolve().then((s) => { setStatus(s); setStep("password"); setCode(""); }), []);
   useEffect(() => { void refresh(); }, [refresh]);
+  const uid = status?.at === "in" ? status.who.uid : undefined;
+  const role = status?.at === "in" ? status.who.role : undefined;
+  const [push,setPush] = useState(SHIFT.pushWait);
+  useEffect(() => {
+    if (!uid || !role) return;
+    let active = true;
+    void registerPush(role).then((value) => { if (active) setPush(value); });
+    return () => { active = false; };
+  },[uid,role]);
   const out = useCallback(async () => { await signOut(); setEnrolment(null); await refresh(); }, [refresh]);
 
   if (status === undefined) return null;
-  if (status.at === "in" && can(status.who.role, need)) return <>{children({ ...status.who, signOut: () => signOut().then(() => router.replace("/")) })}</>;
+  if (status.at === "in" && can(status.who.role, need)) return <>{children({ ...status.who, push, signOut: () => signOut().then(() => router.replace("/")) })}</>;
 
   const run = (fn: () => Promise<ApiError | void>) => async () => {
     setBusy(true); setError("");

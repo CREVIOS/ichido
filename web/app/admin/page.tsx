@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { can, ROLES, type Role } from "@/lib/rbac";
-import { ADMIN, FIRST_SHIFT, SHIFT, STAFF } from "@/content/catalogue";
+import { ADMIN, PACKS, FIRST_SHIFT, SHIFT, STAFF } from "@/content/catalogue";
 
 // Account administration (admins) and the account audit log (admins and auditors). Every change goes through
 // /api/admin, which checks lib/rbac.ts and writes the append-only audit log.
@@ -17,7 +17,7 @@ export default function AdminPage() {
 }
 
 type Site = { id: string; kind: string; label: string };
-type User = { delivery: string | null; notifications: boolean; duty_station: string | null; available: boolean; id: string; email: string; name: string; role: Role; banned: boolean; verified: boolean; totp: boolean; passkeys: number; active_at: string | null };
+type User = { delivery: string | null; notifications: boolean; duty_station: string | null; duty_function: string | null; available: boolean; id: string; email: string; name: string; role: Role; banned: boolean; verified: boolean; totp: boolean; passkeys: number; active_at: string | null };
 type AuditRow = { id: number; at: string; action: string; data: { from?: string; to?: string; role?: string }; actor_name: string | null; target_name: string | null };
 
 async function api<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
@@ -104,9 +104,12 @@ function Admin({ me }: { me: Me }) {
                         <td className="px-4 py-2.5"><Chip>{u.banned ? ADMIN.status.disabled : u.verified ? (u.totp || u.passkeys ? FIRST_SHIFT.ready : FIRST_SHIFT.verified) : u.delivery === "invite_failed" ? FIRST_SHIFT.failed : u.delivery === "invite_sent" ? FIRST_SHIFT.sent : ADMIN.status.invited}</Chip>
                           <div>{u.notifications ? FIRST_SHIFT.pushOn : FIRST_SHIFT.pushOff}</div>
                           {u.role === "field" && <div className="flex gap-2">
-                            <select aria-label={SHIFT.duty} value={u.duty_station ?? ""} onChange={(e) => void run("set_duty",{ userId:u.id,station:e.target.value,available:u.available })}>
+                            <select aria-label={SHIFT.duty} value={u.duty_station ?? ""} onChange={(e) => void run("set_duty",{ userId:u.id,station:e.target.value, dutyFunction:u.duty_function, available:u.available })}>
                               <option value="" disabled>{SHIFT.duty}</option>{sites.map((s) => <option key={s.id} value={s.id}>{s.label ?? s.id} · {s.kind}</option>)}
-                            </select><Button size="sm" disabled={!u.duty_station} onClick={() => void run("set_duty",{userId:u.id,station:u.duty_station,available:!u.available})}>{u.available ? SHIFT.off : SHIFT.available}</Button>
+                            </select>
+                            <select aria-label={SHIFT.responder} disabled={!u.duty_station} value={u.duty_function ?? ""} onChange={(e) => void run("set_duty",{userId:u.id,station:u.duty_station,dutyFunction:e.target.value,available:u.available})}>
+                              <option value="" disabled>{SHIFT.responder}</option>{Object.values(PACKS).map((pack) => <option key={pack.id} value={pack.id}>{pack.responder.staff}</option>)}
+                            </select><Button size="sm" disabled={!u.duty_station || !u.duty_function} onClick={() => void run("set_duty",{userId:u.id,station:u.duty_station,dutyFunction:u.duty_function,available:!u.available})}>{u.available ? SHIFT.off : SHIFT.available}</Button>
                           </div>}</td>
                         <td className="num px-4 py-2.5 text-muted-foreground">{when(u.active_at)}</td>
                         <td className="px-4 py-2.5 text-right">

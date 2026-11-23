@@ -1,5 +1,6 @@
 // The hospital's approved replies. Slots come from the station row: branch = where to register, hours = its hours.
 // While a red-flag tap is on, only HOSP_URGENT may be sent (rule.blockedBy on every other reply).
+// Updated non-English caller wording awaits native review.
 import type { PackReply } from "./types.ts";
 import { slot as p } from "./common.ts";
 

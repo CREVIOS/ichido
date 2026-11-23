@@ -10,7 +10,7 @@ import { faultJa } from "@/lib/staff";
 import { nextFieldStep, SHIFT, ETA_OPTIONS, MOBILE, STAFF, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@content/catalogue";
 
 const F = MOBILE.field;
-type Job = { acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
+type Job = { accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
 const UNKNOWN_ETA = "";
 // Pill tint per assignment state, on the same scale as case status.
 const TONE: Record<FieldState, string> = { none: "neutral", requested: "received", on_way: "review", arrived: "field", done: "guided" };
@@ -25,6 +25,8 @@ function Jobs({ me }: { me: Me }) {
   const [all, setAll] = useState(false);
   const [correct, setCorrect] = useState("");
   const [previous,setPrevious] = useState<{ incident: string; station: string; generation: number }[]>([]);
+  const [loaded,setLoaded] = useState(false);
+  const [failed,setFailed] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [labels, setLabels] = useState<Record<string, string>>({});
   // Each job's estimate starts unknown; only the guard's own pick is ever sent.
@@ -37,6 +39,10 @@ function Jobs({ me }: { me: Me }) {
       db.from("station").select("id, label"),
       db.from("field_standdown").select("incident,station,generation").gt("at",new Date(Date.now()-86400000).toISOString()).order("at",{ascending:false}),
     ]);
+    const failed = Boolean(j.error || s.error || old.error);
+    setFailed(failed);
+    if (failed) return;
+    setLoaded(true);
     setPrevious(old.data ?? []);
     setJobs((j.data ?? []) as Job[]);
     setLabels(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n }[]).map((x) => [x.id, x.label.ja])));
@@ -55,11 +61,12 @@ function Jobs({ me }: { me: Me }) {
       {me.push && <T v="small">{me.push}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
       {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
-      {jobs.length === 0 && <Card><T v="body">{F.empty}</T></Card>}
+      {failed && <Notice tone="alert">{SHIFT.readFailed}</Notice>}
+        {loaded && !failed && jobs.length === 0 && <Card><T v="body">{F.empty}</T></Card>}
       {job && !all && <Button kind="ghost" label={F.title} onPress={() => setAll(true)} />}
       {job && !all && !jobs.some((j) => j.incident === job) && <Notice>{F.changed}</Notice>}
       {jobs.filter((j) => !job || all || j.incident === job).map((j) => {
-        const next = nextFieldStep(j.state, j.acknowledged_at);
+        const next = nextFieldStep(j.state, j.accepted_at);
         const actions = { accept: SHIFT.accept, on_way: F.onWay, arrived: F.arrived, done: F.done };
         return (
         <Card key={j.incident}>

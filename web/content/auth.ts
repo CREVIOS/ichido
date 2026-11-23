@@ -163,7 +163,7 @@ export const ADMIN = {
     mfa_reset: "二段階認証のリセット", sessions_revoked: "全端末サインアウト",
   } as Record<string, string>,
   roleChange: (from: string, to: string) => `${from} → ${to}`,
-  errors: { exists: "このメールアドレスはすでに登録されています。", conflict: "自分自身には実行できません。", bad_request: "入力内容を確認してください。", forbidden: "この操作を行う権限がありません。", mfa_required: "二段階認証を完了したセッションが必要です。" } as Record<string, string>,
+  errors: { invite_failed: "アカウントを作成済みです。招待メールを送れませんでした。名簿から再送してください。", exists: "このメールアドレスはすでに登録されています。", conflict: "自分自身には実行できません。", bad_request: "入力内容を確認してください。", forbidden: "この操作を行う権限がありません。", mfa_required: "二段階認証を完了したセッションが必要です。" } as Record<string, string>,
   loadError: "読み込めませんでした。",
 };
 

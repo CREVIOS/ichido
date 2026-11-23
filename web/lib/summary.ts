@@ -62,11 +62,12 @@ export async function draftSummary(op: Op, incident: string) {
   return { summary: text, model: MODEL() };
 }
 
-export async function saveSummary(op: Op, incident: string, text: unknown) {
+export async function saveSummary(op: Op, incident: string, text: unknown, checked: boolean) {
   await ownCase(op, incident);
   if (typeof text !== "string" || !text.trim() || text.length > 600) fail(400, "bad_request");
   if (identifyingSummary(text as string)) return { withheld: true };
-  await admin.from("desk").update({ ai_summary: (text as string).trim(), ai_summary_by: op.name, ai_summary_at: new Date().toISOString() })
+  if (!checked) fail(400,"bad_request");
+  await admin.from("desk").update({ summary_checked:true, ai_summary: (text as string).trim(), ai_summary_by: op.name, ai_summary_at: new Date().toISOString() })
     .eq("id", incident).eq("operator_id", op.uid).throwOnError();
   return {};
 }

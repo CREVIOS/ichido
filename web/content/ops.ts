@@ -170,10 +170,11 @@ export function opsEventText(kind: string, d: Record<string, string | undefined>
 }
 
 export const SHIFT = {
+  readFailed: "依頼を読み込めませんでした。再度確認してください。",
   accept: "依頼を引き受ける", decline: "対応できません", help: "応援を依頼", eta: "到着目安を更新",
   correct: "進行状況を訂正", accepted: "担当者が受諾", declined: "辞退・再割当が必要",
-  unack: "担当者の応答待ち", provider: "通知サービス受付済み", helpNeeded: "応援要請あり",
-  reassigned: "他の担当者に再割当されました", duty: "担当拠点・職務", available: "受付可", off: "受付停止",
+  ack: "担当者が確認済み", unack: "担当者の応答待ち", provider: "通知サービス受付済み", helpNeeded: "応援要請あり",
+  reassigned: "他の担当者に再割当されました", duty: "担当拠点", responder: "対応できる職務", available: "受付可", off: "受付停止",
   pushReady: "端末通知：登録済み", pushDenied: "端末通知：許可されていません",
   pushMissing: "端末通知：未設定", pushFailed: "端末通知：登録失敗", pushWait: "端末通知：確認中",
   noWorker: "この拠点・職務で出動できる担当者はいません。",
@@ -187,7 +188,8 @@ export function nextFieldStep(state: string, acknowledged: string | null) {
 }
 
 export const PARTNER = {
-  preview: "共有内容を確認", issue: "この内容でリンクを作成", due: "対応期限", desk: "発行窓口", asOf: "情報の時点",
+  none: "未完了の外部対応はありません。", hours: (n: number) => `${n}時間後`,
+  contact: "連絡方法", textOnly: "文字で対応", preview: "共有内容を確認", issue: "この内容でリンクを作成", due: "対応期限", desk: "発行窓口", asOf: "情報の時点",
   tentative: "仮の申告（本人未確認）", action: "依頼すること", pending: "依頼準備中", sent: "依頼連絡済み",
   request: "相手に依頼した", accept: "相手の受諾を記録", accepted: "相手が受諾", ref: "鉄道会社の受付番号",
   verify: "氏名・連絡先・住所など、個人を特定する情報がないことを確認しました",
@@ -200,8 +202,11 @@ export const PARTNER = {
 
 export type ShiftCounts = { period: number; since: string; until: string; as_of: string; unanswered: number; rated: number;
   rating_eligible: number; field_done: number; partner_accepted: number; funnel: Record<string,number> };
+export const unansweredLabel = (n:number) => `未返答 ${n}件`;
 export const jstDay = (s: string) => new Date(s).toLocaleDateString("ja-JP",{ timeZone:"Asia/Tokyo" });
 export const shiftCaption = (d: ShiftCounts) =>
   `${jstDay(d.since)}–${jstDay(new Date(Date.parse(d.until)-1).toISOString())} JST · ${new Date(d.as_of).toLocaleString("ja-JP",{ timeZone:"Asia/Tokyo" })} 集計 · 受付 ${d.funnel.received}件・未返答 ${d.unanswered}件`;
+export const shiftReadError = (period: string, at: Date, message: string) =>
+  `${period} · ${at.toLocaleString("ja-JP",{ timeZone:"Asia/Tokyo" })} JST 取得失敗 · ${message}`;
 export const shiftOutcomes = (d: ShiftCounts) =>
   `案内理解 ${d.funnel.guided}件 · 現場完了 ${d.field_done}件 · 外部受諾 ${d.partner_accepted}件 · 評価回答 ${d.rated} / 対象 ${d.rating_eligible}件`;

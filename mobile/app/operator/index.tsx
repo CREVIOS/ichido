@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { ChartColumn, LogOut } from "lucide-react-native";
+import { ClipboardList, ChartColumn, LogOut } from "lucide-react-native";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Card, IconButton, Menu, Notice, Row, Screen, Section, T, Tag } from "@/components/ui";
 import { type Desk, type OpenDesk, type Targets, errorJa, faultJa, minutesAgo, slaOf, slaText, useClock, when } from "@/lib/staff";
-import { LANG_NAME, MOBILE, NAV, STAFF, STATUS, type L10n, STAFF_JA } from "@content/catalogue";
+import { PARTNER, LANG_NAME, MOBILE, NAV, STAFF, type L10n, STAFF_JA } from "@content/catalogue";
 
 const O = MOBILE.operator;
 const HISTORY = 8;
@@ -54,6 +54,7 @@ function Queue({ me }: { me: Me }) {
       right={
         <View style={{ flexDirection: "row", gap: 4 }}>
           <Menu label={O.simulate} closeLabel={MOBILE.staff.close} items={stations.map((s) => ({ label: O.simulateAt(s.label.ja), onPress: () => simulate(s.id) }))} />
+          <IconButton icon={ClipboardList} label={PARTNER.mine} onPress={() => router.push("/work")} />
           <IconButton icon={ChartColumn} label={NAV.insights} onPress={() => router.push("/insights")} />
           <IconButton icon={LogOut} label={STAFF.signOut} onPress={me.signOut} />
         </View>
@@ -63,6 +64,7 @@ function Queue({ me }: { me: Me }) {
         <Tag label={O.open} value={MOBILE.staff.count(open.length)} />
         <Tag value={me.name} />
       </View>
+      {me.push && <T v="small">{me.push}</T>}
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
       <Section label={O.queue} right={<T v="tiny" mono>{open.length}</T>}>

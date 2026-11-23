@@ -6,7 +6,7 @@
 //           and retries never open a second case.
 // RGB LED : shows the station state polled from the server:
 //           idle = off, received = amber, review = blue, field = amber blinking,
-//           guided = blue slow pulse, fraud = red steady (the operator suspects phone fraud: staff are coming),
+//           guided = blue slow pulse, fraud = red steady (the operator has activated the stop warning),
 //           offline / no valid state yet = red blinking.
 //           Device states: setup hold = white fast blink, setup portal open = magenta slow blink,
 //           firmware download = white steady.

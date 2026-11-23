@@ -66,6 +66,7 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
   const sendAndDispatch = async (g: Guard) => {
     if (!(await run("send", { incident: d.id, intent }))) return;
     if (await run("assign", { incident: d.id, assignee: g.uid })) toast.success(DESK.reply.bundleToast(g.display_name));
+    else toast.warning(DESK.reply.sendOnly);
   };
   return (
     <Panel title={DESK.reply.title} action={<span className="mono text-faint">{MANUAL_VERSION}</span>}>
@@ -113,7 +114,7 @@ export function DispatchCard({ d, job, guards, card, lang, run, company }: { d: 
             {guards.find((g) => g.uid === job.assignee)?.display_name ?? DESK.dispatch.guard}
             <Chip>{staffField[job.state]}</Chip>
           </span>
-          <span>{job.declined_at ? SHIFT.declined : job.acknowledged_at ? SHIFT.accepted : SHIFT.unack}</span>
+          <span>{job.declined_at ? SHIFT.declined : job.accepted_at ? SHIFT.accepted : job.acknowledged_at ? SHIFT.ack : SHIFT.unack}</span>
           {job.provider_at && <span>{SHIFT.provider}</span>}
           {job.help_at && <Notice tone="warn">{SHIFT.helpNeeded}</Notice>}
           <span className="text-[13px]">{job.eta ? DESK.dispatch.eta(job.eta) : DESK.dispatch.etaUnknown}</span>

@@ -1,5 +1,6 @@
 // The city's approved replies. Slots come from the station row: branch = the desk to go to, hours = its hours.
 // They say where a procedure is done; none of them advises on immigration status or the law.
+// Updated non-English caller wording awaits native review.
 import type { PackReply } from "./types.ts";
 import { slot as p } from "./common.ts";
 

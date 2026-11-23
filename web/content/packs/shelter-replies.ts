@@ -1,4 +1,5 @@
 // The municipality's approved replies at a shelter. While an urgent tap is on, only SHELTER_TELL_NOW may be sent.
+// Updated non-English caller wording awaits native review.
 import type { PackReply } from "./types.ts";
 
 const URGENT = ["red_hurt", "family_child"];
@@ -52,12 +53,12 @@ export const SHELTER_REPLIES: Record<string, PackReply> = {
   SHELTER_FAMILY: {
     code: "S-4", title: "避難所の担当者が支援依頼を受諾", rule: { faults: ["shelter_family"], ...calm },
     text: () => ({
-      ja: "ひなんじょの 係の 人が あなたの たのみを うけつけました。",
-      en: "A shelter worker has accepted your request for help.",
-      bn: "আশ্রয়কেন্দ্রের একজন কর্মী আপনার সাহায্যের অনুরোধ গ্রহণ করেছেন।",
-      vi: "Một nhân viên nơi sơ tán đã nhận yêu cầu hỗ trợ của bạn.",
-      id: "Petugas pengungsian sudah menerima permintaan bantuan Anda.",
-      ne: "आश्रयस्थलका कर्मचारीले तपाईंको सहयोगको अनुरोध स्वीकार गर्नुभएको छ।",
+      ja: "ひなんじょの 係の 人が あなたの たのみを うけつけました。 係の 人は ほかの ひなんじょとも れんらくを とります。家族に ぶじを つたえる ときは、171 に 電話して こえを のこせます。",
+      en: "A shelter worker has accepted your request for help. To leave a 'safe' message for your family, you can call 171 (the Disaster Emergency Message Dial) or use web171.",
+      bn: "আশ্রয়কেন্দ্রের একজন কর্মী আপনার সাহায্যের অনুরোধ গ্রহণ করেছেন। পরিবারের জন্য 'নিরাপদ আছি' বার্তা রাখতে ১৭১ (দুর্যোগ জরুরি বার্তা ডায়াল) নম্বরে ফোন করতে বা web171 ব্যবহার করতে পারেন।",
+      vi: "Một nhân viên nơi sơ tán đã nhận yêu cầu hỗ trợ của bạn. Để để lại lời nhắn 'tôi an toàn' cho gia đình, bạn có thể gọi 171 (đường dây nhắn tin khẩn cấp khi thiên tai) hoặc dùng web171.",
+      id: "Petugas pengungsian sudah menerima permintaan bantuan Anda. Untuk meninggalkan pesan 'saya selamat' bagi keluarga, Anda bisa menelepon 171 (layanan pesan darurat bencana) atau memakai web171.",
+      ne: "आश्रयस्थलका कर्मचारीले तपाईंको सहयोगको अनुरोध स्वीकार गर्नुभएको छ। परिवारका लागि 'म सुरक्षित छु' सन्देश छोड्न १७१ (विपद् आपतकालीन सन्देश डायल) मा फोन गर्न वा web171 प्रयोग गर्न सक्नुहुन्छ।",
     }),
   },
   SHELTER_INFO: {

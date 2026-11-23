@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BOT, DESK, nextFieldStep, SHIFT, ETA_OPTIONS, FIELD, OPS, PACKS, PACK_DESK, isFault, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@/content/catalogue";
 
-type Job = { acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
+type Job = { accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string; reminded_gen: number | null; reestimate_gen: number | null };
 type Site = { label: string; company: string };
 const UNKNOWN_ETA = "";
 const STEPS = ["on_way", "arrived", "done"] as const;
@@ -24,6 +24,8 @@ export default function FieldPage() {
 // Only this guard's open assignments (row-level security). No identity checks or card handback here.
 function Jobs({ me }: { me: Me }) {
   const [previous,setPrevious] = useState<{ incident: string; station: string; generation: number }[]>([]);
+  const [loaded,setLoaded] = useState(false);
+  const [failed,setFailed] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sites, setSites] = useState<Record<string, Site>>({});
   const load = useCallback(async () => {
@@ -33,6 +35,10 @@ function Jobs({ me }: { me: Me }) {
       db.from("station").select("id, label, security_company"),
       db.from("field_standdown").select("incident,station,generation").gt("at",new Date(Date.now()-86400000).toISOString()).order("at",{ascending:false}),
     ]);
+    const failed = Boolean(j.error || s.error || old.error);
+    setFailed(failed);
+    if (failed) return;
+    setLoaded(true);
     setPrevious(old.data ?? []);
     setJobs((j.data ?? []) as Job[]);
     setSites(Object.fromEntries(((s.data ?? []) as { id: string; label: L10n; security_company: string }[]).map((x) => [x.id, { label: x.label.ja, company: x.security_company }])));
@@ -47,7 +53,8 @@ function Jobs({ me }: { me: Me }) {
     <AppShell nav={navFor(me.role, { "/field": jobs.length })} footer={<MeFooter me={me} />} title={FIELD.title}>
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 p-4 lg:p-8">
         {previous.map((s) => <Notice key={`${s.incident}-${s.generation}`}>{s.station} · {SHIFT.reassigned}</Notice>)}
-        {jobs.length === 0 && <p className="py-16 text-center text-[14px] text-muted-foreground">{FIELD.none}</p>}
+        {failed && <Notice tone="warn">{SHIFT.readFailed}</Notice>}
+        {loaded && !failed && jobs.length === 0 && <p className="py-16 text-center text-[14px] text-muted-foreground">{FIELD.none}</p>}
         {jobs.map((j) => <JobCard key={`${j.incident}-${j.generation}`} j={j} label={sites[j.station]?.label ?? j.station} company={sites[j.station]?.company} />)}
       </div>
     </AppShell>
@@ -57,7 +64,7 @@ function Jobs({ me }: { me: Me }) {
 function JobCard({ j, label, company }: { j: Job; label: string; company?: string }) {
   // The estimate starts unknown; only the guard's own pick is ever sent.
   const [eta, setEta] = useState(UNKNOWN_ETA);
-  const next = nextFieldStep(j.state, j.acknowledged_at);
+  const next = nextFieldStep(j.state, j.accepted_at);
   const [correct, setCorrect] = useState(false);
   const act = (state: string) =>
     cmd("field", { incident: j.incident, generation: j.generation, state, eta: state === "on_way" ? eta : undefined })

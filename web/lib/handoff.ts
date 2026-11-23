@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { ACTOR, CALLER_FLAGS, FACT_STAFF, HANDOFF, LANG_NAME, OPS, PACKS, PACK_RECIPIENTS, PARTNER, eventText, packOfFault, type Fact, type Lang } from "@/content/catalogue";
+import { ACTOR, DESK, FAULT_DESK, STAFF_JA, REMOTE_RELEASE, bankStatusStaff, isFault, CALLER_FLAGS, FACT_STAFF, HANDOFF, LANG_NAME, identifyingSummary, OPS, PACKS, PACK_RECIPIENTS, PARTNER, eventText, packOfFault, type Fact, type Lang } from "@/content/catalogue";
 import { admin, fail, priv } from "@/lib/server";
 import { rpc } from "@/lib/access";
 
@@ -45,7 +45,7 @@ function shareFlag(recipient: string, flag: string, flags: string[]) {
     case "medical_interpreter": case "consult_desk": return flag === "need_interpreter" || flag === "need_explain";
     case "department": return !/^(ins_|pay_)/.test(flag);
     case "railway": return flag === "leave_soon" || (flags.includes("share_item") && flag.startsWith("item_"));
-    case "health_team": return /^(need_medicine|need_allergy|red_|who_)/.test(flag);
+    case "health_team": return /^(need_medicine|diet_allergy|red_|who_)/.test(flag);
     case "disaster_hq": return !/allergy|medicine|red_|pain_|ins_/.test(flag);
     case "bank": case "city_section": return true;
     default: return false;
@@ -55,8 +55,8 @@ function shareFlag(recipient: string, flag: string, flags: string[]) {
 // The preview and bearer document use the same allowlist, including links issued before partner tracking.
 export async function partnerReport(incident: string, recipient: string, proposedDue: string | null = null): Promise<[string,string][]> {
   const [{ data: d }, { data: c }, { data: w }] = await Promise.all([
-    admin.from("desk").select("station,fault,lang,confirmed_rev,card_back,cash_received,fraud_at,ai_summary,ai_summary_at").eq("id",incident).single().throwOnError(),
-    admin.from("caller_card").select("flags,confirmed_flags,text_only").eq("id",incident).maybeSingle().throwOnError(),
+    admin.from("desk").select("station,fault,lang,remote_release,stated_amount,confirmed_rev,card_back,cash_received,fraud_at,ai_summary,summary_checked").eq("id",incident).single().throwOnError(),
+    admin.from("caller_card").select("flags,confirmed_flags,text_only,bank_status,bank_due,choice").eq("id",incident).maybeSingle().throwOnError(),
     admin.from("partner_work").select("due_at,requested_at,accepted_at,railway_ref").eq("incident",incident).eq("recipient",recipient).maybeSingle().throwOnError(),
   ]);
   if (!d || !Object.hasOwn(PACKS[packOfFault(d.fault)].recipients, recipient)) return fail(400,"bad_request");
@@ -71,14 +71,22 @@ export async function partnerReport(incident: string, recipient: string, propose
   ];
   if (d.lang) rows.push([D.lang, LANG_NAME[d.lang as Lang]]);
   if (recipient === "bank" && d.confirmed_rev != null) rows.push([D.confirmed,[FACT_STAFF.card_back[d.card_back as Fact],FACT_STAFF.cash_received[d.cash_received as Fact]].join("・")]);
+  if (recipient === "bank") {
+    if (isFault(d.fault)) rows.push([D.fault,STAFF_JA.fault[d.fault]]);
+    if (d.stated_amount != null) rows.push([FAULT_DESK.amount,FAULT_DESK.yen(d.stated_amount)]);
+    if (d.remote_release) rows.push([D.release,REMOTE_RELEASE[d.remote_release]]);
+    if (c?.bank_status) rows.push([FAULT_DESK.bank,bankStatusStaff(c.bank_status,c.bank_due)]);
+    if (c?.choice) rows.push([D.choice,DESK.choiceText[c.choice]]);
+  }
   const current: string[] = c?.flags ?? [];
+  if (c?.text_only) rows.push([PARTNER.contact,PARTNER.textOnly]);
   const allowed = current.filter((f) => shareFlag(recipient,f,current));
   for (const confirmed of [true,false]) {
     const names = allowed.filter((f) => Boolean(c?.confirmed_flags?.includes(f)) === confirmed).map((f) => CALLER_FLAGS[f]?.staff).filter(Boolean);
     if (names.length) rows.push([confirmed ? D.confirmed : PARTNER.tentative,names.join("・")]);
   }
   if (w?.railway_ref) rows.push([PARTNER.ref,w.railway_ref]);
-  if ((recipient === "bank" || recipient === "department") && d.ai_summary) rows.push([D.aiSummary,d.ai_summary]);
+  if ((recipient === "bank" || recipient === "department") && d.ai_summary && d.summary_checked && !identifyingSummary(d.ai_summary)) rows.push([D.aiSummary,d.ai_summary]);
   if (recipient === "police" || recipient === "security") {
     const { data: events } = await admin.from("case_event").select("kind,at").eq("incident",incident)
       .in("kind",["fraud","fraud_safe","dispatch","redispatch"]).order("id").throwOnError();

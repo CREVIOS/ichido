@@ -12,10 +12,11 @@ import { PARTNER, HANDOFF, PACKS, packOfFault, staffError } from "@/content/cata
 import { when, type Desk } from "./types";
 
 type Link = { id: string; recipient: string; created_at: string; expires_at: string; revoked_at: string | null; views: number };
+const defaultDeadline = () => new Date(Date.now()+86400000).toISOString();
 const at = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 // Read-only links to this case's record for its pack's recipients (an ATM: the bank, the police, the security company).
-export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
+export function HandoffPanel({ d, uid }: { d: Desk; uid: string }) {
   const { id: incident, fault } = d;
   const RECIPIENTS = Object.keys(PACKS[packOfFault(fault)].recipients);
   const [previewing, setPreviewing] = useState(false);
@@ -37,7 +38,7 @@ export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
 
 
   const inspect = (r: string) => {
-    const value = due ? new Date(due).toISOString() : new Date(Date.now()+86400000).toISOString();
+    const value = due ? new Date(due).toISOString() : defaultDeadline();
     setPreviewing(true); setPreview(null);
     return cmd<{ rows: [string,string][] }>("handoff_preview", { incident, recipient:r, due:value }).then((res) => setPreview({ recipient:r, due:value, rows:res.rows })).catch(fail).finally(() => setPreviewing(false));
   };
@@ -67,12 +68,12 @@ export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
         <Button onClick={() => create(preview.recipient,preview.due)}>{PARTNER.issue}</Button></div>}
       {work.map((w) => <div className="flex flex-wrap items-center gap-2" key={w.recipient}>
         <span>{HANDOFF.recipient[w.recipient]} · {at(w.due_at)} · {w.accepted_at ? PARTNER.accepted : w.requested_at ? PARTNER.sent : PARTNER.pending}</span>
-        {!w.accepted_at && mine && <>
+        {!w.accepted_at && w.owner_id === uid && <>
           {w.recipient === "railway" && w.requested_at && <input aria-label={PARTNER.ref} placeholder={PARTNER.ref} value={reference} maxLength={32} onChange={(e) => setReference(e.target.value.toUpperCase())} />}
           <Button variant="secondary" onClick={() => progress(w.recipient,w.requested_at ? "accept" : "request")}>{w.requested_at ? PARTNER.accept : PARTNER.request}</Button>
         </>}
       </div>)}
-      <Summary d={d} mine={mine} />
+      <Summary d={d} mine={d.operator_id === uid} />
       {links.length > 0 && (
         <ul className="flex flex-col">
           {links.map((l) => {
@@ -109,7 +110,7 @@ function Summary({ d, mine }: { d: Desk; mine: boolean }) {
       .then((r) => { if (r.summary) setText(r.summary); else { setNote(S.off); setText((t) => t ?? ""); } })
       .catch(fail).finally(() => setBusy(false));
   };
-  const save = () => cmd<{ withheld?: boolean }>("summary_save", { incident: d.id, text })
+  const save = () => cmd<{ withheld?: boolean }>("summary_save", { incident: d.id, text, checked:reviewed })
     .then((r) => { if (r.withheld) return setNote(S.withheld); setText(null); toast.success(S.saved); }).catch(fail);
   if (!mine && !d.ai_summary) return null;
   return (

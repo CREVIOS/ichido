@@ -6,7 +6,7 @@ import { useLive } from "@/lib/live";
 import { Panel, Notice } from "@/components/kit";
 import { CASES, HANDOFF, PARTNER } from "@/content/catalogue";
 
-type Task = { incident: string; station: string; task: string; due_at: string };
+type Task = { incident: string; station: string; task: string; due_at: string | null };
 
 export function ExternalWork({ name }: { name: string }) {
   const [rows,setRows] = useState<Task[]>([]);
@@ -17,13 +17,13 @@ export function ExternalWork({ name }: { name: string }) {
     setFailed(Boolean(r.error));
     if (r.data) { setRows(r.data); setNow(Date.now()); }
   },[]);
-  useLive(["partner_work","field_job","desk"],load);
+  useLive(["partner_work","field_job","desk","promise"],load);
   if (!failed && !rows.length) return null;
   return <Panel title={`${name} · ${PARTNER.mine}`}>
     {failed && <Notice tone="warn">{CASES.loadError}</Notice>}
     {rows.map((r) => <Link key={`${r.incident}/${r.task}`} href={`/operator#${r.incident}`}>
-      {r.station} · {r.task === "field" ? PARTNER.field : HANDOFF.recipient[r.task]} · {new Date(r.due_at).toLocaleString("ja-JP")}
-      {Date.parse(r.due_at) < now && ` · ${PARTNER.late}`}
+      {r.station} · {r.task === "field" ? PARTNER.field : HANDOFF.recipient[r.task]}{r.due_at && ` · ${new Date(r.due_at).toLocaleString("ja-JP")}`}
+      {r.due_at && Date.parse(r.due_at) < now && ` · ${PARTNER.late}`}
     </Link>)}
   </Panel>;
 }

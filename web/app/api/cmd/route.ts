@@ -90,7 +90,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
 
   // An AI draft of the staff-facing summary, from the case record only; the operator edits it and saves it (lib/summary.ts).
   summary_draft: (a, b) => draftSummary(staff(a, "operator"), str(b, "incident")),
-  summary_save: (a, b) => saveSummary(staff(a, "operator"), str(b, "incident"), b.text),
+  summary_save: (a, b) => saveSummary(staff(a, "operator"), str(b, "incident"), b.text, b.checked === true),
 
   // Read-only hand-off links for the bank, the police or the security company (lib/handoff.ts).
   async handoff_create(a, b) {

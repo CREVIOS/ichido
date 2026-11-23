@@ -53,6 +53,8 @@ begin
   if m.broadcast_at is not null then perform ichido.fail('conflict'); end if;
   perform 1 from public.desk where mass_incident = p_mass and finished_at is null order by id for update;
   if not found then perform ichido.fail('conflict'); end if;
+  perform 1 from public.station where id in (select station from public.desk where mass_incident=p_mass)
+    order by id for share;
   with sent as (
     update public.caller_card c set notice = 'mass_leave', notice_at = now()
       from ichido.mass_recipients(p_mass) r where c.id=r.incident
@@ -123,7 +125,7 @@ declare d public.desk; st public.station; r uuid;
 begin
   d := ichido.owned_case(p_uid, p_incident);
   if d.confirmed_rev is null or d.clarifying then perform ichido.fail('conflict'); end if;
-  if p_needs_held and (d.card_back <> 'no' or d.remote_release = 'released') then perform ichido.fail('conflict'); end if;
+  if (p_needs_held or p_intent='HELD_WAIT_OR_LEAVE') and (d.card_back <> 'no' or d.remote_release = 'released') then perform ichido.fail('conflict'); end if;
   select * into st from public.station where id = d.station;
   insert into public.reply (incident, intent, slots, manual_version, operator_id)
     values (d.id, p_intent, jsonb_build_object('branch', st.branch, 'hours', st.counter_hours) || case when p_intent='TRANSIT_LEAVE'
@@ -147,7 +149,7 @@ begin
   update public.caller_card set fraud = true, notice = null, notice_at = null where id = d.id;
   perform ichido.event(d.id, 'operator', 'fraud',
     jsonb_build_object('company', (select security_company from public.station where id = d.station)), p_name);
-  if p_assignee is not null then perform public.cmd_assign(p_uid, p_name, d.id, p_assignee); end if;   -- a no-op when this guard already has the job
+  -- The legacy assignee argument is retained for rolling upgrades. Dispatch has its own command.
   perform ichido.set_light(d.station, d.id, 'fraud');
 end $$;
 
@@ -171,8 +173,10 @@ alter table ichido.staff add column if not exists duty_station text references p
   add column if not exists duty_function text check (duty_function in ('atm','hospital','city_office','transit','shelter')),
   add column if not exists available boolean not null default true;
 alter table public.field_job add column if not exists acknowledged_at timestamptz,
-  add column if not exists declined_at timestamptz, add column if not exists help_at timestamptz,
+  add column if not exists accepted_at timestamptz, add column if not exists declined_at timestamptz, add column if not exists help_at timestamptz,
   add column if not exists provider_at timestamptz;
+update public.field_job set accepted_at=updated_at,acknowledged_at=coalesce(acknowledged_at,updated_at)
+  where state in ('on_way','arrived','done') and accepted_at is null;
 update ichido.staff s set duty_station='TABLE-A', duty_function='atm' from auth_ba."user" u
   where s.uid=u.id and u.email in ('guard1@ichido.demo','guard2@ichido.demo') and s.duty_station is null
     and exists (select from public.station where id='TABLE-A');
@@ -208,7 +212,7 @@ begin
   insert into public.field_job (incident, station, fault, assignee, generation, state, eta, case_closed, updated_at)
     values (d.id, d.station, d.fault, p_assignee, coalesce(prev.generation, 0) + 1, 'requested', null, false, now())
     on conflict (incident) do update set assignee = excluded.assignee, generation = excluded.generation,
-      state = 'requested', acknowledged_at=null, declined_at=null, provider_at=null, help_at=null, reestimate_gen=null, assigned_at=now(), fault=excluded.fault, eta = null, case_closed = false, updated_at = now();
+      state = 'requested', accepted_at=null, acknowledged_at=null, declined_at=null, provider_at=null, help_at=null, reestimate_gen=null, assigned_at=now(), fault=excluded.fault, eta = null, case_closed = false, updated_at = now();
   update public.desk set status = 'field' where id = d.id and finished_at is null;
   update public.caller_card set status = case when d.finished_at is null then 'field'::public.case_status else d.status end, field_state = 'requested', eta = null where id = d.id;
   if d.finished_at is null then perform ichido.set_light(d.station, d.id, 'field'); end if;
@@ -231,6 +235,7 @@ begin
   if p_state in ('accept','decline','help') then
     if p_state<>'help' and job.state<>'requested' then perform ichido.fail('conflict'); end if;
     update public.field_job set acknowledged_at=coalesce(acknowledged_at,now()),
+      accepted_at=case when p_state='accept' then coalesce(accepted_at,now()) else accepted_at end,
       declined_at=case when p_state='decline' then now() end,
       help_at=case when p_state='help' then now() else help_at end where incident=p_incident;
     if p_state='decline' then update public.caller_card set field_state='none',eta=null where id=p_incident; end if;
@@ -244,7 +249,7 @@ begin
     perform ichido.fail('conflict');
   end if;
   if p_state is null or p_state not in ('on_way','arrived','done') then perform ichido.fail('bad_request'); end if;
-  update public.field_job set acknowledged_at=coalesce(acknowledged_at,now()), state = p_state, eta = case when p_state = 'on_way' then p_eta end, updated_at = now(),
+  update public.field_job set acknowledged_at=coalesce(acknowledged_at,now()), accepted_at=coalesce(accepted_at,now()), state = p_state, eta = case when p_state = 'on_way' then p_eta end, updated_at = now(),
          case_closed = p_state = 'done' and finished
     where incident = p_incident and assignee = p_uid and generation = p_generation and not case_closed;
   if not found then perform ichido.fail('forbidden'); end if;
@@ -258,6 +263,14 @@ alter table ichido.alert_outbox add column if not exists lease uuid,
   add column if not exists attempts int not null default 0,
   add column if not exists delivered uuid[] not null default '{}',
   add column if not exists generation int;
+-- A pending assignment stays deliverable until the worker responds or its generation ends.
+create or replace function ichido.expire_alerts() returns void
+language sql security definer set search_path = '' as $$
+  delete from ichido.alert_outbox o where o.at < now() - interval '1 hour'
+    and not exists (select from public.field_job j where o.kind='field_job' and j.incident=o.incident
+      and j.assignee=o.target and j.generation=o.generation and not j.case_closed and j.acknowledged_at is null);
+$$;
+
 create or replace function public.alert_take(p_limit int) returns setof ichido.alert_outbox
 language sql security definer set search_path='' as $$
   update ichido.alert_outbox set lease=gen_random_uuid(), attempts=attempts+1, available_at=now()+interval '2 minutes'
@@ -303,6 +316,12 @@ create table if not exists public.partner_work (
   due_at timestamptz not null, requested_at timestamptz, accepted_at timestamptz, railway_ref text,
   primary key(incident,recipient)
 );
+insert into public.partner_work(incident,recipient,owner_id,due_at)
+  select distinct on (h.incident,h.recipient) h.incident,h.recipient,d.operator_id,h.expires_at
+    from ichido.handoff h join public.desk d on d.id=h.incident
+    where h.revoked_at is null and h.expires_at>now() and d.operator_id is not null and not d.abandoned
+    order by h.incident,h.recipient,h.created_at
+  on conflict do nothing;
 alter table public.partner_work enable row level security;
 revoke all on public.partner_work from public,anon,authenticated;
 grant select on public.partner_work to authenticated;
@@ -360,7 +379,7 @@ create or replace function ichido.work_fits(i uuid,intent text) returns boolean 
  when intent in ('HOSP_STAFF_COMING','CITY_STAFF_COMING','SHELTER_STAFF_COMING','TRANSIT_ACCESS')
    then exists(select from public.field_job where incident=i and state='on_way' and declined_at is null and not case_closed)
  when intent in ('SHELTER_NEEDS','SHELTER_FAMILY')
-   then exists(select from public.field_job where incident=i and acknowledged_at is not null and declined_at is null and not case_closed)
+   then exists(select from public.field_job where incident=i and accepted_at is not null and declined_at is null and not case_closed)
  when intent in ('HOSP_INTERPRETER','CITY_APPOINTMENT')
    then exists(select from public.partner_work where incident=i and recipient=case intent when 'HOSP_INTERPRETER' then 'medical_interpreter' else 'consult_desk' end and requested_at is not null)
  when intent='TRANSIT_LEAVE' then exists(select from public.partner_work where incident=i and recipient='railway' and accepted_at is not null and railway_ref is not null)
@@ -561,12 +580,50 @@ $$;
 revoke all on function public.shift_insights(int) from public,anon,authenticated;
 grant execute on function public.shift_insights(int) to authenticated;
 
+create or replace function public.ops_promise_expire(p_id uuid) returns text
+language plpgsql security definer set search_path = '' as $$
+declare p public.promise; d public.desk; j public.field_job;
+begin
+  select * into p from public.promise where id = p_id;
+  if not found then return 'gone'; end if;
+  select * into d from public.desk where id = p.incident for update;
+  select * into p from public.promise where id = p_id for update;
+  if p.settled_at is not null then return 'settled'; end if;
+  if d.finished_at is not null and (d.abandoned or p.kind not in ('eta','arrived')) then
+    update public.promise set settled_at = now(), outcome = 'closed' where id = p_id;
+    return 'closed';
+  end if;
+  if p.kind in ('eta', 'arrived') then
+    select * into j from public.field_job where incident = d.id for update;
+    if not found or j.generation <> p.generation or j.case_closed
+       or j.state <> (case p.kind when 'eta' then 'on_way' else 'arrived' end) then
+      update public.promise set settled_at = now(), outcome = 'replaced' where id = p_id;
+      return 'moved';
+    end if;
+    update public.field_job set reestimate_gen = j.generation where incident = d.id;
+  end if;
+  update public.promise set settled_at = now(), outcome = 'expired' where id = p_id;
+  update public.caller_card set notice = 'still_working', notice_at = now() where id = d.id and not fraud and d.finished_at is null;
+  perform ichido.event(d.id, 'bot', 'promise_due', jsonb_strip_nulls(jsonb_build_object('kind', p.kind, 'by', p.made_by)));
+  return 'expired';
+end $$;
+
+-- The per-case workflow exits at guided closure. Continue timers for workers still in the field.
+select cron.schedule('ichido-guided-field-promises','* * * * *',$job$
+  select public.ops_promise_expire(p.id) from public.promise p join public.desk d on d.id=p.incident
+    where d.finished_at is not null and not d.abandoned and p.kind in ('eta','arrived')
+      and p.settled_at is null and p.due_at<=now() order by p.due_at limit 100
+$job$);
+
 create or replace function public.my_external_work() returns table(incident uuid,station text,task text,due_at timestamptz)
 language sql stable security definer set search_path='' as $$
  select w.incident,d.station,w.recipient,w.due_at from public.partner_work w join public.desk d on d.id=w.incident
    where ichido.has_role('operator') and w.owner_id=auth.uid() and w.accepted_at is null
  union all
- select d.id,d.station,'field',j.assigned_at+make_interval(secs=>t.seconds) from public.desk d
+ select d.id,d.station,'field',case when j.state='requested' then j.assigned_at+make_interval(secs=>t.seconds)
+   else (select p.due_at from public.promise p where p.incident=j.incident and p.generation=j.generation
+     and p.kind=case j.state when 'on_way' then 'eta' else 'arrived' end and (p.settled_at is null or p.outcome='expired')
+     order by p.created_at desc limit 1) end from public.desk d
    join public.field_job j on j.incident=d.id join ichido.sla_target t on t.reason='guard_late'
    where ichido.has_role('operator') and d.operator_id=auth.uid() and j.state<>'done' and not j.case_closed
  order by due_at
@@ -595,3 +652,25 @@ begin
 end $$;
 create or replace trigger stand_down after update of generation on public.field_job for each row
 when (old.assignee<>new.assignee) execute function ichido.stand_down();
+
+create or replace function public.disaster_preview(p_stations text[]) returns integer language sql stable security definer set search_path='' as $$
+  select count(distinct d.id)::int from public.station s join public.desk d on d.station=s.id
+    join ichido.binding b on b.incident=d.id and b.expires>now()
+    where s.id=any(p_stations) and ichido.pack_of(s.kind)='atm' and d.finished_at is null
+    and (ichido.has_role('operator') or ichido.my_role() in ('manager','admin'))
+$$;
+revoke all on function public.disaster_preview(text[]) from public,anon,authenticated;
+grant execute on function public.disaster_preview(text[]) to authenticated;
+
+-- Old mass groups and active instructions may predate pack or dispatch checks.
+update public.caller_card c set notice=null, notice_at=null from public.station st
+  where c.station=st.id and ichido.pack_of(st.kind)<>'atm' and c.notice='mass_leave';
+update public.desk d set mass_incident=null from public.station st
+  where d.station=st.id and ichido.pack_of(st.kind)<>'atm' and d.mass_incident is not null;
+select ichido.withdraw_unfit_reply(d.id) from public.desk d join public.caller_card c on c.id=d.id
+  join public.reply r on r.id=c.reply_id where d.finished_at is null
+  and ((d.remote_release='released' and r.intent='HELD_WAIT_OR_LEAVE') or not ichido.work_fits(d.id,r.intent));
+
+revoke all on function ichido.snapshot_flags(), ichido.check_field_reply(), ichido.stand_down() from public,anon,authenticated;
+
+alter table public.desk add column if not exists summary_checked boolean not null default false;
