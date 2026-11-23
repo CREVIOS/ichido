@@ -50,7 +50,7 @@ export const COMMANDS: Record<string, Access> = {
   me: "any", mine: "any",
   // Caller
   pair: "caller", draft: "caller", confirm: "caller", set_lang: "caller", choose: "caller", teachback: "caller", human: "caller",
-  rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller", line_status: "caller", line_code: "caller",
+  rate: "caller", flag: "caller", followup: "caller", silent_alert: "caller", disaster_info: "caller",
   // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
   push_key: "any", push_subscribe: "any", push_unsubscribe: "any",
   // Operator on a case

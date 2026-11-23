@@ -16,7 +16,6 @@
     "@base-ui/react": "^1.9.0",
     "@better-auth/expo": "^1.7.27",
     "@better-auth/passkey": "^1.7.27",
-    "@line/bot-sdk": "^11.4.0",
     "@livekit/protocol": "^1.54.1",
     "@modelcontextprotocol/server": "^2.4.0",
     "@supabase/ssr": "^0.12.7",

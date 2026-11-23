@@ -47,6 +47,7 @@ export async function POST(req: Request): Promise<Response> {
   after(flushAlerts);
 
   // The station's Better Stack heartbeat, at most once a minute (Better Stack's shortest period), fire-and-forget.
+  // BETTERSTACK_DEVICE_HEARTBEATS_JSON is the earlier name of the same setting.
   const urls = JSON.parse(process.env.BETTERSTACK_HEARTBEATS_JSON || process.env.BETTERSTACK_DEVICE_HEARTBEATS_JSON || "{}") as Record<string, string>;
   const url = Object.hasOwn(urls, station) ? urls[station] : undefined;
   if (url) {

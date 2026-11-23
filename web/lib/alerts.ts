@@ -1,15 +1,14 @@
 import "server-only";
 import { generateRequestDetails } from "web-push";
-import { PUSH, PUSH_UNKNOWN_PLACE, SLACK } from "@/content/catalogue";
+import { PUSH, PUSH_UNKNOWN_PLACE } from "@/content/catalogue";
 import { admin, fail, rpc, type Actor } from "@/lib/server";
 import { entry, errorFields, ship } from "@/lib/log";
-import { deliverLine } from "@/lib/line";
 
-// Staff alerts (Web Push, Expo push, Slack) and the caller's LINE follow-up, delivered from the outbox that triggers
-// fill (supabase/migrations/20261124030000_alerts.sql). flushAlerts() runs after commands, device calls and the
-// Ichido Bot's steps; never from a browser. Every payload is a code, a station label and a link: no caller text.
+// Staff alerts (Web Push in the browser, Expo push in the mobile app), delivered from the outbox that database
+// triggers fill (supabase/migrations/20261124030000_alerts.sql). flushAlerts() runs after commands, device calls and
+// the Ichido Bot's steps; never from a browser. Every payload is a code, a station label and a link: no caller text.
 
-type Outbox = { id: number; kind: string; incident: string | null; station: string | null; target: string | null; data: Record<string, unknown> };
+type Outbox = { id: number; kind: string; incident: string | null; station: string | null; target: string | null };
 type Sub = { id: string; uid: string; platform: "web" | "expo"; endpoint: string; p256dh: string | null; auth: string | null };
 export type Message = { title: string; body: string; url: string; path: string; tag: string };
 
@@ -74,17 +73,8 @@ async function sendExpo(batch: { s: Sub; m: Message }[]): Promise<string[]> {
   return (out?.data ?? []).flatMap((t, i) => (t?.details?.error === "DeviceNotRegistered" && batch[i] ? [batch[i].s.id] : []));
 }
 
-async function slack(o: Outbox, place: (id: string | null) => string) {
-  const url = process.env.SLACK_WEBHOOK_URL;
-  if (!url || !URL.canParse(url)) return;
-  const text = o.kind === "sla" ? SLACK.sla(place(o.station), String(o.data.reason ?? ""))
-    : SLACK.disaster(((o.data.stations as string[] | undefined) ?? []).map((s) => place(s)).join("、"));
-  const res = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS), headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
-  if (!res.ok) throw new Error(`slack ${res.status}`);
-}
-
 async function deliver(rows: Outbox[]) {
-  const ids = [...new Set(rows.flatMap((o) => [o.station, ...((o.data.stations as string[] | undefined) ?? [])]).filter(Boolean))] as string[];
+  const ids = [...new Set(rows.map((o) => o.station).filter(Boolean))] as string[];
   const { data: stations } = ids.length ? await admin.from("station").select("id, label").in("id", ids) : { data: [] };
   const labels = new Map((stations ?? []).map((s) => [s.id as string, (s.label as { ja?: string })?.ja ?? PUSH_UNKNOWN_PLACE]));
   const place = (id: string | null) => (id && labels.get(id)) || PUSH_UNKNOWN_PLACE;
@@ -92,9 +82,6 @@ async function deliver(rows: Outbox[]) {
   let sent = 0;
   for (const o of rows) {
     try {
-      if (o.kind.startsWith("line_")) { await deliverLine(o); continue; }
-      if (o.kind === "disaster" || o.kind === "sla") await slack(o, place).catch((e) => ship([entry("warn", "alert_failed", { code: "slack", incident: o.incident ?? undefined, ...errorFields(e) })]));
-      if (o.kind === "disaster") continue;
       const { uids, roles } = recipients(o);
       if (!uids.length && !roles.length) continue;
       const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });
