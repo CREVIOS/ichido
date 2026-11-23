@@ -23,3 +23,14 @@ export function nearestWorking(from: { lat: number; lng: number }, places: Place
     .sort((a, b) => a.distance_m - b.distance_m)
     .slice(0, limit);
 }
+
+// GSI designated evacuation sites (public.shelter_site) that support a hazard, nearest first. Designated, not
+// necessarily open: whether a site is open is announced by the city and shelter staff.
+export type ShelterSite = { id: string; name: string; lat: number; lng: number; hazards: string[] };
+export function nearestShelters<T extends ShelterSite>(lat: number, lng: number, hazard: string, sites: T[], limit = 3) {
+  return sites
+    .filter((s) => s.hazards.includes(hazard))
+    .map((s) => ({ ...s, distance_m: metres({ lat, lng }, s) }))
+    .sort((a, b) => a.distance_m - b.distance_m)
+    .slice(0, limit);
+}

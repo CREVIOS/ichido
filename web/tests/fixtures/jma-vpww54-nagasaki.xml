@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trimmed from the live bulletin https://www.data.jma.go.jp/developer/xml/data/20261123075819_0_VPWW54_420000.xml
+     (2026-11-23): header and the 長崎市 item of the 市町村等 warning block. Advisories only (強風注意報). -->
+<Report xmlns="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx_add="http://xml.kishou.go.jp/jmaxml1/addition1/">
+<Control>
+<Title>気象警報・注意報（Ｈ２７）</Title>
+<DateTime>2026-11-23T07:58:17Z</DateTime>
+<Status>通常</Status>
+<EditorialOffice>長崎地方気象台</EditorialOffice>
+<PublishingOffice>長崎地方気象台</PublishingOffice>
+</Control>
+<Head xmlns="http://xml.kishou.go.jp/jmaxml1/informationBasis1/">
+<Title>長崎県気象警報・注意報</Title>
+<ReportDateTime>2026-11-23T16:58:00+09:00</ReportDateTime>
+<TargetDateTime>2026-11-23T16:58:00+09:00</TargetDateTime>
+<EventID/>
+<InfoType>発表</InfoType>
+<Serial/>
+<InfoKind>気象警報・注意報</InfoKind>
+<InfoKindVersion>1.2_2</InfoKindVersion>
+</Head>
+<Body xmlns="http://xml.kishou.go.jp/jmaxml1/body/meteorology1/" xmlns:jmx_eb="http://xml.kishou.go.jp/jmaxml1/elementBasis1/">
+<Warning type="気象警報・注意報（市町村等）">
+<Item>
+<Kind>
+<Name>強風注意報</Name>
+<Code>15</Code>
+<Status>継続</Status>
+<LastKind>
+<Name>強風注意報</Name>
+<Code>15</Code>
+</LastKind>
+</Kind>
+<Area>
+<Name>長崎市</Name>
+<Code>4220100</Code>
+</Area>
+<ChangeStatus>警報・注意報種別に変化無、量的予想事項等に変化有</ChangeStatus>
+</Item>
+</Warning>
+</Body>
+</Report>

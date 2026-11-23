@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CONSTRUCTED for tests from the structure of the live 長崎地方気象台 bulletin (jma-vpww54-nagasaki.xml) and the
+     JMA kind codes: 33 大雨特別警報 for 長崎市 (newly issued), 03 大雨警報 lifted for 佐世保市. Not a real bulletin. -->
+<Report xmlns="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx="http://xml.kishou.go.jp/jmaxml1/" xmlns:jmx_add="http://xml.kishou.go.jp/jmaxml1/addition1/">
+<Control>
+<Title>気象警報・注意報（Ｈ２７）</Title>
+<DateTime>2026-11-23T07:58:17Z</DateTime>
+<Status>通常</Status>
+<EditorialOffice>長崎地方気象台</EditorialOffice>
+<PublishingOffice>長崎地方気象台</PublishingOffice>
+</Control>
+<Head xmlns="http://xml.kishou.go.jp/jmaxml1/informationBasis1/">
+<Title>長崎県気象特別警報・警報・注意報</Title>
+<ReportDateTime>2026-11-23T16:58:00+09:00</ReportDateTime>
+<TargetDateTime>2026-11-23T16:58:00+09:00</TargetDateTime>
+<EventID/>
+<InfoType>発表</InfoType>
+<Serial/>
+<InfoKind>気象警報・注意報</InfoKind>
+<InfoKindVersion>1.2_2</InfoKindVersion>
+</Head>
+<Body xmlns="http://xml.kishou.go.jp/jmaxml1/body/meteorology1/" xmlns:jmx_eb="http://xml.kishou.go.jp/jmaxml1/elementBasis1/">
+<Warning type="気象警報・注意報（市町村等）">
+<Item>
+<Kind>
+<Name>大雨特別警報</Name>
+<Code>33</Code>
+<Status>発表</Status>
+</Kind>
+<Area>
+<Name>長崎市</Name>
+<Code>4220100</Code>
+</Area>
+</Item>
+<Item>
+<Kind>
+<Name>大雨特別警報</Name>
+<Code>33</Code>
+<Status>解除</Status>
+</Kind>
+<Area>
+<Name>佐世保市（宇久地域を除く）</Name>
+<Code>4220201</Code>
+</Area>
+</Item>
+</Warning>
+</Body>
+</Report>
