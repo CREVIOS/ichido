@@ -5,12 +5,13 @@ import { EarOff, ShieldCheck } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { Human } from "@/app/caller/human";
+import { usePrefs } from "@/app/caller/prefs";
 import { Phone } from "@/components/phone";
 import { Chip, Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LangSelect, preferredLang } from "@/components/lang-select";
-import { ACCESS, UI, STATION, errorText, type Lang } from "@/content/catalogue";
+import { ACCESS, JOURNEY, FAULT_UI, FRONTLINE, UI, STATION, errorText, type Lang } from "@/content/catalogue";
 
 const CODE_LENGTH = 6;
 const noop = () => () => {};
@@ -26,6 +27,8 @@ function StationForm() {
   const detected = useSyncExternalStore(noop, preferredLang, () => "bn" as Lang);
   const [chosen, setLang] = useState<Lang | null>(null);
   const lang = chosen ?? detected;
+  const [resume,setResume] = useState("");
+  const [prefs,setPrefs] = usePrefs();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,13 +36,16 @@ function StationForm() {
   // Pressed "I can't hear / I can't speak": the code will appear on the Help Point screen, not be spoken.
   const [silent, setSilent] = useState(false);
 
-  // A phone already paired goes straight to its case; a staff session must not be reused for a caller.
+  // Let the caller check the station before opening an existing case.
   useEffect(() => {
-    cmd<{ incident: string | null; staff: boolean }>("mine").then((m) => {
-      if (m.incident) location.replace("/caller");
+    let active = true;
+    cmd<{ incident: string | null; station?: string; finished?: boolean; staff: boolean }>("mine").then((m) => {
+      if (!active) return;
+      setResume(m.incident && m.station ? m.station : "");
       setStaffSession(m.staff);
-    }).catch(() => setStaffSession(false));
-  }, []);
+    }).catch((e: Error) => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [station]);
 
   async function withSession(run: () => Promise<void>) {
     setBusy(true); setError("");
@@ -51,7 +57,7 @@ function StationForm() {
       }
       await run();
     } catch (err) {
-      setError(errorText((err as Error).message, lang));
+      setError((err as Error).message);
     } finally {
       setBusy(false);
     }
@@ -67,8 +73,10 @@ function StationForm() {
   const alertSilently = () => withSession(async () => { await cmd("silent_alert", { station }); setSilent(true); });
 
   return (
-    <Phone lang={lang} center right={<LangSelect value={lang} onChange={setLang} />}>
-      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="sticky top-1 z-10" onClick={alertSilently} disabled={busy}>{UI.human[lang]}</Button>}
+    <Phone lang={lang} large={prefs.large} center right={<LangSelect value={lang} onChange={setLang} />}>
+      {staffSession ? <Human lang={lang} open={false} /> : <Button type="button" variant="secondary" className="sticky top-1 z-10" onClick={alertSilently} disabled={busy || silent}>{(silent ? FRONTLINE.requested : UI.human)[lang]}</Button>}
+      <Button variant="ghost" aria-pressed={prefs.large} onClick={() => setPrefs({ ...prefs,large:!prefs.large })}>{FAULT_UI.largeText[lang]}</Button>
+      {resume && <Button variant="secondary" onClick={() => location.replace("/caller")}>{JOURNEY.resume[lang]} · {resume}</Button>}
       <Chip className="self-start">Help Point · <span className="mono">{station}</span></Chip>
       <h1 className="text-[28px] leading-tight">{STATION.title[lang]}</h1>
       {staffSession ? (
@@ -84,7 +92,7 @@ function StationForm() {
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} maxLength={CODE_LENGTH} required
               className="h-16 w-full rounded-xl border bg-card text-center font-mono text-[32px] tracking-[0.3em] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40" />
           </div>
-          {error && <Notice tone="warn">{error}</Notice>}
+          {error && <p role="alert">{errorText(error,lang)}</p>}
           <Button type="submit" size="lg" className="h-11" disabled={busy || code.length < CODE_LENGTH}>{STATION.go[lang]}</Button>
           {silent ? <Notice tone="info">{ACCESS.alertSent[lang]}</Notice> : (
             <div className="flex flex-col gap-2">

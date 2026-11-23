@@ -13,7 +13,7 @@ const LINGER_MS = 5_000;
 // Private topics broadcast by the database (supabase/migrations/20261124010000_live_broadcast.sql): live:<table>
 // for staff; a caller hears only their own case (live:incident:<id>) and station (live:station:<id>).
 export type LiveScope = { incident?: string | null; station?: string | null };
-const SCOPED: Record<string, keyof LiveScope> = { caller_card: "incident", draft: "incident", reply: "incident", station: "station" };
+const SCOPED: Record<string, keyof LiveScope> = { frontline_turn: "incident", caller_card: "incident", draft: "incident", reply: "incident", station: "station" };
 
 function topics(tables: string[], scope?: LiveScope) {
   return [...new Set(tables.flatMap((t) => {

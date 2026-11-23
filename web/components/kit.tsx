@@ -189,5 +189,5 @@ export const Big = ({ children, className }: { children: ReactNode; className?: 
   <span className={cn("num text-[44px] leading-none tracking-[-0.04em] text-foreground", className)}>{children}</span>;
 
 export const Notice = ({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "warn" | "info" }) => (
-  <p className={cn("rounded-lg px-3 py-2.5 text-[14px]", tone === "warn" ? "bg-[oklch(0.97_0.03_70)] text-[oklch(0.45_0.1_60)]" : tone === "info" ? "bg-[oklch(0.97_0.02_250)] text-[oklch(0.42_0.1_250)]" : "bg-secondary text-soft")}>{children}</p>
+  <p className={cn("rounded-lg px-3 py-2.5 text-[14px]", tone === "warn" ? "bg-[oklch(0.97_0.03_70)] text-[oklch(0.45_0.1_60)]" : tone === "info" ? "bg-[oklch(0.97_0.02_250)] text-[oklch(0.42_0.1_250)]" : "bg-secondary text-foreground")}>{children}</p>
 );

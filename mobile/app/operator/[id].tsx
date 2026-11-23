@@ -17,7 +17,7 @@ import {
 const O = MOBILE.operator;
 type CallerCard = {
   field_state: FieldState; eta: string | null; choice: string | null; reply_id: string | null;
-  teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
+  teachback_lang: Lang | null; teachback: string | null; teachback_ja: string | null; teachback_reply: string | null; needs_human: boolean;
   notice?: string; flags: string[];
 };
 type Event = { id: number; actor: string; actor_name: string | null; kind: string; data: Record<string, string>; at: string };
@@ -34,6 +34,7 @@ function CaseView({ me }: { me: Me }) {
   const [d, setD] = useState<Desk | null>(null);
   const [stationLabel, setStationLabel] = useState("");
   const [card, setCard] = useState<CallerCard | null>(null);
+  const [checkedAt,setCheckedAt] = useState(0);
   const [events, setEvents] = useState<Event[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [job, setJob] = useState<Job | null>(null);
@@ -47,12 +48,13 @@ function CaseView({ me }: { me: Me }) {
     const db = sb();
     const [k, c, e, r, j] = await Promise.all([
       db.from("desk").select("*").eq("id", id).maybeSingle(),
-      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback, teachback_ja, teachback_reply, needs_human, notice, flags").eq("id", id).maybeSingle(),
+      db.from("caller_card").select("field_state, eta, choice, reply_id, teachback_lang, teachback, teachback_ja, teachback_reply, needs_human, notice, flags").eq("id", id).maybeSingle(),
       db.from("case_event").select("*").eq("incident", id).order("id"),
       db.from("reply").select("id, intent, slots, sent_at").eq("incident", id).order("sent_at"),
       db.from("field_job").select("assignee, state, eta, accepted_at, acknowledged_at, declined_at, help_at, provider_at").eq("incident", id).maybeSingle(),
     ]);
     const desk = k.data as Desk | null;
+    setCheckedAt(Date.now());
     setD(desk); setCard(c.data as CallerCard); setEvents((e.data ?? []) as Event[]); setReplies((r.data ?? []) as Reply[]); setJob(j.data as Job);
     if (desk) {
       const { data: s } = await db.from("station").select("label").eq("id", desk.station).maybeSingle();
@@ -81,8 +83,7 @@ function CaseView({ me }: { me: Me }) {
   const mine = d.operator_id === me.uid;
   const closed = Boolean(d.finished_at);
   const lang: Lang = d.lang ?? "bn";
-  const lastPaired = events.findLastIndex((x) => x.kind === "paired");
-  const paired = lastPaired >= 0 && !events.some((e, i) => e.kind === "caller_reset" && i > lastPaired);
+  const paired = Boolean(d.binding_expires && Date.parse(d.binding_expires) > checkedAt);
 
   return (
     <Screen
@@ -179,9 +180,9 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
       ) : (
         <>
           <Inset>
-            <T v="small">{O.original(LANG_NAME[lang])}</T>
-            <T v="h2" weight={400}>{d.caller_words ?? O.byChoice}</T>
-            {d.caller_words && lang !== "ja" && d.caller_words_ja && (
+            <T v="small">{O.original(d.caller_words_lang ? LANG_NAME[d.caller_words_lang] : "—")}</T>
+            <T v="h2" weight={400} accessibilityLanguage={d.caller_words_lang ?? undefined}>{d.caller_words ?? O.byChoice}</T>
+            {d.caller_words && d.caller_words_lang !== "ja" && d.caller_words_ja && (
               <View style={{ gap: 6 }}><Tag value={O.machineTranslation} /><T v="body" tone="ink">{d.caller_words_ja}</T></View>
             )}
           </Inset>
@@ -194,7 +195,7 @@ function CallerWords({ d, card, lang, paired, canJudge, run }: { d: Desk; card: 
         </>
       )}
       {card?.choice && <Tag label={O.choice} value={card.choice === "wait" ? O.choiceWait : O.choiceLeave} />}
-      {card?.teachback && <TeachBack card={card} lang={lang} canJudge={canJudge} onJudge={(result) => run("outcome", { incident: d.id, reply: card.teachback_reply, result })} />}
+      {card?.teachback && <TeachBack card={card} lang={card.teachback_lang ?? lang} canJudge={canJudge} onJudge={(result) => run("outcome", { incident: d.id, reply: card.teachback_reply, result })} />}
     </Card>
   );
 }
@@ -205,7 +206,7 @@ function TeachBack({ card, lang, canJudge, onJudge }: { card: CallerCard; lang: 
   return (
     <Inset style={{ gap: 8 }}>
       <T v="small">{O.teachBack}</T>
-      <T v="h2" weight={400}>{card.teachback}</T>
+      <T v="h2" weight={400} accessibilityLanguage={card.teachback_lang ?? undefined}>{card.teachback}</T>
       {lang !== "ja" && (card.teachback_ja ? (
         <View style={{ gap: 6 }}><Tag value={O.machineTranslation} /><T v="body" tone="ink">{card.teachback_ja}</T></View>
       ) : (

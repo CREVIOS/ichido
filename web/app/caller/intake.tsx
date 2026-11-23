@@ -1,4 +1,5 @@
 "use client";
+import { canConfirm } from "@/content/caller-session";
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { cmd } from "@/lib/supabase";
@@ -7,7 +8,7 @@ import { Notice } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ACCESS, ANSWER, CALLER_FLAGS, FACTS, FACT_KEYS, STATUS, UI, callerPack, contentPack, errorText, type Fact, type Lang } from "@/content/catalogue";
+import { ACCESS, JOURNEY, ANSWER, CALLER_FLAGS, FACTS, FACT_KEYS, STATUS, UI, callerPack, contentPack, errorText, type Fact, type Lang } from "@/content/catalogue";
 import { CallerFlags, tapFlag } from "./faults";
 import type { CallerCase, Draft, Triage } from "./types";
 
@@ -26,13 +27,13 @@ export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: 
     try {
       const r = await cmd<{ withheld?: boolean; say?: SignedSpeech | null }>("draft", { base_rev: draft.rev, ...body });
       if (r.withheld) setNote(UI.numbersWithheld[lang]);
-      else { setText(""); setSay(r.say ?? null); }
+      else { if (typeof body.text === "string") setText(value => value === body.text ? "" : value); setSay(r.say ?? null); }
     } catch (e) {
       setNote(errorText((e as Error).message, lang));
     } finally { setBusy(false); }
   }
   const fail = (e: Error) => setNote(errorText(e.message, lang));
-  const ready = P.atm ? FACT_KEYS.some((k) => draft[k] !== "unknown") : card.flags.length > 0;
+  const ready = canConfirm(P.atm,draft,card.flags);
 
   return (
     <>
@@ -45,14 +46,15 @@ export function Intake({ lang, draft, card }: { lang: Lang; draft: Draft; card: 
       {!textOnly && <VoiceIntake lang={lang} onFinal={(t) => send({ text: t })} say={say} />}
       <form className="surface flex flex-col gap-2 p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) send({ text }); }}>
         <label className="px-1 text-[13px] text-muted-foreground" htmlFor="what">{UI.whatHappened[lang]}</label>
+        <p className="text-sm">{JOURNEY.privacy[lang]}</p>
         <Textarea id="what" value={text} onChange={(e) => setText(e.target.value)} maxLength={500} className="min-h-20 resize-none border-0 bg-transparent px-1 text-[16px] shadow-none focus-visible:ring-0" />
-        <div className="flex justify-end"><Button type="submit" disabled={busy || !text.trim()}>{UI.send[lang]}</Button></div>
+        <div className="flex justify-end"><Button type="submit" disabled={busy || !text.trim()}>{JOURNEY.review[lang]}</Button></div>
       </form>
-      {note && <Notice tone="warn">{note}</Notice>}
-      {draft.needs_clarification && <Notice tone="info">{UI.unsure[lang]}</Notice>}
-      {P.atm ? <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
-        : draft.words && <p className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
+      <p role="status">{note}</p>
+      {P.atm && !card.flags.includes("need_other") ? <ReadBack lang={lang} draft={draft} busy={busy} onAnswer={(k, v) => send({ [k]: v })} />
+        : draft.words && <p lang={draft.words_lang ?? undefined} className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
       {!P.atm && draft.triage && <TriageReadBack lang={lang} card={card} triage={draft.triage} onError={fail} />}
+      {!ready && <p>{(draft.needs_clarification ? UI.unsure : JOURNEY.choose)[lang]}</p>}
       <Button size="lg" className="h-11" disabled={busy || !ready} onClick={() => cmd("confirm", { rev: draft.rev }).catch(fail)}>{UI.confirm[lang]}</Button>
 
     </>
@@ -64,15 +66,14 @@ export function ReadBack({ lang, draft, busy, onAnswer }: { lang: Lang; draft: D
     <section className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <span className="text-[13px] text-muted-foreground">{UI.understood[lang]}</span>
-        {draft.rev > 0 && <span className="mono text-faint">v{draft.rev}</span>}
       </div>
-      {draft.words && <p className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
+      {draft.words && <p lang={draft.words_lang ?? undefined} className="border-l-2 pl-3 text-[15px] leading-6">{draft.words}</p>}
       {FACT_KEYS.map((k) => (
         <div key={k} className="flex flex-col gap-2.5">
           <span className="text-[17px] text-foreground">{FACTS[k].question[lang]}</span>
           <div className="grid grid-cols-3 gap-1.5">
             {(["yes", "no", "unknown"] as Fact[]).map((v) => (
-              <button key={v} type="button" disabled={busy} aria-pressed={draft[k] === v} onClick={() => onAnswer(k, v)}
+              <button aria-label={`${FACTS[k].question[lang]} — ${ANSWER[v][lang]}`} key={v} type="button" disabled={busy} aria-pressed={draft[k] === v} onClick={() => onAnswer(k, v)}
                 className={cn("h-11 rounded-lg border text-[15px] transition-colors disabled:opacity-50", draft[k] === v ? "border-primary bg-primary text-primary-foreground" : "bg-card text-foreground hover:bg-accent")}>
                 {ANSWER[v][lang]}
               </button>
@@ -106,15 +107,15 @@ function TriageReadBack({ lang, card, triage, onError }: { lang: Lang; card: Cal
           <span className="text-[15px] text-foreground">{UI.aiAsk[lang]}</span>
           <span className="text-[17px] leading-7 text-foreground">{CALLER_FLAGS[t].label[lang]}</span>
           <div className="grid grid-cols-2 gap-1.5">
-            {(["yes", "no"] as Fact[]).map((v) => <Button key={v} variant={v === "yes" ? "default" : "secondary"} className="h-11" onClick={() => answer(t, v)}>{ANSWER[v][lang]}</Button>)}
+            {(["yes", "no"] as Fact[]).map((v) => <Button aria-label={`${CALLER_FLAGS[t].label[lang]} — ${ANSWER[v][lang]}`} key={v} variant={v === "yes" ? "default" : "secondary"} className="h-11" onClick={() => answer(t, v)}>{ANSWER[v][lang]}</Button>)}
           </div>
         </div>
       ))}
       {suggested.map((t) => (
         <div key={t} className="flex min-h-12 items-center gap-3 rounded-lg border border-dashed px-3.5 py-2">
           <span className="flex-1 text-[15px] leading-6 text-foreground">{CALLER_FLAGS[t].label[lang]}</span>
-          <Button size="sm" onClick={() => tap(t)}>{ANSWER.yes[lang]}</Button>
-          <Button size="sm" variant="ghost" onClick={() => answer(t, "no")}>{ANSWER.no[lang]}</Button>
+          <Button aria-label={`${CALLER_FLAGS[t].label[lang]} — ${ANSWER.yes[lang]}`} size="sm" onClick={() => tap(t)}>{ANSWER.yes[lang]}</Button>
+          <Button aria-label={`${CALLER_FLAGS[t].label[lang]} — ${ANSWER.no[lang]}`} size="sm" variant="ghost" onClick={() => answer(t, "no")}>{ANSWER.no[lang]}</Button>
         </div>
       ))}
     </section>

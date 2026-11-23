@@ -64,7 +64,9 @@ export function sb(): SupabaseClient {
 export const callerAuth = () => callerClient().auth;
 
 export async function bearer(): Promise<string> {
-  const value = staff ? await staffToken() : (await callerClient().auth.getSession()).data.session?.access_token;
+  const session = staff ? null : await callerClient().auth.getSession();
+  if (session?.error) throw new Error("server");
+  const value = staff ? await staffToken() : session?.data.session?.access_token;
   return `Bearer ${value ?? ""}`;
 }
 
@@ -88,7 +90,7 @@ export async function cmd<T = unknown>(name: string, body: Record<string, unknow
   } catch {
     throw new Error("server");
   }
-  const json = await res.json().catch(() => ({}));
+  const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? "server");
   return json as T;
 }

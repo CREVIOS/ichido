@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { Button, Notice } from "./ui";
+import { Button, LiveText } from "./ui";
 import { cmd } from "@/lib/supabase";
 import { FRONTLINE, UI, errorText, type Lang } from "@content/catalogue";
 
-export function Human({ lang, connected = true }: { lang: Lang; connected?: boolean }) {
+export function Human({ lang, connected = true, state, requested }: { lang: Lang; connected?: boolean; state?: string; requested?: boolean }) {
   const [note,setNote] = useState("");
+  const [sent,setSent] = useState(false);
+  const [busy,setBusy] = useState(false);
   const request = async () => {
     if (!connected) return setNote(FRONTLINE.inPerson[lang]);
-    try { await cmd("human"); setNote(FRONTLINE.requested[lang]); }
+    setBusy(true);
+    try { await cmd("human"); setSent(true); setNote(""); }
     catch (error) { setNote(`${errorText((error as Error).message, lang)} ${FRONTLINE.inPerson[lang]}`); }
+    finally { setBusy(false); }
   };
-  return <><Button kind="secondary" label={UI.human[lang]} onPress={request} />{note && <Notice>{note}</Notice>}</>;
+  if (state === "human" || state === "queued" || requested || sent) return <LiveText>{(state === "human" ? FRONTLINE.connected : FRONTLINE.requested)[lang]}</LiveText>;
+  return <><Button kind="secondary" busy={busy} label={UI.human[lang]} onPress={request} />{note && <LiveText>{note}</LiveText>}</>;
 }

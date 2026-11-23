@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
+  AccessibilityInfo, ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View,
   type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +30,13 @@ const TONE_FOR: Record<keyof typeof type, Tone> = { h1: "ink", h2: "ink", big: "
 
 // The caller's "large text" setting scales every T below it.
 export const TextScale = createContext(1);
+
+export function LiveText({ children }: { children:string }) {
+  useEffect(() => {
+    if (children && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(children);
+  }, [children]);
+  return <T accessibilityLiveRegion="polite">{children}</T>;
+}
 
 export function T({ v = "body", tone, weight = 400, mono, style, children, ...rest }: TextProps & { v?: keyof typeof type; tone?: Tone; weight?: 400 | 500; mono?: boolean }) {
   const k = useContext(TextScale);
@@ -64,15 +71,15 @@ export const Brand = () => (
 );
 
 type ButtonKind = "primary" | "secondary" | "ghost";
-export function Button({ label, onPress, kind = "primary", disabled, busy, icon, block, style }: {
-  label: string; onPress?: () => void; kind?: ButtonKind; disabled?: boolean; busy?: boolean; icon?: LucideIcon; block?: boolean; style?: StyleProp<ViewStyle>;
+export function Button({ label, accessibilityLabel, onPress, kind = "primary", disabled, busy, icon, block, style }: {
+  label: string; accessibilityLabel?: string; onPress?: () => void; kind?: ButtonKind; disabled?: boolean; busy?: boolean; icon?: LucideIcon; block?: boolean; style?: StyleProp<ViewStyle>;
 }) {
   const primary = kind === "primary";
   const fg = primary ? "onPrimary" : "ink";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: Boolean(disabled || busy) }}
       disabled={disabled || busy}
       onPress={onPress}
@@ -333,7 +340,7 @@ export function LangPicker({ lang, onChange }: { lang: Lang; onChange: (l: Lang)
   return (
     <View style={{ alignSelf: "stretch" }}>
       <Pressable accessibilityRole="button" accessibilityLabel={UI.language[lang]} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
-        style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 8, height: control.height, paddingHorizontal: space.md, borderRadius: radius.control,
+        style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.control,
           backgroundColor: pressed ? color.press : color.surface, borderWidth: 1, borderColor: color.line })}>
         <Languages size={16} strokeWidth={1.5} color={color.muted} />
         <Text style={[type.body, { flex: 1, color: color.ink }]}>{LANG_NAME[lang]}</Text>

@@ -7,10 +7,10 @@ import { useLive } from "@/lib/live";
 import { StaffGate, type Me } from "@/components/StaffGate";
 import { Brand, Button, Card, Hairline, IconButton, Notice, Pill, Screen, T, Tag, Toggle } from "@/components/ui";
 import { faultJa } from "@/lib/staff";
-import { nextFieldStep, SHIFT, ETA_OPTIONS, MOBILE, STAFF, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@content/catalogue";
+import { ASSIST, CALLER_FLAGS, nextFieldStep, SHIFT, ETA_OPTIONS, MOBILE, STAFF, packOfFault, packStaffField, type FieldState, type L10n, STAFF_JA } from "@content/catalogue";
 
 const F = MOBILE.field;
-type Job = { accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
+type Job = { allergy_flags:string[]; allergy_ack_at:string|null; accepted_at: string | null; acknowledged_at: string | null; declined_at: string | null; incident: string; station: string; fault: string; generation: number; state: FieldState; eta: string | null; updated_at: string };
 const UNKNOWN_ETA = "";
 // Pill tint per assignment state, on the same scale as case status.
 const TONE: Record<FieldState, string> = { none: "neutral", requested: "received", on_way: "review", arrived: "field", done: "guided" };
@@ -78,6 +78,9 @@ function Jobs({ me }: { me: Me }) {
             <T v="h1" style={{ fontSize: 22, lineHeight: 28, letterSpacing: -0.66 }}>{labels[j.station] ?? j.station}</T>
             <T v="row" tone="alert">{faultJa(j.fault)}</T>
           </View>
+          {j.allergy_flags.length > 0 && <><T>{j.allergy_flags.map(f => CALLER_FLAGS[f].staff).join(" · ")}</T>
+            <Button kind="secondary" label={j.allergy_ack_at ? ASSIST.acknowledged : ASSIST.ack} disabled={Boolean(j.allergy_ack_at || j.declined_at)} onPress={() =>
+              cmd("ack_allergy",{incident:j.incident,generation:j.generation,flags:j.allergy_flags}).then(load).catch(() => setError(F.changed))} /></>}
           {j.eta && <Tag label={F.eta} value={F.minutes(j.eta)} />}
           <Hairline />
           <T v="label">{F.etaMine}</T>
