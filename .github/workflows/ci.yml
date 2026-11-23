@@ -62,7 +62,15 @@ jobs:
           echo 'MAIL_FROM=Ichido <no-reply@example.jp>' >> web/.env.local
           echo 'MAILPIT_URL=http://127.0.0.1:8025' >> web/.env.local
           echo 'DEVICE_SECRETS_JSON={"TABLE-A":"local-device-secret"}' >> web/.env.local
+          # Alerts (tests/alerts.test.mjs): a local stub on 3199 stands in for push services, Expo and Better Stack.
+          echo 'PUSH_ENDPOINT_ORIGINS=http://127.0.0.1:3199' >> web/.env.local
+          echo 'EXPO_PUSH_URL=http://127.0.0.1:3199/expo/push' >> web/.env.local
+          echo 'BETTERSTACK_HEARTBEATS_JSON={"TABLE-A":"http://127.0.0.1:3199/bs/TABLE-A"}' >> web/.env.local
+          echo 'BETTERSTACK_UPTIME_ORIGIN=http://127.0.0.1:3199' >> web/.env.local
+          echo "CRON_SECRET=$(openssl rand -hex 16)" >> web/.env.local
       - run: npm ci
+        working-directory: web
+      - run: node scripts/vapid-keys.mjs >> .env.local
         working-directory: web
       - run: npm run seed:staff
         working-directory: web

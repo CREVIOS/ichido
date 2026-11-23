@@ -85,7 +85,10 @@ Import the repository and set **Root Directory** to `web`. Set these environment
 | `AGENT_NAME` | `ichido-intake` (must match the agent) |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | optional: fact extraction and teach-back translation |
 | `BETTERSTACK_SOURCE_TOKEN`, `BETTERSTACK_INGEST_HOST` | optional: Better Stack logs (section 5) |
-| `BETTERSTACK_DEVICE_HEARTBEATS_JSON` | optional: `{"TABLE-A":"<heartbeat URL>"}` (section 5) |
+| `BETTERSTACK_HEARTBEATS_JSON` | optional: `{"TABLE-A":"<heartbeat URL>"}` (section 5; the earlier name `BETTERSTACK_DEVICE_HEARTBEATS_JSON` still works) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | optional: staff Web Push (section 6), from `node scripts/vapid-keys.mjs mailto:<ops inbox>` |
+| `EXPO_ACCESS_TOKEN` | optional: Expo push for the mobile app, only if the Expo project enforces push security (section 6) |
+| `CRON_SECRET` | optional: lets a scheduler call `/api/alerts/flush` (section 6) |
 | `FIRMWARE_MANIFEST_JSON` | optional: signed Help Point firmware manifest from `scripts/sign-firmware.mjs` (section 4) |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | optional: Gemini decision support, also precomputed by the Ichido Bot when the caller confirms |
 | `BOT_REMIND_AT` | optional: when the Ichido Bot reminds, as a share of each `ichido.sla_target` (default `0.75`, when the console's countdown turns amber) |
@@ -310,10 +313,46 @@ Suggested alerts: `level = "error"` over 0 in 5 min; `message = "device_auth_fai
 **Uptime.** Uptime → Monitors → Create: URL `https://<app>/api/health`, alert when the status is not 2xx.
 It returns 503 when the database does not answer.
 
-**Device heartbeats.** Uptime → Heartbeats → Create one per station, period 1 minute, grace 3 minutes. Put the
-URLs in `BETTERSTACK_DEVICE_HEARTBEATS_JSON` as `{"TABLE-A":"https://uptime.betterstack.com/api/v1/heartbeat/…"}`.
-The server pings the URL each time that station's heartbeat arrives, so a device that goes silent opens an
-incident.
+**Help Point heartbeats.** Each Help Point posts `/api/device/heartbeat` every 60 s; the server stores it
+(`public.device_health`, which the `/stations` map and "nearest working" read) and, when configured, pings that
+station's Better Stack heartbeat so a device that goes silent opens an incident and pages whoever is on call.
+Following Better Stack's [cron and heartbeat monitor](https://betterstack.com/docs/uptime/cron-and-heartbeat-monitor/)
+guide, for each station:
+
+1. Uptime → **Heartbeats** → **Create heartbeat**, named after the station (e.g. `Help Point TABLE-A`).
+2. **Expect a heartbeat every** 1 minute; **grace period** 3 minutes (two missed beats and a slow network).
+3. Choose the on-call escalation, then **Create heartbeat**, and copy its secret URL from the detail page.
+
+Put the URLs in `BETTERSTACK_HEARTBEATS_JSON` as `{"TABLE-A":"https://uptime.betterstack.com/api/v1/heartbeat/…"}`
+(URLs on `incidents.betterstack.com` are accepted too; any other host is refused). The server forwards at most one
+ping per station per minute, after the response, with a 3 s timeout and no telemetry in it. A heartbeat stays
+"Pending" until its first ping. Treat the URLs as secrets: anyone with one can keep a dead station looking alive.
+
+## 6. Staff notifications (Web Push and the mobile app)
+
+Operators, guards and managers can get a notification for a new case (operators signed in), a case waiting past its
+target (the case's operator, or every operator if nobody has claimed it, and managers), a new field job (only the
+assigned guard), a reminder or a promise that has come due (the case's operator). A notification says what happened
+and at which station, with a link to the case or `/field`; it never carries the caller's words. Database triggers
+write each event to `ichido.alert_outbox` (migration `20261124030000_alerts.sql`), and the server delivers it after
+commands, Help Point calls and Ichido Bot steps.
+
+- **Web:** run `node scripts/vapid-keys.mjs mailto:<ops inbox>` in `web/` once and set the three `VAPID_*` variables.
+  Each person turns notifications on in `/account` for that browser. The subscription belongs to that sign-in:
+  signing out, being signed out by an admin, or the session expiring deletes it. A new key pair invalidates every
+  browser subscription. Endpoints are accepted only from the browsers' push services (Google, Mozilla, Apple, Microsoft).
+- **Mobile app:** a development or store build with an EAS project id (`eas init` writes `extra.eas.projectId`, or
+  set `EXPO_PUBLIC_EAS_PROJECT_ID`) and push credentials (APNs key / FCM) uploaded with `eas credentials`. After
+  staff sign-in the app asks for permission and registers its Expo push token for that session; tapping a
+  notification opens the case or the guard's screen. The server posts to Expo's push API
+  (`https://exp.host/--/api/v2/push/send`, `EXPO_ACCESS_TOKEN` only when the project enforces push security) and
+  deletes a token Expo reports as `DeviceNotRegistered`.
+- **SLA breaches** are found by the database's escalation cron (`ichido.escalate_due`, every minute). Help Point
+  heartbeats deliver them within a minute; with no Help Points online, schedule `GET /api/alerts/flush` every minute
+  with `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends that header when `CRON_SECRET` is set).
+- **Check by hand** (Chrome and the internet): `APP=http://localhost:3000 node --env-file=.env.local scripts/push-e2e.mjs`
+  in `web/` subscribes Chrome at `/account`, presses the TABLE-A Help Point and waits for the service worker to
+  receive the push through Chrome's push service.
 
 ## Local stack and demo data
 

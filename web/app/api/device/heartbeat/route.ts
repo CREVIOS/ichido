@@ -51,8 +51,9 @@ export async function POST(req: Request): Promise<Response> {
   const urls = JSON.parse(process.env.BETTERSTACK_HEARTBEATS_JSON || process.env.BETTERSTACK_DEVICE_HEARTBEATS_JSON || "{}") as Record<string, string>;
   const url = Object.hasOwn(urls, station) ? urls[station] : undefined;
   if (url) {
-    const origin = process.env.BETTERSTACK_UPTIME_ORIGIN || "https://uptime.betterstack.com";
-    if (!URL.canParse(url) || new URL(url).origin !== origin) {
+    // Better Stack hands out heartbeat URLs on either host; BETTERSTACK_UPTIME_ORIGIN replaces both (a local test stub).
+    const origins = process.env.BETTERSTACK_UPTIME_ORIGIN ? [process.env.BETTERSTACK_UPTIME_ORIGIN] : ["https://uptime.betterstack.com", "https://incidents.betterstack.com"];
+    if (!URL.canParse(url) || !origins.includes(new URL(url).origin)) {
       log.warn("heartbeat_forward_failed", { station, code: "invalid_destination" });
       return new Response(null, { status: 204 });
     }
