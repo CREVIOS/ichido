@@ -73,6 +73,7 @@ jobs:
         run: |
           npm run dev -- --hostname 127.0.0.1 --port 3127 > "$RUNNER_TEMP/ichido-dev.log" 2>&1 &
           curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 2 "$APP/api/health"
+          node --env-file=.env.local scripts/wait-realtime.mjs supabase_db_ichido 180
           npm test
       - name: Show web log on failure
         if: failure()
