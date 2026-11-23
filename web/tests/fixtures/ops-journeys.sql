@@ -98,6 +98,9 @@ begin
   update public.caller_card set flags='{leave_soon,share_item,item_bag}',confirmed_rev=1 where id=r;
   update public.caller_card set flags=array_append(flags,'item_in_station') where id=r;
   assert (select not 'item_in_station'=any(confirmed_flags) from public.caller_card where id=r);
+  update public.caller_card set flags=array_remove(flags,'item_bag') where id=r;
+  update public.caller_card set flags=array_append(flags,'item_bag') where id=r;
+  assert (select not 'item_bag'=any(confirmed_flags) from public.caller_card where id=r);
   update public.desk set confirmed_rev=1 where id=r;
   assert pg_temp.refused(format('select public.cmd_send(%L,%L,%L,%L,%L,false)',op,'Dispatch',r,'TRANSIT_LEAVE','fixture'),'conflict');
   perform public.prepare_handoff(op,r,replace(gen_random_uuid()::text,'-','')||replace(gen_random_uuid()::text,'-',''),'railway',now()+interval '2 hours');

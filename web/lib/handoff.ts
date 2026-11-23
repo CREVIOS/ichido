@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { ACTOR, DESK, FAULT_DESK, STAFF_JA, REMOTE_RELEASE, bankStatusStaff, isFault, CALLER_FLAGS, FACT_STAFF, HANDOFF, LANG_NAME, identifyingSummary, OPS, PACKS, PACK_RECIPIENTS, PARTNER, eventText, packOfFault, type Fact, type Lang } from "@/content/catalogue";
 import { admin, fail, priv } from "@/lib/server";
+import { shareFlag } from "./handoff-fields";
 import { rpc } from "@/lib/access";
 
 // Hand-off links: a read-only record of one case for the recipients of its pack (an ATM's bank, police or security
@@ -39,18 +40,6 @@ export async function openHandoff(token: string) {
 }
 
 const partnerTime = (s: string) => new Date(s).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", timeZoneName: "short" });
-
-function shareFlag(recipient: string, flag: string, flags: string[]) {
-  switch (recipient) {
-    case "medical_interpreter": case "consult_desk": return flag === "need_interpreter" || flag === "need_explain";
-    case "department": return !/^(ins_|pay_)/.test(flag);
-    case "railway": return flag === "leave_soon" || (flags.includes("share_item") && flag.startsWith("item_"));
-    case "health_team": return /^(need_medicine|diet_allergy|red_|who_)/.test(flag);
-    case "disaster_hq": return !/allergy|medicine|red_|pain_|ins_/.test(flag);
-    case "bank": case "city_section": return true;
-    default: return false;
-  }
-}
 
 // The preview and bearer document use the same allowlist, including links issued before partner tracking.
 export async function partnerReport(incident: string, recipient: string, proposedDue: string | null = null): Promise<[string,string][]> {

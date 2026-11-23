@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { shareFlag } from "../lib/handoff-fields.ts";
 import pg from "pg";
 import { FIRST_SHIFT, LANGS, OPS_CALLER, PARTNER, flagsFor, identifyingSummary, nextFieldStep, replyOf, shiftCaption } from "../content/catalogue.ts";
 
@@ -37,6 +38,15 @@ test("all six catalogues carry withdrawal and reference-bearing railway follow-u
   assert.doesNotMatch(OPS_CALLER.fraud.body.en,/coming/);
   assert.match(replyOf("HOSP_INTERPRETER").text({}).en,/requested/);
   assert.match(replyOf("SHELTER_NEEDS").text({}).en,/accepted/);
+});
+
+test("handoff flags depend on the recipient and the current railway sharing choice", () => {
+  for (const flag of ["ins_none","need_pay","pay_cash","where_belly","pain_strong"]) assert.equal(shareFlag("medical_interpreter",flag,[]),false);
+  assert.equal(shareFlag("medical_interpreter","need_interpreter",[]),true);
+  assert.equal(shareFlag("department","need_pay",[]),false);
+  assert.equal(shareFlag("railway","item_bag",[]),false);
+  assert.equal(shareFlag("railway","item_bag",["share_item"]),true);
+  assert.equal(shareFlag("police","item_bag",["share_item"]),false);
 });
 
 test("summary review withholds contact details, names with explicit labels and account numbers", () => {

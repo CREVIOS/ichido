@@ -367,6 +367,20 @@ revoke all on function public.prepare_handoff(uuid,uuid,text,text,timestamptz),p
 grant execute on function public.prepare_handoff(uuid,uuid,text,text,timestamptz),public.partner_progress(uuid,text,uuid,text,text,text) to service_role;
 
 alter table public.caller_card add column if not exists confirmed_flags text[] not null default '{}';
+-- Older confirmations have no flag snapshot. Recover only current taps recorded before the last confirmation.
+update public.caller_card c set confirmed_flags=(
+  select coalesce(array_agg(f),'{}') from unnest(c.flags) f where
+    (select max(e.id) from public.case_event e where e.incident=c.id and e.kind='flag' and e.data->>'flag'=f)
+      < (select max(e.id) from public.case_event e where e.incident=c.id and e.kind='confirmed')
+) where c.confirmed_rev is not null and cardinality(c.confirmed_flags)=0 and cardinality(c.flags)>0;
+
+create or replace function ichido.prune_confirmed_flags() returns trigger language plpgsql set search_path='' as $$
+begin
+  new.confirmed_flags:=array(select f from unnest(old.confirmed_flags) f where f=any(new.flags));
+  return new;
+end $$;
+create or replace trigger prune_confirmed_flags before update of flags on public.caller_card for each row execute function ichido.prune_confirmed_flags();
+
 create or replace function ichido.snapshot_flags() returns trigger language plpgsql set search_path='' as $$
 begin
   new.confirmed_flags:=case when new.confirmed_rev is null then '{}'::text[] else new.flags end;

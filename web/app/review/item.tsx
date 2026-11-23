@@ -4,8 +4,9 @@ import { toast } from "sonner";
 import { Check, ChevronDown, ChevronUp, FileCheck2, Languages, Link2, Sparkles, X, type LucideIcon } from "lucide-react";
 import { PaneButton, TitleBar } from "@/components/pane";
 import { Chip } from "@/components/kit";
+import { cmd } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { CASES, DESK, HANDOFF, LANG_NAME, REVIEW, STAFF_JA, isFault, replyOf, type L10n, type Lang } from "@/content/catalogue";
+import { CASES, DESK, HANDOFF, PARTNER, staffError, LANG_NAME, REVIEW, STAFF_JA, isFault, replyOf, type L10n, type Lang } from "@/content/catalogue";
 import type { ReviewItem, ReviewKind } from "@/lib/review";
 import type { Suggestion } from "../operator/types";
 
@@ -188,10 +189,15 @@ function view(item: ReviewItem, decide: Decide, note: string, setNote: (s: strin
     primary: {
       label: H.reissue,
       run: async () => {
+        let rows: [string,string][];
+        try {
+          ({ rows } = await cmd<{ rows: [string,string][] }>("handoff_preview", { incident:item.incident,recipient:h.recipient }));
+        } catch (e) { toast.error(staffError((e as Error).message)); return; }
+        if (!window.confirm([PARTNER.preview,...rows.map(([label,value]) => label + "　" + value),PARTNER.issue].join("\n"))) return;
         const r = await decide(item, "reissued");
         if (!r?.path) return;
         const url = `${location.origin}${r.path}`;
-        await navigator.clipboard.writeText(url).catch(() => undefined);
+        try { await navigator.clipboard.writeText(url); } catch { window.prompt(HANDOFF.copy,url); return; }
         toast.success(H.copied, { description: url });
       },
     },
