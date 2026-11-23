@@ -1,6 +1,6 @@
 import "server-only";
 import { ParticipantInfo_Kind } from "@livekit/protocol";
-import { priv, rpc } from "@/lib/server";
+import { admin, priv, rpc } from "@/lib/server";
 import { RoomServiceClient, ServerError } from "livekit-server-sdk";
 import { after } from "next/server";
 import { roomFor } from "@/lib/speech";
@@ -24,11 +24,13 @@ export async function closeVoice(incident: string, voiceRoom: string): Promise<v
 export async function revokeAgentAudio(incident:string) {
   const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
   if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) return;
-  const {data:b} = await priv().from("binding").select("voice_room,desk!inner(handler)").eq("desk.handler","human").eq("incident",incident).maybeSingle().throwOnError();
-  if (!b) return;
-  const room = roomFor(b.voice_room);
-  const client = new RoomServiceClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
   try {
+    const {data:desk} = await admin.from("desk").select("handler").eq("id",incident).maybeSingle().throwOnError();
+    if (desk?.handler !== "human") return;
+    const {data:binding} = await priv().from("binding").select("voice_room").eq("incident",incident).maybeSingle().throwOnError();
+    if (!binding) return;
+    const room = roomFor(binding.voice_room);
+    const client = new RoomServiceClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
     const participants = await client.listParticipants(room);
     await Promise.all(participants.filter(p => p.kind===ParticipantInfo_Kind.AGENT).map(p => client.removeParticipant(room,p.identity)));
   } catch (error) {
