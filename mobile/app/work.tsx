@@ -25,7 +25,7 @@ function Tasks({ name }: { name: string }) {
   return <Screen back eyebrow={<T v="label">{name}</T>} title={PARTNER.mine} onRefresh={load}>
     {failed && <Notice tone="alert">{CASES.loadError}</Notice>}
     {tasks && <Card>{!tasks.length && !failed && <T>{PARTNER.none}</T>}
-      {tasks.map((r) => <Row key={r.incident+r.task} label={r.station} sub={r.task === "field" ? PARTNER.field : HANDOFF.recipient[r.task]}
+      {tasks.map((r) => <Row key={r.incident+r.task} label={r.station} sub={PARTNER.fieldStates[r.task] ?? HANDOFF.recipient[r.task]}
         meta={r.due_at ? new Date(r.due_at).toLocaleString() + (Date.parse(r.due_at)<now ? " · "+PARTNER.late : "") : undefined}
         onPress={() => router.push({ pathname:"/operator/[id]",params:{ id:r.incident } })} chevron />)}
     </Card>}

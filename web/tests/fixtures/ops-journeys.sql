@@ -64,10 +64,13 @@ begin
   update ichido.staff set available=true where uid=worker;
   perform public.cmd_assign(op,'Dispatch',s,worker);
   assert not ichido.work_fits(s,'SHELTER_NEEDS');
+  assert exists(select from public.my_external_work() where incident=s and task='field_unack');
   select * into msg from ichido.alert_outbox where incident=s and kind='field_job';
   -- An isolated test message sorts ahead of any queued application messages.
   insert into ichido.alert_outbox(id,incident,kind,station,target,generation) overriding system value
     values (-msg.id,s,'field_job',shelter,worker,1);
+  update ichido.alert_outbox set at=now()-interval '2 hours' where id=-msg.id;
+  perform ichido.expire_alerts();
   select * into msg from public.alert_take(1);
   assert msg.lease is not null and msg.generation=1;
   assert (select available_at>now() from ichido.alert_outbox where id=msg.id);

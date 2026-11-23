@@ -263,6 +263,8 @@ alter table ichido.alert_outbox add column if not exists lease uuid,
   add column if not exists attempts int not null default 0,
   add column if not exists delivered uuid[] not null default '{}',
   add column if not exists generation int;
+update ichido.alert_outbox o set generation=j.generation from public.field_job j
+  where o.kind='field_job' and o.generation is null and o.incident=j.incident and o.target=j.assignee and o.at>=j.assigned_at;
 -- A pending assignment stays deliverable until the worker responds or its generation ends.
 create or replace function ichido.expire_alerts() returns void
 language sql security definer set search_path = '' as $$
@@ -620,7 +622,8 @@ language sql stable security definer set search_path='' as $$
  select w.incident,d.station,w.recipient,w.due_at from public.partner_work w join public.desk d on d.id=w.incident
    where ichido.has_role('operator') and w.owner_id=auth.uid() and w.accepted_at is null
  union all
- select d.id,d.station,'field',case when j.state='requested' then j.assigned_at+make_interval(secs=>t.seconds)
+ select d.id,d.station,case when j.declined_at is not null then 'field_declined' when j.help_at is not null then 'field_help'
+     when j.acknowledged_at is null then 'field_unack' else 'field' end,case when j.state='requested' then j.assigned_at+make_interval(secs=>t.seconds)
    else (select p.due_at from public.promise p where p.incident=j.incident and p.generation=j.generation
      and p.kind=case j.state when 'on_way' then 'eta' else 'arrived' end and (p.settled_at is null or p.outcome='expired')
      order by p.created_at desc limit 1) end from public.desk d

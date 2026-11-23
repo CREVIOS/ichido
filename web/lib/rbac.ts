@@ -55,15 +55,16 @@ export const COMMANDS: Record<string, Access> = {
   // Push notifications for this staff session: the command itself checks staff, aal2 and a role that receives alerts.
   push_key: "any", push_subscribe: "any", push_unsubscribe: "any",
   // Operator on a case
-  simulate: "case:act", suggest: "case:act", summary_draft: "case:act", summary_save: "case:act", handoff_preview: "case:act", partner_progress: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
+  simulate: "case:act", suggest: "case:act", summary_draft: "case:act", summary_save: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
   review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",
   reset_caller: "case:act", abandon: "case:act", set_fault: "case:act", stated_amount: "case:act", bank_status: "case:act",
   issue_code: "case:act", show_code_on_device: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",
   abusive: "case:act",
-  assign: "case:dispatch", fraud: "case:dispatch", fraud_safe: "case:dispatch",
+  assign: "case:dispatch", fraud: "case:dispatch",
   takeover: "case:takeover",
   training_start: "training:use", training_say: "training:use", training_readback: "training:use", training_reply: "training:use",
   training_dispatch: "training:use", training_end: "training:use",
+  handoff_preview: "case:act", partner_progress: "case:act", fraud_safe: "case:dispatch",
   field: "field:act",
   disaster_set: "stations:disaster", disaster_clear: "stations:disaster",
   disaster_proposal_confirm: "stations:disaster", disaster_proposal_dismiss: "stations:disaster",

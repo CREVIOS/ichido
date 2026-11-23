@@ -78,7 +78,7 @@ async function deliver(o: Outbox) {
   if (o.kind === "field_job") {
     const { data } = await admin.from("field_job").select("generation").eq("incident", o.incident)
       .eq("assignee", o.target).eq("case_closed", false).is("acknowledged_at", null).maybeSingle().throwOnError();
-    if (!data || (o.generation != null && o.generation !== data.generation)) return settle(false);
+    if (!data || o.generation !== data.generation) return settle(false);
   }
   const { uids, roles } = recipients(o);
   const subs = await rpc<Sub[]>("alert_subscriptions", { p_uids: uids, p_roles: roles });

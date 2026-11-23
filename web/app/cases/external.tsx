@@ -22,7 +22,7 @@ export function ExternalWork({ name }: { name: string }) {
   return <Panel title={`${name} · ${PARTNER.mine}`}>
     {failed && <Notice tone="warn">{CASES.loadError}</Notice>}
     {rows.map((r) => <Link key={`${r.incident}/${r.task}`} href={`/operator#${r.incident}`}>
-      {r.station} · {r.task === "field" ? PARTNER.field : HANDOFF.recipient[r.task]}{r.due_at && ` · ${new Date(r.due_at).toLocaleString("ja-JP")}`}
+      {r.station} · {PARTNER.fieldStates[r.task] ?? HANDOFF.recipient[r.task]}{r.due_at && ` · ${new Date(r.due_at).toLocaleString("ja-JP")}`}
       {r.due_at && Date.parse(r.due_at) < now && ` · ${PARTNER.late}`}
     </Link>)}
   </Panel>;

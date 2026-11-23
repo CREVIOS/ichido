@@ -189,6 +189,7 @@ export function nextFieldStep(state: string, acknowledged: string | null) {
 
 export const PARTNER = {
   none: "未完了の外部対応はありません。", hours: (n: number) => `${n}時間後`,
+  fieldStates: { field:"現場対応", field_declined:"現場担当者が辞退・再割当待ち", field_unack:"現場担当者の応答待ち", field_help:"現場から応援要請" } as Record<string,string>,
   contact: "連絡方法", textOnly: "文字で対応", preview: "共有内容を確認", issue: "この内容でリンクを作成", due: "対応期限", desk: "発行窓口", asOf: "情報の時点",
   tentative: "仮の申告（本人未確認）", action: "依頼すること", pending: "依頼準備中", sent: "依頼連絡済み",
   request: "相手に依頼した", accept: "相手の受諾を記録", accepted: "相手が受諾", ref: "鉄道会社の受付番号",
