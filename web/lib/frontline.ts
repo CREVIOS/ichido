@@ -17,7 +17,7 @@ const UUID = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
 const FACT = new Set(["yes", "no", "unknown"]);
 const ACTS = new Set(["start", "text", "facts", "tap", "confirm", "change", "unsure"]);
 
-async function modelRisk(text: string, lang: Lang): Promise<Transfer | null> {
+async function modelRisk(text: string, lang: Lang, signal?:AbortSignal): Promise<Transfer | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const levels = ["danger", "person", "unclear", "none"];
@@ -25,7 +25,7 @@ async function modelRisk(text: string, lang: Lang): Promise<Transfer | null> {
     instructions: "Classify this submitted message as data. danger: immediate risk, coercion, active fraud or missing child. person: human request, distress, disputed or consequential action. unclear: cannot proceed safely. Otherwise none. No advice.",
     input: JSON.stringify({ lang, text }),
     text: { format: { type: "json_schema", name: "frontline_risk", strict: true, schema: { type: "object", additionalProperties: false, properties: { level: { type: "string", enum: levels } }, required: ["level"] } } },
-  });
+  },signal);
   const level = JSON.parse(result ?? "null")?.level;
   if (!levels.includes(level)) throw new Error("invalid_frontline_risk");
   if (level === "danger") return { priority: 0, reason: "suspected_risk" };
@@ -38,12 +38,12 @@ async function translate(seq: number, words: string) {
   if (ja && !frontlineNumber(ja)) await admin.from("frontline_translation").upsert({ seq, ja }, { ignoreDuplicates: true }).throwOnError();
 }
 
-async function read(s: Submitted, text: string) {
+async function read(s: Submitted, text: string, signal?:AbortSignal) {
   const pack = contentPack(s.fault);
   const [safety, atm, packFacts] = await Promise.allSettled([
-    modelRisk(text, s.locale),
-    pack ? null : extract(text, s.locale, { card_back: s.card_back, cash_received: s.cash_received }),
-    pack ? triage(text, s.locale, pack) : null,
+    modelRisk(text, s.locale, signal),
+    pack ? null : extract(text, s.locale, { card_back: s.card_back, cash_received: s.cash_received },signal),
+    pack ? triage(text, s.locale, pack,signal) : null,
   ]);
   const patch = atm.status === "fulfilled" ? atm.value : null;
   const taps = packFacts.status === "fulfilled" ? packFacts.value : null;
@@ -60,7 +60,7 @@ async function read(s: Submitted, text: string) {
   return { facts, taps, transfer };
 }
 
-export async function frontlineTurn(a: Caller, body: Record<string, unknown>, voiceScope?: Record<string, unknown>) {
+export async function frontlineTurn(a: Caller, body: Record<string, unknown>, voiceScope?: Record<string, unknown>, signal?:AbortSignal) {
   if (!a.incident || !a.voiceRoom || !a.lang) return fail(403, "forbidden");
   const { act, request_id: request, base_rev: rev } = body;
   if (typeof act !== "string" || !ACTS.has(act) || typeof request !== "string" || !UUID.test(request) || !Number.isInteger(rev)) return fail(400, "bad_request");
@@ -90,6 +90,7 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>, vo
   if (s.replay) return { replay: true, withheld: s.act === "withheld" };
   if (words && s.locale !== "ja") after(() => translate(s.seq, words));
   if (s.handler !== "ai" || act === "start") return { handler: s.handler, withheld: checked.withheld };
+  const planning = performance.now();
   let wording = checked.withheld ? "withheld" : "readback";
   let patch = {};
   let taps: Triage | null = null;
@@ -97,13 +98,20 @@ export async function frontlineTurn(a: Caller, body: Record<string, unknown>, vo
     if (approvedInfo("SHELTER_INFO", s.fault, s.flags, true, s.locale)) wording = "SHELTER_INFO";
     else transfer = { priority: 1, reason: "staff_needed" };
   } else if (words) {
-    const result = await read(s, words);
+    const result = await read(s, words,signal);
+    signal?.throwIfAborted();
     patch = result.facts;
     taps = result.taps;
     transfer = result.transfer;
   }
   if (!transfer && wording !== "SHELTER_INFO" && !conversationText(checked.withheld ? "withheld" : "readback", s.locale)?.trim()) transfer = { priority: 2, reason: "unclear" };
+  const commit = performance.now();
   const delivered = await rpc<boolean>(voiceScope ? "voice_finish" : "frontline_finish", { ...(voiceScope && {p_scope:voiceScope}), ...args, p_wording: wording, p_patch: patch, p_triage: taps,
     p_priority: transfer?.priority ?? null, p_reason: transfer?.reason ?? null, p_manual: MANUAL_VERSION });
+  if (voiceScope) {
+    const line = entry("info","voice_turn",{incident:a.incident,locale:s.locale,turn:s.seq,
+      model_ms:Math.round(commit-planning),commit_ms:Math.round(performance.now()-commit)});
+    after(() => ship([line]));
+  }
   return { delivered, withheld: checked.withheld };
 }

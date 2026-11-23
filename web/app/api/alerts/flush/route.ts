@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { expireMonitors } from "@/lib/livekit";
 import { flushAlerts } from "@/lib/alerts";
 import { reply } from "@/lib/server";
 
@@ -9,6 +10,6 @@ export async function GET(req: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET;
   const hash = (v: string) => createHash("sha256").update(v).digest();
   if (!secret || !timingSafeEqual(hash(req.headers.get("authorization") ?? ""), hash(`Bearer ${secret}`))) return reply(404, { error: "not_found" });
-  await flushAlerts();
+  await Promise.all([flushAlerts(),expireMonitors()]);
   return new Response(null, { status: 204 });
 }

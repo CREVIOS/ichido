@@ -1,7 +1,8 @@
 begin;
 
 alter table ichido.binding add column if not exists voice_session uuid,
-  add column if not exists voice_job text;
+  add column if not exists voice_job text,
+  add column if not exists voice_expires timestamptz;
 create table if not exists ichido.turn_delivery (
   seq bigint primary key references public.frontline_turn on delete cascade,
   mode text not null check (mode in ('screen','voice')),
@@ -41,7 +42,7 @@ begin
   if d.lang is distinct from p_lang or d.lang='ne' or d.text_only or d.handler='legacy' then perform ichido.fail('forbidden'); end if;
   perform public.voice_end(p_uid,p_generation,b.voice_session) from ichido.binding b
     where b.uid=p_uid and b.voice_room=p_generation and b.voice_session is not null;
-  update ichido.binding set voice_session=gen_random_uuid(),voice_job=null
+  update ichido.binding set voice_session=gen_random_uuid(),voice_job=null,voice_expires=least(expires,clock_timestamp()+interval '10 minutes')
     where uid=p_uid and voice_room=p_generation and frontline_started returning voice_session into s;
   if not found then perform ichido.fail('forbidden'); end if;
   return jsonb_build_object('session',s,'epoch',d.handler_epoch,'handler',d.handler);
@@ -52,7 +53,7 @@ language plpgsql security definer set search_path='' as $$
 begin
   perform 1 from public.desk d join ichido.binding b on b.incident=d.id
     where b.uid=p_uid and b.voice_room=p_generation for update of d;
-  update ichido.binding set voice_session=null,voice_job=null where uid=p_uid and voice_room=p_generation and voice_session=p_session;
+  update ichido.binding set voice_session=null,voice_job=null,voice_expires=null where uid=p_uid and voice_room=p_generation and voice_session=p_session;
   if found then
     update ichido.turn_delivery v set state='partial' from public.frontline_turn t
       where t.seq=v.seq and t.generation=p_generation and v.mode='voice' and v.state in ('pending','playing');
@@ -68,6 +69,7 @@ begin
   if d.handler<>'ai' or d.text_only or not b.frontline_started or d.lang='ne'
     or d.id is distinct from (p_scope->>'incident')::uuid or d.lang is distinct from p_scope->>'lang'
     or d.handler_epoch is distinct from (p_scope->>'epoch')::int or b.voice_room is distinct from (p_scope->>'generation')::uuid
+    or b.voice_expires is null or b.voice_expires<=clock_timestamp()
     or b.voice_session is null or b.voice_session is distinct from (p_scope->>'session')::uuid
     or nullif(p_scope->>'job','') is null or (b.voice_job is not null and b.voice_job<>p_scope->>'job')
     then perform ichido.fail('forbidden'); end if;
@@ -102,6 +104,10 @@ language plpgsql security definer set search_path='' as $$
 declare d public.desk; dr public.draft; t public.frontline_turn; v ichido.turn_delivery; c public.caller_card;
 begin
   d:=ichido.voice_owner(p_scope);
+  if p_action='end' then
+    perform public.voice_end((p_scope->>'uid')::uuid,(p_scope->>'generation')::uuid,(p_scope->>'session')::uuid);
+    return '{}';
+  end if;
   select * into strict dr from public.draft where incident=d.id;
   if p_action='failure' then perform ichido.queue_frontline(d.id,2,'provider'); return '{}'; end if;
   select * into c from public.caller_card where id=d.id;
@@ -114,8 +120,8 @@ begin
       'facts',t.facts,'fault',d.fault,'flags',c.flags,'confirmed',d.confirmed_rev=dr.rev);
   end if;
   if p_action='partial' then
-    update ichido.turn_delivery v set state='partial' from public.frontline_turn a where a.seq=p_seq and a.seq=v.seq
-      and a.incident=d.id and a.generation=(p_scope->>'generation')::uuid and v.state in ('playing','partial');
+    update ichido.turn_delivery delivery set state='partial' from public.frontline_turn a where a.seq=p_seq and a.seq=delivery.seq
+      and a.incident=d.id and a.generation=(p_scope->>'generation')::uuid and delivery.mode='voice' and delivery.state in ('pending','playing','partial');
     if not found then perform ichido.fail('conflict'); end if;
     return '{}';
   end if;
@@ -133,7 +139,7 @@ create or replace function ichido.cancel_voice() returns trigger language plpgsq
 begin
   update ichido.turn_delivery v set state='partial' from public.frontline_turn t
     where t.seq=v.seq and t.incident=new.id and v.mode='voice' and v.state in ('pending','playing');
-  update ichido.binding set voice_session=null,voice_job=null where incident=new.id;
+  update ichido.binding set voice_session=null,voice_job=null,voice_expires=null where incident=new.id;
   return null;
 end $$;
 create or replace trigger cancel_voice after update on public.desk for each row
@@ -146,17 +152,18 @@ revoke all on function ichido.turn_channel(),ichido.track_delivery(),ichido.canc
 grant execute on function public.voice_begin(uuid,uuid,text),public.voice_end(uuid,uuid,uuid),public.voice_step(jsonb,text,bigint),
  public.voice_submit(jsonb,uuid,uuid,uuid,int,text,text,jsonb,int,text) to service_role;
 
-create or replace function public.voice_failure(p_uid uuid,p_generation uuid) returns void
+create or replace function public.voice_failure(p_uid uuid,p_generation uuid,p_session uuid) returns void
 language plpgsql security definer set search_path='' as $$
 declare d public.desk;
 begin
   d:=ichido.caller_case(p_uid);
   if not exists(select from ichido.binding where uid=p_uid and voice_room=p_generation and frontline_started)
     then perform ichido.fail('forbidden'); end if;
-  if d.handler='ai' then perform ichido.queue_frontline(d.id,2,'provider'); end if;
+  if d.handler='ai' and exists(select from ichido.binding where uid=p_uid and (voice_session is null or voice_session=p_session))
+    then perform ichido.queue_frontline(d.id,2,'provider'); end if;
 end $$;
-revoke all on function public.voice_failure(uuid,uuid) from public,anon,authenticated;
-grant execute on function public.voice_failure(uuid,uuid) to service_role;
+revoke all on function public.voice_failure(uuid,uuid,uuid) from public,anon,authenticated;
+grant execute on function public.voice_failure(uuid,uuid,uuid) to service_role;
 
 create or replace function ichido.frontline_owner() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -171,10 +178,15 @@ begin
        (old.lang is not null and new.lang is distinct from old.lang) then
       new.handler_epoch := old.handler_epoch + 1;
     end if;
-    if new.status = 'guided' and old.status <> 'guided' then new.resolved_by := case when new.handler='ai' then 'ai' else 'human' end; end if;
+    if new.status='guided' and old.status<>'guided' then
+      if new.handler='ai' and not exists(select from ichido.ai_resolution where incident=new.id and rev=new.confirmed_rev)
+        then perform ichido.fail('conflict'); end if;
+      new.resolved_by:=case when new.handler='ai' then 'ai' else 'human' end;
+    end if;
   end if;
   return new;
 end $$;
+revoke all on function ichido.frontline_owner() from public,anon,authenticated;
 alter table ichido.ops_setting drop constraint if exists ops_setting_key_check, drop constraint if exists ops_setting_value_check;
 alter table ichido.ops_setting add constraint ops_setting_key_check check (key in
   ('mass_stations','mass_window_s','arrived_open_s','pair_station_limit','pair_phone_limit','ai_closure','qa_sample')),
@@ -187,6 +199,7 @@ create table if not exists ichido.ai_resolution (
  delivered_at timestamptz not null, acknowledged_at timestamptz not null default clock_timestamp(),
  linked_until timestamptz not null, recontact_at timestamptz, next_incident uuid references public.desk on delete set null
 );
+alter table ichido.ai_resolution add column if not exists recontact_started_at timestamptz;
 create table if not exists ichido.frontline_qa (
  incident uuid primary key references public.desk on delete cascade, reason text not null,
  flagged_at timestamptz not null default clock_timestamp(), reviewed_at timestamptz, reviewer uuid
@@ -246,10 +259,12 @@ begin
  select delivered_at into delivered from ichido.turn_delivery where seq=t.seq and state='full';
  if delivered is null then perform ichido.fail('conflict'); end if;
 
- update public.caller_card set status='guided' where id=d.id;
- update public.desk set status='guided',resolved_by='ai',guided_at=clock_timestamp(),finished_at=clock_timestamp() where id=d.id;
  insert into ichido.ai_resolution(incident,seq,reply_id,rev,locale,pack,manual,policy,delivered_at,linked_until)
- select d.id,t.seq,p_reply,p_rev,b.lang,'shelter',p_manual,t.policy_version,delivered,f.expires from ichido.follow_up f where f.incident=d.id and f.uid=p_uid;
+ values(d.id,t.seq,p_reply,p_rev,b.lang,'shelter',p_manual,t.policy_version,delivered,b.expires);
+ update public.caller_card set status='guided' where id=d.id;
+ update public.desk set status='guided',guided_at=clock_timestamp(),finished_at=clock_timestamp() where id=d.id;
+ update ichido.ai_resolution r set linked_until=f.expires from ichido.follow_up f
+ where r.incident=d.id and f.incident=r.incident and f.uid=p_uid;
  if not found then perform ichido.fail('conflict'); end if;
  chosen:=true;
  if exists(select from ichido.ops_setting where key='qa_sample' and value=1) then
@@ -268,11 +283,11 @@ end $$;
 create or replace function ichido.start_recontact(previous uuid) returns void language plpgsql security definer set search_path='' as $$
 declare d public.desk; f ichido.follow_up; i uuid;
 begin
- select * into f from ichido.follow_up where incident=previous and expires>clock_timestamp();
+ select * into f from ichido.follow_up where incident=previous and expires>clock_timestamp() for share;
  if not found then return; end if;
  perform pg_advisory_xact_lock(1,hashtext(f.uid::text));
  select * into strict d from public.desk where id=previous for update;
- if not exists(select from ichido.ai_resolution where incident=d.id and recontact_at is not null and next_incident is null)
+ if not exists(select from ichido.ai_resolution where incident=d.id and recontact_at is not null and recontact_started_at is null)
    or exists(select from ichido.binding where uid=f.uid and expires>now()) then return; end if;
  perform 1 from public.station where id=d.station for update;
  if exists(select from public.desk where station=d.station and finished_at is null) then return; end if;
@@ -283,18 +298,18 @@ begin
  delete from ichido.binding where uid=f.uid and expires<=now();
  insert into ichido.binding(incident,uid,lang,expires) values(i,f.uid,d.lang,least(f.expires,now()+interval '2 hours'));
  perform ichido.queue_frontline(i,1,'human_request');
- update ichido.ai_resolution set next_incident=i where incident=d.id;
+ update ichido.ai_resolution set next_incident=i,recontact_started_at=clock_timestamp() where incident=d.id;
  perform ichido.event(i,'caller','follow_up_request',jsonb_build_object('previous',d.id));
 end $$;
 revoke all on function ichido.start_recontact(uuid) from public,anon,authenticated;
 select cron.schedule('ichido-start-recontacts','* * * * *',
- 'select ichido.start_recontact(incident) from ichido.ai_resolution where recontact_at is not null and next_incident is null and linked_until>now() order by recontact_at');
+ 'select ichido.start_recontact(incident) from ichido.ai_resolution where recontact_at is not null and recontact_started_at is null and linked_until>now() order by recontact_at');
 
 create or replace function public.recontact(p_uid uuid,p_receipt uuid) returns void language plpgsql security definer set search_path='' as $$
 begin
  perform pg_advisory_xact_lock(1,hashtext(p_uid::text));
  if not exists(select from ichido.follow_up f join ichido.ai_resolution r using(incident)
-   where f.uid=p_uid and f.incident=p_receipt and f.expires>clock_timestamp()) then perform ichido.fail('forbidden'); end if;
+   where f.uid=p_uid and f.incident=p_receipt and f.expires>clock_timestamp() for share of f) then perform ichido.fail('forbidden'); end if;
  update ichido.ai_resolution set recontact_at=clock_timestamp() where incident=p_receipt and recontact_at is null;
  if found then
    perform ichido.event(p_receipt,'caller','recontact','{}');
@@ -306,7 +321,7 @@ create or replace function public.followup_rate(p_uid uuid,p_receipt uuid,p_rati
 language plpgsql security definer set search_path='' as $$
 begin
  if p_rating is null or p_rating not between 1 and 3 then perform ichido.fail('bad_request'); end if;
- if not exists(select from ichido.follow_up where uid=p_uid and incident=p_receipt and expires>clock_timestamp())
+ if not exists(select from ichido.follow_up where uid=p_uid and incident=p_receipt and expires>clock_timestamp() for share)
  then perform ichido.fail('forbidden'); end if;
  update public.caller_card set rating=p_rating where id=p_receipt and status='guided' and rating is null;
  if not found then perform ichido.fail('conflict'); end if;
@@ -346,7 +361,8 @@ begin
  return (select coalesce(jsonb_agg(to_jsonb(x) order by x.flagged_at),'[]') from (
    select q.incident,q.reason,q.flagged_at,d.fault,d.lang,
      (select jsonb_agg(jsonb_build_object('seq',t.seq,'speaker',t.speaker,'wording',t.wording,'locale',t.locale,
-       'flag',t.facts->>'flag','rev',t.rev,'manual',r.manual_version,'delivery',v.state) order by t.seq)
+       'flag',t.facts->>'flag','on',t.facts->'on','card_back',t.facts->>'card_back','cash_received',t.facts->>'cash_received',
+       'rev',t.rev,'manual',r.manual_version,'delivery',v.state) order by t.seq)
       from public.frontline_turn t left join public.reply r on r.id=t.reply_id left join ichido.turn_delivery v using(seq)
       where t.incident=q.incident) as turns
    from ichido.frontline_qa q join public.desk d on d.id=q.incident where q.reviewed_at is null order by q.flagged_at limit 100
@@ -426,4 +442,63 @@ create or replace function public.caller_screen(p_uid uuid) returns jsonb langua
     join public.station s on s.id=c.station where b.uid=p_uid and b.expires>now()
 $$;
 
+
+create or replace function public.frontline_monitor(p_uid uuid,p_session uuid,p_incident uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare g uuid;
+begin
+  if not exists(select from auth_ba."session" s join auth_ba."user" u on u.id=s."userId"
+    join ichido.staff st on st.uid=u.id where s.id=p_session and u.id=p_uid and not u.banned
+      and st.role='operator' and s.aal='aal2' and s."expiresAt">now()) then perform ichido.fail('forbidden'); end if;
+  select b.voice_room into g from ichido.binding b join public.desk d on d.id=b.incident
+    where b.incident=p_incident and b.expires>now() and d.handler<>'legacy' and d.finished_at is null;
+  if not found then return '[]'::jsonb; end if;
+  insert into ichido.frontline_monitor(incident,generation,staff_id,session_id) values(p_incident,g,p_uid,p_session)
+    on conflict do nothing;
+  return (select coalesce(jsonb_agg(jsonb_build_object('seq',t.seq,'speaker',t.speaker,'locale',t.locale,
+    'words',t.words,'ja',j.ja,'slots',r.slots,'manual_version',r.manual_version,'delivery',coalesce(v.state,t.delivery),'wording',t.wording,'facts',t.facts,'rev',t.rev,'at',t.at) order by t.seq),'[]')
+    from public.frontline_turn t left join ichido.turn_delivery v using(seq) left join public.frontline_translation j using(seq) left join public.reply r on r.id=t.reply_id
+    where t.incident=p_incident and t.generation=g);
+end $$;
+
+create table if not exists ichido.monitor_media (
+ id uuid primary key default gen_random_uuid(), generation uuid not null, staff_session uuid not null, expires timestamptz not null
+);
+alter table ichido.monitor_media enable row level security;
+revoke all on ichido.monitor_media from public,anon,authenticated,service_role;
+grant delete,select on ichido.monitor_media to service_role;
+create or replace function public.monitor_voice(p_uid uuid,p_session uuid,p_incident uuid) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare g uuid; expiry timestamptz; lease uuid;
+begin
+ select b.voice_room,least(b.expires,s."expiresAt",clock_timestamp()+interval '60 seconds') into g,expiry
+ from ichido.binding b join public.desk d on d.id=b.incident join auth_ba."session" s on s.id=p_session
+ join auth_ba."user" u on u.id=s."userId" join ichido.staff st on st.uid=u.id
+ where st.uid=p_uid and st.role='operator' and not u.banned and s.aal='aal2' and s."expiresAt">clock_timestamp()
+   and b.incident=p_incident and b.lang<>'ne' and not d.text_only and b.expires>clock_timestamp()
+   and b.frontline_started and d.handler<>'legacy' and d.finished_at is null for share of d;
+ if not found then perform ichido.fail('forbidden'); end if;
+ insert into ichido.frontline_monitor(incident,generation,staff_id,session_id) values(p_incident,g,p_uid,p_session) on conflict do nothing;
+ insert into ichido.monitor_media(generation,staff_session,expires) values(g,p_session,expiry) returning id into lease;
+ return jsonb_build_object('lease',lease,'generation',g,'expires',expiry);
+end $$;
+create or replace function public.expired_monitors() returns table(id uuid,generation uuid)
+language sql stable security definer set search_path='' as $$
+ select m.id,m.generation from ichido.monitor_media m where m.expires<=now() or not exists(
+   select from auth_ba."session" s join auth_ba."user" u on u.id=s."userId" join ichido.staff st on st.uid=u.id
+   join ichido.binding b on b.voice_room=m.generation join public.desk d on d.id=b.incident
+   where s.id=m.staff_session and s.aal='aal2' and not u.banned and st.role='operator' and s."expiresAt">now()
+   and d.finished_at is null and not d.text_only and b.lang<>'ne' and b.expires>now()) order by m.expires limit 200
+$$;
+revoke all on function public.monitor_voice(uuid,uuid,uuid), public.expired_monitors() from public,anon,authenticated;
+grant execute on function public.monitor_voice(uuid,uuid,uuid), public.expired_monitors() to service_role;
+
+create or replace function ichido.followup_coverage() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ update ichido.ai_resolution set linked_until=least(linked_until,case when tg_op='DELETE' then clock_timestamp() else new.expires end)
+   where incident=old.incident;
+ return null;
+end $$;
+revoke all on function ichido.followup_coverage() from public,anon,authenticated;
+create or replace trigger followup_coverage after update of expires or delete on ichido.follow_up for each row execute function ichido.followup_coverage();
 commit;

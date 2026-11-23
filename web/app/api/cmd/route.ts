@@ -385,7 +385,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   },
   async voice_failure(a,b) {
     const c = caller(a);
-    await rpc("voice_failure",{p_uid:c.uid,p_generation:str(b,"generation")});
+    await rpc("voice_failure",{p_uid:c.uid,p_generation:str(b,"generation"),p_session:b.session ?? null});
     return {};
   },
   async human(a) {

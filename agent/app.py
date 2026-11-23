@@ -105,30 +105,59 @@ class FrontlineAgent(Agent):
         self.scope = scope
         self.request = request
         self.seen = {}
+        self.last_final = None
         self.pending_speech = None
         self.playback = None
         self.interruptions = 0
         self.submitting = False
+        self.user_speaking = False
+        self.turn_task = None
+        self.end_of_speech = None
 
     async def on_user_turn_completed(self, turn_ctx, new_message):
         # The SDK skips the default reply pipeline without an LLM. Invoke our server node on the final only.
         turn_ctx.items.append(new_message)
         self.submitting = True
         try:
-            await self.llm_node(turn_ctx, [], None)
+            self.turn_task = asyncio.create_task(self.llm_node(turn_ctx, [], None))
+            await self.turn_task
         finally:
+            self.turn_task = None
             self.submitting = False
 
     async def llm_node(self, chat_ctx, tools, model_settings):
         message = chat_ctx.items[-1]
         request_id = str(uuid.uuid5(uuid.NAMESPACE_URL, self.scope["job"] + "/" + message.id))
+        if self.last_final == request_id:
+            return
+        self.last_final = request_id
         generation = self.interruptions
         try:
             result = await self.request("turn", request_id=request_id, text=message.text_content)
-            if generation == self.interruptions:
-                await self.play(result.get("say"))
+            speech = result.get("say")
+            if speech and generation != self.interruptions:
+                await self.request("partial", seq=speech["seq"])
+            elif speech:
+                await self.play(speech)
         except (aiohttp.ClientError, TimeoutError):
             await self.request("failure")
+
+    async def watch(self, ctx, pending, played):
+        try:
+            while True:
+                state = await self.request("state")
+                if self.pending_speech and state["seq"] != self.pending_speech:
+                    self.interrupt()
+                if state.get("say") and not self.pending_speech and not self.submitting:
+                    task = asyncio.create_task(self.play(state["say"]))
+                    pending.add(task)
+                    task.add_done_callback(played)
+                await asyncio.sleep(0.4 if self.pending_speech else 0.8)
+        except (aiohttp.ClientError, TimeoutError):
+            self.interrupt()
+            if self.turn_task:
+                self.turn_task.cancel()
+            ctx.shutdown("voice grant ended")
 
     def interrupt(self):
         self.interruptions += 1
@@ -136,23 +165,25 @@ class FrontlineAgent(Agent):
             self.session.interrupt(force=True)
 
     async def play(self, envelope):
-        if not envelope or self.pending_speech is not None:
+        if not envelope or self.user_speaking or self.pending_speech is not None:
             return
         room = "case-" + self.scope["generation"]
-        text = signed_text(room, "c-" + self.scope["uid"], json.dumps(envelope), self.seen, self.scope)
-        if not text:
-            return
         seq = envelope["seq"]
         self.pending_speech = seq
         generation = self.interruptions
         try:
             await self.request("play", seq=seq)
-            if generation != self.interruptions or int(time.time()) >= envelope["issued"] + SAY_WINDOW_S:
+            text = signed_text(room, "c-" + self.scope["uid"], json.dumps(envelope), self.seen, self.scope)
+            if not text or generation != self.interruptions:
                 await self.request("partial", seq=seq)
                 return
             self.playback = None
-            handle = self.session.say(text, allow_interruptions=True, add_to_chat_ctx=False)
-            await handle.wait_for_playout()
+            try:
+                handle = self.session.say(text, allow_interruptions=True, add_to_chat_ctx=False)
+                await handle.wait_for_playout()
+            except (RuntimeError, OSError):
+                await self.request("partial", seq=seq)
+                return
             played = self.playback
             full = (played and played.playback_position > 0 and not played.interrupted and not handle.interrupted
                     and handle.exception() is None and generation == self.interruptions)
@@ -254,21 +285,7 @@ async def intake(ctx: JobContext) -> None:
         raise RuntimeError("Voice intake failed") from None
 
 
-async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> None:
-    await ctx.connect()
-
-    turn_model = use_turn_model(locale, ctx.proc.userdata.get("turn_model_ready", False))
-    nc = noise_filter()
-    log.info("audio_setup", extra={"event": "audio_setup", "room": room, "locale": locale,
-                                   "turn_detection": "multilingual" if turn_model else "vad", "noise_cancellation": nc is not None})
-
-    session = AgentSession(
-        turn_handling={"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": False},
-        stt=make_stt(locale),
-        tts=make_tts(locale),
-        vad=ctx.proc.userdata["vad"],
-    )
-
+def wire_legacy_intake(ctx, room, locale, session):
     # Only the caller relays text, and only server-signed text for this room is spoken.
     seen: dict[str, int] = {}
     pending: set[asyncio.Task] = set()
@@ -285,7 +302,8 @@ async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> Non
         async def speak() -> None:
             try:
                 payload = await asyncio.wait_for(read_bounded(reader), timeout=5)
-            except (TimeoutError, rtc.StreamError):
+            except (TimeoutError, rtc.StreamError) as error:
+                log.warning("say_stream_failed", extra={"room":room, "error":type(error).__name__})
                 return
             finally:
                 reader.close()
@@ -302,81 +320,128 @@ async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> Non
         pending.add(task)
         task.add_done_callback(pending.discard)
 
-    front = None
-    if scope is None:
-        ctx.room.register_text_stream_handler("ichido.say", on_say)
-    else:
-        if scope["lang"] != LANGS[locale] or room != "case-" + scope["generation"]:
-            raise ValueError("Invalid voice scope")
-        scope = {**scope, "job": ctx.job.id}
-        endpoint = os.environ["FRONTLINE_URL"]
-        http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12))
+    ctx.room.register_text_stream_handler("ichido.say", on_say)
 
-        async def request(action, **fields):
-            raw = json.dumps({"scope": scope, "action": action, **fields}, separators=(",", ":")).encode()
-            issued = str(int(time.time()))
-            sig = hmac.digest(BRIDGE_SECRET, b"ichido-job/1\n" + issued.encode() + b"\n" + raw, "sha256").hex()
-            async with http.post(endpoint, data=raw, allow_redirects=False, headers={
-                "Content-Type": "application/json", "x-issued": issued, "x-job-signature": sig,
-            }) as response:
-                response.raise_for_status()
-                return await response.json()
 
-        front = FrontlineAgent(scope, request)
+def wire_frontline(ctx, room, locale, session, scope):
+    pending: set[asyncio.Task] = set()
+    if scope["lang"] != LANGS[locale] or room != "case-" + scope["generation"]:
+        raise ValueError("Invalid voice scope")
+    scope = {**scope, "job": ctx.job.id}
+    endpoint = os.environ["FRONTLINE_URL"]
+    http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12))
 
-        @session.on("user_state_changed")
-        def on_user_state(ev):
-            if ev.new_state == "speaking":
-                front.interrupt()
+    async def request(action, **fields):
+        raw = json.dumps({"scope": scope, "action": action, **fields}, separators=(",", ":")).encode()
+        issued = str(int(time.time()))
+        sig = hmac.digest(BRIDGE_SECRET, b"ichido-job/1\n" + issued.encode() + b"\n" + raw, "sha256").hex()
+        async with http.post(endpoint, data=raw, allow_redirects=False, headers={
+            "Content-Type": "application/json", "x-issued": issued, "x-job-signature": sig,
+        }) as response:
+            response.raise_for_status()
+            return await response.json()
 
-        async def watch():
-            try:
-                while True:
-                    state = await request("state")
-                    if front.pending_speech and state["seq"] != front.pending_speech:
-                        front.interrupt()
-                    if state.get("say") and not front.pending_speech and not front.submitting:
-                        task = asyncio.create_task(front.play(state["say"]))
-                        pending.add(task)
-                        task.add_done_callback(played)
-                    await asyncio.sleep(0.4 if front.pending_speech else 0.8)
-            except (aiohttp.ClientError, TimeoutError):
-                front.interrupt()
-                ctx.shutdown("voice grant ended")
+    front = FrontlineAgent(scope, request)
 
-        def played(task):
-            pending.discard(task)
-            if not task.cancelled() and task.exception() is not None:
-                front.interrupt()
-                ctx.shutdown("delivery ended")
+    def disconnect():
+        front.interrupt()
+        if front.turn_task:
+            front.turn_task.cancel()
+        ctx.shutdown("voice connection ended")
 
-        async def cleanup():
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*list(pending), return_exceptions=True)
+    @ctx.room.on("participant_disconnected")
+    def caller_left(participant):
+        if participant.identity == "c-" + scope["uid"]:
+            disconnect()
+
+    ctx.room.on("reconnecting", disconnect)
+
+    @session.on("user_state_changed")
+    def on_user_state(ev):
+        front.user_speaking = ev.new_state == "speaking"
+        if front.user_speaking:
+            front.interrupt()
+        elif ev.old_state == "speaking":
+            front.end_of_speech = time.monotonic()
+
+    @session.on("agent_state_changed")
+    def first_audio(ev):
+        if ev.new_state == "speaking" and front.end_of_speech is not None:
+            log.info("voice_first_audio", extra={"event":"voice_first_audio", "locale":locale, "room":room,
+                     "turn":front.pending_speech, "duration_ms":round((time.monotonic()-front.end_of_speech)*1000)})
+            front.end_of_speech = None
+
+    def played(task):
+        pending.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            front.interrupt()
+            ctx.shutdown("delivery ended")
+
+    async def cleanup():
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*list(pending), return_exceptions=True)
+        try:
+            await request("end")
+        except (aiohttp.ClientError, TimeoutError) as error:
+            log.info("lease_ended", extra={"room":room,"error":type(error).__name__})
+        finally:
             await http.close()
 
-        ctx.add_shutdown_callback(cleanup)
+    ctx.add_shutdown_callback(cleanup)
+
+    @session.on("error")
+    def provider_error(ev: ErrorEvent):
+        if isinstance(ev.source, soniox.STT):
+            task = asyncio.create_task(request("failure"))
+            pending.add(task)
+            task.add_done_callback(played)
+        if isinstance(ev.source, elevenlabs.TTS):
+            front.interrupt()
+
+    async def start_watch():
+        session.output.audio.on("playback_finished", lambda ev: setattr(front, "playback", ev))
+        await asyncio.wait_for(ctx.wait_for_participant(identity="c-" + scope["uid"]), timeout=30)
+        pending.add(asyncio.create_task(front.watch(ctx, pending, played)))
+
+    return front, start_watch
+
+
+async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> None:
+    await ctx.connect()
+
+    turn_model = use_turn_model(locale, ctx.proc.userdata.get("turn_model_ready", False))
+    nc = noise_filter()
+    log.info("audio_setup", extra={"event": "audio_setup", "room": room, "locale": locale,
+                                   "turn_detection": "multilingual" if turn_model else "vad", "noise_cancellation": nc is not None})
+
+    session = AgentSession(
+        turn_handling={"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": False},
+        stt=make_stt(locale),
+        tts=make_tts(locale),
+        vad=ctx.proc.userdata["vad"],
+    )
+
+    front = None
+    if scope is None:
+        wire_legacy_intake(ctx, room, locale, session)
+    else:
+        front, start_watch = wire_frontline(ctx, room, locale, session, scope)
+        await front.request("state")
 
     @session.on("metrics_collected")
     def on_metrics(ev: MetricsCollectedEvent) -> None:
         m = ev.metrics
         if isinstance(m, metrics.EOUMetrics):
-            log.info("stt_latency", extra={"event": "stt_latency", "room": room,
+            log.info("stt_latency", extra={"event": "stt_latency", "room": room, "locale": locale,
                                            "transcription_delay_ms": round(m.transcription_delay * 1000),
                                            "end_of_utterance_delay_ms": round(m.end_of_utterance_delay * 1000)})
         elif isinstance(m, metrics.TTSMetrics):
-            log.info("tts", extra={"event": "tts", "room": room, "ttfb_ms": round(m.ttfb * 1000),
+            log.info("tts", extra={"event": "tts", "room": room, "locale": locale, "ttfb_ms": round(m.ttfb * 1000),
                                    "audio_s": round(m.audio_duration, 2), "chars": m.characters_count, "cancelled": m.cancelled})
 
     @session.on("error")
     def on_error(ev: ErrorEvent) -> None:
-        if front and isinstance(ev.source, soniox.STT):
-            task = asyncio.create_task(request("failure"))
-            pending.add(task)
-            task.add_done_callback(played)
-        if front and isinstance(ev.source, elevenlabs.TTS):
-            front.interrupt()
         # Type names only: provider error messages can echo request content.
         log.error("session_error", extra={"event": "session_error", "room": room, "source": type(ev.source).__name__,
                                           "error": type(ev.error).__name__, "recoverable": bool(getattr(ev.error, "recoverable", False))})
@@ -390,9 +455,7 @@ async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> Non
         record={"audio": False, "traces": False, "logs": False, "transcript": False, "redaction": True},
     )
     if front:
-        session.output.audio.on("playback_finished", lambda ev: setattr(front, "playback", ev))
-        await ctx.wait_for_participant(identity="c-" + scope["uid"])
-        pending.add(asyncio.create_task(watch()))
+        await start_watch()
 
 
 def ship_logs_to_betterstack() -> None:

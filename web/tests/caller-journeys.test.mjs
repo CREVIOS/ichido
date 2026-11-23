@@ -31,7 +31,7 @@ test("need-first intake opens only the chosen details and the food card excludes
   for (const value of Object.values(JOURNEY)) for (const l of LANGS) assert.ok(value[l].trim());
 });
 
-test("caller and worker transitions run in one rolled-back database fixture",async () => {
+for (const fixture of ["caller-journeys","voice-resolution","closure-qa"]) test(fixture+" transitions run in a rolled-back database fixture",async () => {
   const url = new URL(process.env.DATABASE_URL);
   assert.ok(["localhost","127.0.0.1","[::1]"].includes(url.hostname));
   const db = new pg.Client({connectionString:url.href});
@@ -39,7 +39,7 @@ test("caller and worker transitions run in one rolled-back database fixture",asy
   try {
     await db.query("begin");
     await db.query("set local plpgsql.check_asserts=on");
-    await db.query(await readFile(new URL("./fixtures/caller-journeys.sql",import.meta.url),"utf8"));
+    await db.query(await readFile(new URL(`./fixtures/${fixture}.sql`,import.meta.url),"utf8"));
   } finally {
     try { await db.query("rollback"); } finally { await db.end(); }
   }

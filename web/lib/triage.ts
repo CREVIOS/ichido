@@ -53,14 +53,14 @@ export function clean(p: Pack, raw: unknown): Omit<Triage, "model"> {
 }
 
 // Null when no model is configured: the caller answers with taps, as without AI.
-export async function triage(text: string, lang: string, p: Pack): Promise<Triage | null> {
+export async function triage(text: string, lang: string, p: Pack, signal?:AbortSignal): Promise<Triage | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const out = await respond(key, {
     instructions: SYSTEM,
     input: JSON.stringify({ language: lang, pack: p.id, catalogue: catalogue(p), utterance: text }),
     text: { format: { type: "json_schema", name: "triage", strict: true, schema: schema(p) } },
-  });
+  },signal);
   if (!out) throw new Error("triage returned no content");
   return { ...clean(p, JSON.parse(out)), model: MODEL() };
 }

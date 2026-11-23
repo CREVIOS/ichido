@@ -1,4 +1,5 @@
 """Run: uv run python -m unittest"""
+import asyncio
 import io
 import logging
 import os
@@ -99,9 +100,6 @@ class NeverRepliesTest(unittest.TestCase):
         self.assertNotIn("llm=", src)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class FrontlinePlaybackTest(unittest.IsolatedAsyncioTestCase):
     def agent(self):
         self.request = mock.AsyncMock(return_value={})
@@ -131,4 +129,59 @@ class FrontlinePlaybackTest(unittest.IsolatedAsyncioTestCase):
         ctx = mock.Mock(items=[mock.Mock(id="final-1",text_content="My question")])
         await front.llm_node(ctx, [], None)
         await front.llm_node(ctx, [], None)
-        self.assertEqual(self.request.await_args_list[0],self.request.await_args_list[1])
+        self.request.assert_awaited_once()
+        self.assertEqual(self.request.await_args.kwargs["request_id"],str(app.uuid.uuid5(app.uuid.NAMESPACE_URL,"job/final-1")))
+
+    async def test_full_delivery_needs_completed_audio(self):
+        front = self.agent()
+        handle = self.session.say.return_value
+        handle.interrupted = False
+        handle.exception.return_value = None
+        def finished():
+            front.playback = mock.Mock(playback_position=1.4, interrupted=False)
+        handle.wait_for_playout = mock.AsyncMock(side_effect=finished)
+        await front.play({"seq":2})
+        self.request.assert_awaited_with("full", seq=2)
+
+    async def test_takeover_interrupts_in_progress_playout(self):
+        front = self.agent()
+        playing, stopped = asyncio.Event(), asyncio.Event()
+        handle = self.session.say.return_value
+        async def playout():
+            playing.set()
+            await stopped.wait()
+        handle.wait_for_playout = playout
+        self.session.interrupt.side_effect = lambda **kwargs: stopped.set()
+        async def request(action, **fields):
+            if action == "state":
+                await playing.wait()
+                raise app.aiohttp.ClientError()
+            return {}
+        self.request.side_effect = request
+        ctx = mock.Mock()
+        await asyncio.wait_for(asyncio.gather(front.play({"seq":8}), front.watch(ctx,set(),None)), timeout=1)
+        ctx.shutdown.assert_called_once()
+        self.request.assert_awaited_with("partial",seq=8)
+
+    async def test_synthesis_failure_marks_the_text_only_turn_partial(self):
+        front = self.agent()
+        self.session.say.side_effect = RuntimeError("unavailable")
+        await front.play({"seq":3})
+        self.request.assert_awaited_with("partial", seq=3)
+
+    async def test_interrupt_before_the_reply_arrives_discards_queued_audio(self):
+        front = self.agent()
+        async def request(action, **fields):
+            if action == "turn":
+                front.interrupt()
+                return {"say":{"seq":4}}
+            return {}
+        self.request.side_effect = request
+        ctx = mock.Mock(items=[mock.Mock(id="final-2", text_content="A question")])
+        await front.llm_node(ctx, [], None)
+        self.request.assert_awaited_with("partial",seq=4)
+        self.session.say.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

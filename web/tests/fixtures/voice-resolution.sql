@@ -5,10 +5,11 @@ declare
  manual constant text:='retained-card/v2'; scenario text;
 begin
  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+ update ichido.ops_setting set value=0 where key='qa_sample';
  insert into auth.users(id,is_anonymous) values(uid1,true),(stranger,true);
  insert into auth_ba."user"(id,email,name,role) values(op,op||'@example.invalid','Operator','operator');
  insert into public.station(id,kind,label,branch,counter_hours,security_company) values(site,'shelter','{}','{}','{}','fixture');
- foreach scenario in array array['partial','takeover','nepali','closed','screen'] loop
+ foreach scenario in array array['partial','takeover','nepali','closed','expired','full','screen'] loop
    i:=public.cmd_display_press(site,md5(random()::text),'shelter_checkin','ABCDEF',md5(site));
    perform public.frontline_pair(uid1,site,md5(site),'en',true);
    select voice_room into g from ichido.binding where uid=uid1;
@@ -33,6 +34,8 @@ begin
    select reply_id,seq into r,seq1 from public.frontline_turn where incident=i and request_id=req and speaker='ai';
    update ichido.ops_setting set value=1 where key='ai_closure';
    begin perform public.resolve_info(uid1,r,rev,'en',true,manual); assert false,'undelivered';
+   exception when raise_exception then assert sqlerrm='conflict'; end;
+   begin update public.desk set status='guided' where id=i; assert false,'direct close lacks acknowledgement';
    exception when raise_exception then assert sqlerrm='conflict'; end;
    if scenario='screen' then
      assert public.info_delivery(uid1,r,rev,'en',manual);
@@ -65,10 +68,17 @@ begin
    end if;
    assert not public.info_delivery(uid1,r,rev,'en',manual),'reading cannot override a voice delivery';
    perform public.voice_step(scope,'play',seq1);
-   if scenario='partial' then perform public.voice_step(scope,'partial',seq1);
+   if scenario='full' then
+     perform public.voice_step(scope,'full',seq1);
+     assert public.info_delivery(uid1,r,rev,'en',manual);
+     assert public.resolve_info(uid1,r,rev,'en',true,manual)=g;
+     continue;
+   end if;
+   if scenario='expired' then update ichido.binding set voice_expires=now()-interval '1 second' where uid=uid1;
+   elsif scenario='partial' then perform public.voice_step(scope,'partial',seq1);
    elsif scenario='takeover' then perform public.frontline_takeover(op,'Operator',i,(lease->>'epoch')::int);
    elsif scenario='nepali' then perform public.cmd_set_lang(uid1,'ne');
-   else perform public.voice_end(uid1,g,(lease->>'session')::uuid);
+   else perform public.voice_step(scope,'end');
    end if;
    begin perform public.voice_step(scope,'full',seq1); assert false,'obsolete playout';
    exception when raise_exception then assert sqlerrm in ('forbidden','conflict'); end;

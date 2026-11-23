@@ -34,9 +34,10 @@ type Output = { type: string; content?: { type: string; text?: string }[] }[];
 export type Response = { output?: Output };
 
 // One call to the Responses API; returns the whole response (tool calls, MCP calls and messages).
-export async function responses(key: string, body: Record<string, unknown>, timeoutMs = 20_000): Promise<Response> {
+export async function responses(key: string, body: Record<string, unknown>, timeoutMs = 20_000, signal?:AbortSignal): Promise<Response> {
+  const deadline = AbortSignal.timeout(timeoutMs);
   const res = await fetch(OPENAI_URL(), {
-    method: "POST", redirect: "error", signal: AbortSignal.timeout(timeoutMs),
+    method: "POST", redirect: "error", signal: signal ? AbortSignal.any([signal,deadline]) : deadline,
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({ model: MODEL(), max_output_tokens: 1200, store: false, ...body }),
   });
@@ -50,16 +51,16 @@ export const outputText = (r: Response): string | null => {
 };
 
 // One call; returns the model's output text, or null when it gave none.
-export const respond = async (key: string, body: Record<string, unknown>) => outputText(await responses(key, body));
+export const respond = async (key: string, body: Record<string, unknown>, signal?:AbortSignal) => outputText(await responses(key, body, undefined, signal));
 
-export async function extract(text: string, lang: string, current: { card_back: Fact; cash_received: Fact }): Promise<Patch | null> {
+export async function extract(text: string, lang: string, current: { card_back: Fact; cash_received: Fact }, signal?:AbortSignal): Promise<Patch | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null; // no model configured: the caller sets facts with the on-screen choices
   const out = await respond(key, {
     instructions: SYSTEM,
     input: JSON.stringify({ language: lang, current_facts: current, utterance: text }),
     text: { format: { type: "json_schema", name: "patch", strict: true, schema: SCHEMA } },
-  });
+  },signal);
   if (!out) throw new Error("extraction returned no content");
   const patch = JSON.parse(out);
   if (!patch || !SCHEMA.properties.card_back.enum.includes(patch.card_back) ||

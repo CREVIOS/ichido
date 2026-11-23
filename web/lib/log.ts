@@ -28,6 +28,9 @@ export type Fields = {
   run_id?: string;
   presence?: string;        // online operators seen, or "unavailable"
   model_ms?: number;
+  locale?: string;
+  turn?: number;
+  commit_ms?: number;
   total_s?: number;
   fault?: string;
   repeat?: boolean;

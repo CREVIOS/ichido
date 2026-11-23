@@ -3,6 +3,7 @@ name = "ichido-agent"
 version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+  "aiohttp>=3.10,<4",
   "huggingface-hub>=2.4.0",
   "livekit-agents[elevenlabs,silero,soniox,turn-detector]==1.8.13",
   "livekit-plugins-noise-cancellation>=0.3.3",

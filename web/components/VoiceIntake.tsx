@@ -4,7 +4,7 @@ import { Room, RoomEvent, Track, type RemoteParticipant } from "livekit-client";
 import { Mic, Square } from "lucide-react";
 import { cmd, sb, staffToken } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { FRONTLINE, FRONT_DESK, VOICE, VOICE_LANGS, type Lang } from "@/content/catalogue";
+import { FRONT_DESK, VOICE, VOICE_LANGS, type Lang } from "@/content/catalogue";
 import { callerTranscript, type SignedSpeech } from "@/content/speech";
 
 export type { SignedSpeech };
@@ -77,12 +77,13 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
       void cmd("voice_end",{generation,session}).catch(() => setState("unavailable"));
     }
     const fail = () => {
+      const failedSession = lease;
       release();
       if (room.current !== r) return;
       room.current = null;
       void r.disconnect();
       setState("unavailable");
-      if (generation) void cmd("voice_failure",{generation}).catch(() => setState("unavailable"));
+      if (generation) void cmd("voice_failure",{generation,session:failedSession}).catch(() => setState("unavailable"));
     };
     try {
       const bearer = monitor ? await staffToken() : (await sb().auth.getSession()).data.session?.access_token;
@@ -96,13 +97,24 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
         p => monitor ? p.identity.startsWith("c-") : p.isAgent && (!generation || owner.current === "ai"));
       r.on(RoomEvent.Disconnected, () => { release(); if (room.current === r) { room.current = null; setState("idle"); } });
       r.on(RoomEvent.Reconnecting, () => { void r.disconnect(); });
+      async function lostAgent() {
+        if (!generation || owner.current!=="ai" || room.current!==r) return;
+        try {
+          const {screen} = await cmd<{screen?:{generation:string;card:{handler:string}}}>("caller_screen");
+          if (screen?.generation===generation && screen.card.handler==="ai") fail();
+        } catch { fail(); }
+      }
+      if (generation && needsAgent) r.on(RoomEvent.ParticipantDisconnected,p => { if (p.isAgent) void lostAgent(); });
       const agentJoined = needsAgent ? waitForAgent(r) : Promise.resolve(true);
       await r.connect(url, token);
       if (room.current !== r) return r.disconnect();
       await r.startAudio();  // inside the Speak gesture, so the browser allows playback
       if (!monitor && room.current === r) await r.localParticipant.setMicrophoneEnabled(true);
       if (room.current !== r) return r.disconnect();  // stopped or unmounted meanwhile
-      if (!(await agentJoined)) return fail();
+      if (!(await agentJoined)) {
+        if (!generation) return fail();
+        await lostAgent();
+      }
       if (room.current !== r) return r.disconnect();
       timer = setTimeout(() => { void r.disconnect(); },ttl*1000);
       setState("live");
@@ -135,7 +147,7 @@ export function VoiceIntake({ lang, onFinal, say, generation, monitor, handler }
       )}
       {state === "live" && <p className="flex items-center gap-2 text-[15px] text-foreground"><span className="dot" data-s="live" />{partial || VOICE.hearing[lang]}</p>}
       {state === "unavailable" && <p className="text-[14px]">{VOICE.unavailable[lang]}</p>}
-      {!monitor && <p className="text-[12px] leading-5 text-muted-foreground">{generation && FRONTLINE.voicePrivacy[lang]} {VOICE.notice[lang]}</p>}
+      {!monitor && <p className="text-[12px] leading-5 text-muted-foreground">{VOICE.notice[lang]}</p>}
       <div ref={audio} hidden />
     </div>
   );

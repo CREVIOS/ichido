@@ -22,12 +22,12 @@ export async function POST(req:Request) {
   if (!verifyVoiceRequest(raw,req.headers.get("x-issued"),req.headers.get("x-job-signature"))) return reply(403,{error:"forbidden"});
   try {
     const {scope,action,seq,request_id,text} = JSON.parse(raw);
-    if (!scope || !["state","turn","play","partial","full","failure"].includes(action)) return reply(400,{error:"bad_request"});
+    if (!scope || !["state","turn","play","partial","full","failure","end"].includes(action)) return reply(400,{error:"bad_request"});
     const args = {p_scope:scope,p_seq:seq ?? null};
     if (action === "turn") {
       const state = await rpc<State>("voice_step",{...args,p_action:"state"});
       await frontlineTurn({kind:"caller",uid:scope.uid,lang:scope.lang,incident:scope.incident,voiceRoom:scope.generation,expires:null},
-        {act:"text",request_id,text,base_rev:state.rev},scope);
+        {act:"text",request_id,text,base_rev:state.rev},scope,req.signal);
     }
     if (action !== "state" && action !== "turn") {
       await rpc("voice_step",{...args,p_action:action});

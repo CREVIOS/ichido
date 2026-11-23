@@ -1,6 +1,6 @@
 import { RoomAgentDispatch, RoomConfiguration, TrackSource } from "@livekit/protocol";
 import { AccessToken, AgentDispatchClient } from "livekit-server-sdk";
-import { actorFrom, admin, priv, rpc, reply, HttpError } from "@/lib/server";
+import { actorFrom, admin, rpc, reply, HttpError } from "@/lib/server";
 import { boundedText, limitKey, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 import { roomFor } from "@/lib/speech";
@@ -30,14 +30,17 @@ export async function POST(req: Request): Promise<Response> {
   const incident = new URL(req.url).searchParams.get("incident");
   if (incident) {
     if (a.kind !== "staff" || a.role !== "operator" || a.aal !== "aal2" || !/^[a-f0-9-]{36}$/i.test(incident)) return refuse("not_monitor");
-    const turns = await rpc<{wording:string}[]>("frontline_monitor",{p_uid:a.uid,p_session:a.session,p_incident:incident});
-    const {data:b} = await priv().from("binding").select("voice_room,expires,lang").eq("incident",incident).gt("expires",new Date().toISOString()).maybeSingle().throwOnError();
-    const {data:d} = await admin.from("desk").select("text_only").eq("id",incident).is("finished_at",null).maybeSingle().throwOnError();
-    if (!turns.some(t => t.wording==="start") || !b || !d || d.text_only || !VOICE_LANGS.includes(b.lang)) return refuse("unavailable");
-    const ttl = Math.min(60,Math.floor((Date.parse(b.expires)-Date.now())/1000));
+    let grant;
+    try {
+      grant = await rpc<{generation:string; lease:string; expires:string}>("monitor_voice",{p_uid:a.uid,p_session:a.session,p_incident:incident});
+    } catch (error) {
+      if (error instanceof HttpError) return refuse("not_monitor");
+      throw error;
+    }
+    const ttl = Math.floor((Date.parse(grant.expires)-Date.now())/1000);
     if (ttl<=0) return refuse("expired");
-    const token = new AccessToken(LIVEKIT_API_KEY,LIVEKIT_API_SECRET,{identity:`op-${a.session}`,ttl});
-    token.addGrant({roomJoin:true,room:roomFor(b.voice_room),canSubscribe:true,canPublish:false,canPublishData:false,canUpdateOwnMetadata:false});
+    const token = new AccessToken(LIVEKIT_API_KEY,LIVEKIT_API_SECRET,{identity:`op-${grant.lease}`,ttl});
+    token.addGrant({roomJoin:true,room:roomFor(grant.generation),canSubscribe:true,canPublish:false,canPublishData:false,canUpdateOwnMetadata:false});
     return reply(200,{url:LIVEKIT_URL,token:await token.toJwt(),ttl});
   }
   if (a.kind !== "caller" || !a.incident || !a.lang || !a.expires || !a.voiceRoom) return refuse(a.kind === "caller" ? "unpaired" : "not_caller");
@@ -60,11 +63,13 @@ export async function POST(req: Request): Promise<Response> {
     canPublishSources: [TrackSource.MICROPHONE], canUpdateOwnMetadata: false,
   });
   let session: string | undefined;
+  let needsAgent = open.handler === "legacy";
   if (open.handler !== "legacy") {
     try {
       const lease = await rpc<{session:string;epoch:number;handler:string}>("voice_begin",{p_uid:a.uid,p_generation:a.voiceRoom,p_lang:a.lang});
       session = lease.session;
-      if (lease.handler === "ai") {
+      needsAgent = lease.handler === "ai";
+      if (needsAgent) {
         if (!process.env.AGENT_BRIDGE_SECRET) throw new Error("missing_bridge");
         const scope = {uid:a.uid,incident:a.incident,generation:a.voiceRoom,lang:a.lang,session,epoch:lease.epoch};
         const dispatch = new AgentDispatchClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
@@ -81,5 +86,5 @@ export async function POST(req: Request): Promise<Response> {
   });
   const jwt = await token.toJwt();
   log.info("voice_token", { role, incident: a.incident, status: 200, ttl_s: ttl, duration_ms: log.ms() });
-  return reply(200, { url: LIVEKIT_URL, token: jwt, session, ttl, needsAgent: open.handler === "ai" || open.handler === "legacy" });
+  return reply(200, { url: LIVEKIT_URL, token: jwt, session, ttl, needsAgent });
 }
