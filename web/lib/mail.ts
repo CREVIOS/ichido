@@ -38,6 +38,12 @@ function sender() {
   return { email: m[2] ?? m[3], name: m[1]?.trim() || MAIL.brand };
 }
 
+// A production build may use the local mail catcher only when the app itself is served from this machine.
+function onThisMachine(): boolean {
+  const url = process.env.BETTER_AUTH_URL;
+  return !!url && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname);
+}
+
 export async function sendMail(msg: Message): Promise<void> {
   const { subject, html, text } = render(msg);
   const from = sender();
@@ -50,14 +56,14 @@ export async function sendMail(msg: Message): Promise<void> {
       headers: { "api-key": brevo, "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({ sender: from, to: [{ email: msg.to }], subject, htmlContent: html, textContent: text, tags: [`auth-${msg.kind}`] }),
     });
-  } else if (mailpit && process.env.NODE_ENV !== "production") {
+  } else if (mailpit && (process.env.NODE_ENV !== "production" || onThisMachine())) {
     res = await fetch(new URL("/api/v1/send", mailpit), {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ From: { Email: from.email, Name: from.name }, To: [{ Email: msg.to }], Subject: subject, HTML: html, Text: text, Tags: [`auth-${msg.kind}`] }),
     });
   } else {
-    throw new Error("no mail transport: set BREVO_API_KEY (or MAILPIT_URL in development)");
+    throw new Error("no mail transport: set BREVO_API_KEY (or MAILPIT_URL for a server on this machine)");
   }
   if (!res.ok) {
     entry("error", "mail_failed", { code: msg.kind, status: res.status });

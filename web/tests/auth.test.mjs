@@ -284,8 +284,13 @@ test("passkey: register on the account page, then sign in with it (Chrome virtua
 
     await context.clearCookies();
     await page.goto(`${APP}/account`);
-    await page.getByRole("button", { name: AUTH.passkey }).click();
-    await page.getByRole("heading", { name: ACCOUNT.sessions }).waitFor({ timeout: 15_000 });   // the account page itself, not the sign-in screen
+    // Passkey autofill (conditional UI) may sign in by itself: the virtual authenticator approves at once, where a person
+    // would pick the passkey from the autofill list. Otherwise the button does it.
+    const account = page.getByRole("heading", { name: ACCOUNT.sessions });   // the account page itself, not the sign-in screen
+    if (!(await account.waitFor({ timeout: 4_000 }).then(() => true, () => false))) {
+      await page.getByRole("button", { name: AUTH.passkey }).click();
+      await account.waitFor({ timeout: 15_000 });
+    }
     const session = await page.evaluate(async () => (await fetch("/api/auth/get-session")).json());
     assert.equal(session.user.id, state.uid);
     assert.equal(session.session.aal, "aal2", "a user-verified passkey is a second factor");

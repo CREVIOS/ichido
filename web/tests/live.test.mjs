@@ -116,6 +116,6 @@ test("frontline sends only invalidations to the operator and bound caller", asyn
   await f.turn("start");
   for (const sub of [monitoring, mine]) {
     const message = await next(sub, (x) => x.payload.table === "frontline_turn");
-    assert.deepEqual(message.payload, { table: "frontline_turn" });
+    assert.deepEqual(Object.keys(message.payload).sort(), ["id", "table"], "no row data: Realtime's message id and the table");
   }
 });
