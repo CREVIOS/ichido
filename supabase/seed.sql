@@ -48,3 +48,10 @@ update ichido.ops_setting set value = 500 where key = 'pair_station_limit';
 -- JMA areas of the demo stations (migration 20261124020000_disaster_feeds.sql): all in Nagasaki City, west coast.
 update public.station set jma_areas = array['pref:長崎県', 'eq:長崎県南西部', 'city:長崎市', 'tsunami:長崎県西方']
   where id in ('TABLE-A', 'HOSP-A', 'CITY-A', 'RAIL-A', 'SHELTER-A');
+
+-- Printed identification at the fictional demo sites. New stations supply these when commissioned.
+update public.station s set host_org=v.host,short_address=v.place from (values
+ ('TABLE-A','出島銀行','長崎駅前 店舗外ATM'),('HOSP-A','浦上みなと病院','浦上みなと病院 1階 外来受付'),
+ ('CITY-A','出島市役所','本館1階 市民課'),('RAIL-A','みなと鉄道','浦上駅 改札横'),
+ ('SHELTER-A','稲佐小学校 避難所受付','稲佐小学校 体育館入口')
+) v(id,host,place) where s.id=v.id;
