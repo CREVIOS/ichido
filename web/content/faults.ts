@@ -439,7 +439,7 @@ export const FAULT_DESK = {
   bankDue: "連絡予定日",
   bankSave: "記録",
   bankNone: "未記録",
-  blocked: { fault: "この障害の種類では送れない返答です", flag: "お客様の申告がこの返答の条件に合いません" } as Record<string, string>,
+  blocked: { work: "担当者の依頼・受諾・移動状況がこの案内の条件を満たしていません。", fault: "この障害の種類では送れない返答です", flag: "お客様の申告がこの返答の条件に合いません" } as Record<string, string>,
 };
 
 // Timeline sentences for the events this file adds (catalogue.ts eventText falls through to here).

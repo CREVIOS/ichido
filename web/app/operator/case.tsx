@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import type { Me } from "@/components/StaffGate";
@@ -56,12 +56,15 @@ function useCase(id: string) {
 
 export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
   const { card, events, replies, job, bot } = useCase(d.id);
+  const [work, setWork] = useState<string[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
   const roster = useCallback(async () => {
     const r = await cmd<{ field: Guard[] }>("staff_list", { incident: d.id }).catch(() => null);
     setGuards(r?.field ?? []);
+    const { data } = await sb().rpc("blocked_work_replies", { p_incident: d.id });
+    setWork(data ?? []);
   }, [d.id]);
-  useLive(["field_job", "staff"], roster);
+  useLive(["field_job", "staff", "partner_work"], roster);
 
   const mine = d.operator_id === me.uid;
   const closed = Boolean(d.finished_at);
@@ -81,7 +84,7 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         <BotPanel steps={bot.steps} escalations={bot.escalations} />
         <CallerFlags flags={card?.flags ?? []} />
         <Timeline events={events} fault={d.fault} />
-        {d.operator_id && <HandoffPanel d={d} mine={mine} />}
+        {d.operator_id && <HandoffPanel key={d.id} d={d} mine={mine} />}
         {d.operator_id && atm && <BankStatusCard incident={d.id} card={card} run={run} />}
         {closed && d.status === "guided" && (
           <Panel title={DESK.record} action={<Chip>{bot.approval ? REVIEW.record.approved(bot.approval.reviewer, when(bot.approval.reviewed_at)) : bot.summary ? BOT.recordBy : DESK.recordDraft}</Chip>}>
@@ -91,14 +94,14 @@ export function CaseView({ d, me, run }: { d: Desk; me: Me; run: Run }) {
         )}
       </div>
       <aside className="flex flex-col gap-8 border-t p-5 lg:p-8 xl:border-t-0 xl:border-l">
-        <Actions d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} company={company} run={run} />
+        <Actions work={work} d={d} me={me.uid} mine={mine} closed={closed} paired={paired} lang={lang} replies={replies} job={job} guards={guards} card={card} bot={bot} company={company} run={run} />
       </aside>
     </div>
   );
 }
 
-function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card, bot, company, run }: {
-  d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
+function Actions({ work, d, me, mine, closed, paired, lang, replies, job, guards, card, bot, company, run }: {
+  work: string[]; d: Desk; me: string; mine: boolean; closed: boolean; paired: boolean; lang: Lang; replies: Reply[]; job: Job | null; guards: Guard[]; card: CallerCard | null; bot: BotState; company: string | null; run: Run;
 }) {
   const routed = bot.steps.find((s) => s.step === "route" && s.status === "done")?.data;
   if (closed) return <Panel title={DESK.closed}><p className="text-[14px]">{d.abandoned ? DESK.closedAbandoned : DESK.closedDone}</p></Panel>;
@@ -117,7 +120,7 @@ function Actions({ d, me, mine, closed, paired, lang, replies, job, guards, card
       {!paired && (d.text_only ? <DeviceCodeCard incident={d.id} station={d.station} /> : <PairCard incident={d.id} />)}
       <SuggestCard d={d} run={run} prepared={bot.prepared} step={bot.steps.find((s) => s.step === "prepare")} />
       <FaultCard d={d} flags={card?.flags ?? []} run={run} />
-      <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
+      <ReplyCard work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
       <Separator />
       <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} company={company} />
       <Separator />

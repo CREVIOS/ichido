@@ -28,14 +28,14 @@ export const SHELTER_REPLIES: Record<string, PackReply> = {
     }),
   },
   SHELTER_NEEDS: {
-    code: "S-2", title: "必要な支援の申告を共有（到着まで時間がかかる場合あり）", rule: { faults: ["shelter_needs"], ...calm },
+    code: "S-2", title: "避難所の担当者が支援依頼を受諾", rule: { faults: ["shelter_needs"], ...calm },
     text: () => ({
-      ja: "あなたが おした ことを、ひなんじょの 係の 人に つたえました。アレルギーや ハラールの 食べもの、あかちゃんの もの、車いすは、とどくまで 時間が かかる ことが あります。係の 人が なにが できるか おしえます。",
-      en: "Your taps have been passed to the shelter staff. Food for allergies, halal food, baby items or a wheelchair may take time to arrive. Staff will tell you what can be arranged.",
-      bn: "আপনার বেছে নেওয়া বিষয়গুলো আশ্রয়কেন্দ্রের কর্মীদের জানানো হয়েছে। অ্যালার্জির উপযোগী খাবার, হালাল খাবার, শিশুর জিনিস বা হুইলচেয়ার আসতে সময় লাগতে পারে। কী ব্যবস্থা করা যায়, কর্মীরা জানাবেন।",
-      vi: "Những lựa chọn của bạn đã được chuyển đến nhân viên nơi sơ tán. Đồ ăn cho người dị ứng, đồ ăn halal, đồ cho em bé hoặc xe lăn có thể cần thời gian mới đến. Nhân viên sẽ cho bạn biết có thể chuẩn bị gì.",
-      id: "Pilihan Anda sudah disampaikan kepada petugas pengungsian. Makanan untuk alergi, makanan halal, perlengkapan bayi, atau kursi roda mungkin butuh waktu untuk datang. Petugas akan memberi tahu apa yang bisa disiapkan.",
-      ne: "तपाईंले छानेका कुरा आश्रयस्थलका कर्मचारीलाई पुर्‍याइयो। एलर्जीअनुसारको खाना, हलाल खाना, शिशुका सामान वा ह्वीलचेयर आइपुग्न समय लाग्न सक्छ। के व्यवस्था गर्न सकिन्छ, कर्मचारीले बताउनुहुन्छ।",
+      ja: "ひなんじょの 係の 人が あなたの たのみを うけつけました。",
+      en: "A shelter worker has accepted your request for help.",
+      bn: "আশ্রয়কেন্দ্রের একজন কর্মী আপনার সাহায্যের অনুরোধ গ্রহণ করেছেন।",
+      vi: "Một nhân viên nơi sơ tán đã nhận yêu cầu hỗ trợ của bạn.",
+      id: "Petugas pengungsian sudah menerima permintaan bantuan Anda.",
+      ne: "आश्रयस्थलका कर्मचारीले तपाईंको सहयोगको अनुरोध स्वीकार गर्नुभएको छ।",
     }),
   },
   SHELTER_MEDICINE: {
@@ -50,14 +50,14 @@ export const SHELTER_REPLIES: Record<string, PackReply> = {
     }),
   },
   SHELTER_FAMILY: {
-    code: "S-4", title: "家族の捜索依頼を共有（災害対策本部経由で照会・災害用伝言ダイヤル171）", rule: { faults: ["shelter_family"], ...calm },
+    code: "S-4", title: "避難所の担当者が支援依頼を受諾", rule: { faults: ["shelter_family"], ...calm },
     text: () => ({
-      ja: "あなたの たのみを ひなんじょの 係の 人に つたえました。係の 人は ほかの ひなんじょとも れんらくを とります。家族に ぶじを つたえる ときは、171 に 電話して こえを のこせます。",
-      en: "Your request has been passed to the shelter staff, who contact other shelters through the disaster headquarters. To leave a 'safe' message for your family, you can call 171 (the Disaster Emergency Message Dial) or use web171.",
-      bn: "আপনার অনুরোধ আশ্রয়কেন্দ্রের কর্মীদের জানানো হয়েছে; তাঁরা দুর্যোগ সদর দপ্তরের মাধ্যমে অন্য আশ্রয়কেন্দ্রে খোঁজ নেবেন। পরিবারের জন্য 'নিরাপদ আছি' বার্তা রাখতে ১৭১ (দুর্যোগ জরুরি বার্তা ডায়াল) নম্বরে ফোন করতে বা web171 ব্যবহার করতে পারেন।",
-      vi: "Yêu cầu của bạn đã được chuyển đến nhân viên nơi sơ tán, họ sẽ liên hệ các nơi sơ tán khác qua ban chỉ huy phòng chống thiên tai. Để để lại lời nhắn 'tôi an toàn' cho gia đình, bạn có thể gọi 171 (đường dây nhắn tin khẩn cấp khi thiên tai) hoặc dùng web171.",
-      id: "Permintaan Anda sudah disampaikan kepada petugas pengungsian, yang akan menghubungi tempat pengungsian lain melalui posko bencana. Untuk meninggalkan pesan 'saya selamat' bagi keluarga, Anda bisa menelepon 171 (layanan pesan darurat bencana) atau memakai web171.",
-      ne: "तपाईंको अनुरोध आश्रयस्थलका कर्मचारीलाई पुर्‍याइयो; उहाँहरूले विपद् मुख्यालयमार्फत अरू आश्रयस्थलमा सोधखोज गर्नुहुन्छ। परिवारका लागि 'म सुरक्षित छु' सन्देश छोड्न १७१ (विपद् आपतकालीन सन्देश डायल) मा फोन गर्न वा web171 प्रयोग गर्न सक्नुहुन्छ।",
+      ja: "ひなんじょの 係の 人が あなたの たのみを うけつけました。",
+      en: "A shelter worker has accepted your request for help.",
+      bn: "আশ্রয়কেন্দ্রের একজন কর্মী আপনার সাহায্যের অনুরোধ গ্রহণ করেছেন।",
+      vi: "Một nhân viên nơi sơ tán đã nhận yêu cầu hỗ trợ của bạn.",
+      id: "Petugas pengungsian sudah menerima permintaan bantuan Anda.",
+      ne: "आश्रयस्थलका कर्मचारीले तपाईंको सहयोगको अनुरोध स्वीकार गर्नुभएको छ।",
     }),
   },
   SHELTER_INFO: {

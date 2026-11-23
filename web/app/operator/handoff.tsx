@@ -2,13 +2,13 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Link2, Sparkles } from "lucide-react";
-import { cmd } from "@/lib/supabase";
+import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Chip, Panel } from "@/components/kit";
 import { Pill } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { HANDOFF, PACKS, packOfFault, staffError } from "@/content/catalogue";
+import { PARTNER, HANDOFF, PACKS, packOfFault, staffError } from "@/content/catalogue";
 import { when, type Desk } from "./types";
 
 type Link = { id: string; recipient: string; created_at: string; expires_at: string; revoked_at: string | null; views: number };
@@ -18,15 +18,33 @@ const at = (t: string) => new Date(t).toLocaleString("ja-JP", { month: "numeric"
 export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
   const { id: incident, fault } = d;
   const RECIPIENTS = Object.keys(PACKS[packOfFault(fault)].recipients);
+  const [recipient, setRecipient] = useState("");
+  const [due, setDue] = useState("");
+  const [reference, setReference] = useState("");
+  const [preview, setPreview] = useState<[string,string][] | null>(null);
+  const [work, setWork] = useState<{ recipient: string; owner_id: string; requested_at: string | null; accepted_at: string | null; due_at: string }[]>([]);
   const [state, setState] = useState<{ links: Link[]; now: number }>({ links: [], now: 0 });
-  const load = useCallback(() => cmd<{ links: Link[] }>("handoff_list", { incident })
-    .then((r) => setState({ links: r.links, now: Date.now() })).catch(() => setState({ links: [], now: Date.now() })), [incident]);
+  const load = useCallback(async () => {
+    try {
+      const [r,w] = await Promise.all([cmd<{ links: Link[] }>("handoff_list",{ incident }),
+        sb().from("partner_work").select("*").eq("incident",incident).throwOnError()]);
+      setState({ links:r.links, now:Date.now() }); setWork(w.data ?? []);
+    } catch (e) { toast.error(staffError((e as Error).message)); }
+  },[incident]);
   const { links, now } = state;
-  useLive(["case_event"], load);
+  useLive(["case_event","partner_work"], load);
   const fail = (e: Error) => toast.error(staffError(e.message));
 
-  const create = (recipient: string) => cmd<{ path: string }>("handoff_create", { incident, recipient })
+  const deadline = () => due ? new Date(due).toISOString() : new Date(Date.now()+86400000).toISOString();
+  const inspect = (r: string) => {
+    const value = deadline();
+    setDue(value); setRecipient(r); setPreview(null);
+    return cmd<{ rows: [string,string][] }>("handoff_preview", { incident, recipient:r, due:value }).then((res) => setPreview(res.rows)).catch(fail);
+  };
+  const progress = (r: string, action: string) => cmd("partner_progress",{ incident,recipient:r,action,reference }).then(load).catch(fail);
+  const create = (recipient: string) => cmd<{ path: string }>("handoff_create", { incident, recipient, due:deadline() })
     .then(async (r) => {
+      setPreview(null);
       const url = `${location.origin}${r.path}`;
       try {
         await navigator.clipboard.writeText(url);
@@ -42,8 +60,18 @@ export function HandoffPanel({ d, mine }: { d: Desk; mine: boolean }) {
     <Panel title={HANDOFF.title}>
       <p className="max-w-2xl text-[13px] leading-5">{HANDOFF.lead}</p>
       <div className="flex flex-wrap gap-2">
-        {RECIPIENTS.map((r) => <Button key={r} variant="secondary" onClick={() => create(r)}><Link2 className="stroke-[1.5]" />{HANDOFF.create(HANDOFF.recipient[r])}</Button>)}
+        {RECIPIENTS.map((r) => <Button key={r} variant="secondary" onClick={() => inspect(r)}><Link2 className="stroke-[1.5]" />{HANDOFF.recipient[r]} · {PARTNER.preview}</Button>)}
       </div>
+      <label>{PARTNER.due} <input type="datetime-local" onChange={(e) => { setDue(e.target.value); setPreview(null); }} /></label>
+      {preview && <div className="inset p-3"><dl>{preview.map(([k,v],i) => <div key={i}><dt className="label">{k}</dt><dd>{v}</dd></div>)}</dl>
+        <Button onClick={() => create(recipient)}>{PARTNER.issue}</Button></div>}
+      {work.map((w) => <div className="flex flex-wrap items-center gap-2" key={w.recipient}>
+        <span>{HANDOFF.recipient[w.recipient]} · {at(w.due_at)} · {w.accepted_at ? PARTNER.accepted : w.requested_at ? PARTNER.sent : PARTNER.pending}</span>
+        {!w.accepted_at && mine && <>
+          {w.recipient === "railway" && w.requested_at && <input aria-label={PARTNER.ref} placeholder={PARTNER.ref} value={reference} maxLength={32} onChange={(e) => setReference(e.target.value.toUpperCase())} />}
+          <Button variant="secondary" onClick={() => progress(w.recipient,w.requested_at ? "accept" : "request")}>{w.requested_at ? PARTNER.accept : PARTNER.request}</Button>
+        </>}
+      </div>)}
       <Summary d={d} mine={mine} />
       {links.length > 0 && (
         <ul className="flex flex-col">
@@ -72,10 +100,11 @@ function Summary({ d, mine }: { d: Desk; mine: boolean }) {
   const [text, setText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [reviewed, setReviewed] = useState(false);
   const S = HANDOFF.summary;
   const fail = (e: Error) => toast.error(staffError(e.message));
   const draft = () => {
-    setBusy(true); setNote("");
+    setReviewed(false); setBusy(true); setNote("");
     cmd<{ summary: string | null }>("summary_draft", { incident: d.id })
       .then((r) => { if (r.summary) setText(r.summary); else { setNote(S.off); setText((t) => t ?? ""); } })
       .catch(fail).finally(() => setBusy(false));
@@ -96,8 +125,9 @@ function Summary({ d, mine }: { d: Desk; mine: boolean }) {
         </>
       ) : (
         <>
-          <Textarea aria-label={S.title} value={text} onChange={(e) => setText(e.target.value)} maxLength={600} className="min-h-24 text-[14px]" />
-          <span className="flex items-center gap-2"><Pill tone="neutral">{S.unsaved}</Pill><Button size="sm" className="ml-auto" disabled={!text.trim()} onClick={save}>{S.save}</Button></span>
+          <Textarea aria-label={S.title} value={text} onChange={(e) => { setText(e.target.value); setReviewed(false); }} maxLength={600} className="min-h-24 text-[14px]" />
+          <label><input type="checkbox" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)} /> {PARTNER.verify}</label>
+          <span className="flex items-center gap-2"><Pill tone="neutral">{S.unsaved}</Pill><Button size="sm" className="ml-auto" disabled={!reviewed || !text.trim()} onClick={save}>{S.save}</Button></span>
         </>
       )}
       {note && <span className="text-[12px] text-muted-foreground">{note}</span>}

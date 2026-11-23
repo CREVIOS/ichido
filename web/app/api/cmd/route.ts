@@ -4,7 +4,7 @@ import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
 import { triage } from "@/lib/triage";
 import { draftSummary, saveSummary } from "@/lib/summary";
-import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
+import { createHandoff, listHandoffs, revokeHandoff, partnerReport } from "@/lib/handoff";
 import * as training from "@/lib/training";
 import * as faults from "@/lib/faults";
 import { signSpeech } from "@/lib/speech";
@@ -95,7 +95,19 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
   // Read-only hand-off links for the bank, the police or the security company (lib/handoff.ts).
   async handoff_create(a, b) {
     const op = staff(a, "operator");
-    return createHandoff(str(b, "incident"), str(b, "recipient"), op);
+    return createHandoff(str(b, "incident"), str(b, "recipient"), op, typeof b.due === "string" ? b.due : undefined);
+  },
+
+  async handoff_preview(a, b) {
+    staff(a, "operator");
+    return { rows: await partnerReport(str(b,"incident"), str(b,"recipient"), typeof b.due === "string" ? b.due : null) };
+  },
+
+  async partner_progress(a,b) {
+    const op=staff(a,"operator");
+    await rpc("partner_progress", { p_uid:op.uid, p_name:op.name, p_incident:str(b,"incident"), p_recipient:str(b,"recipient"),
+      p_action:str(b,"action"), p_ref:typeof b.reference === "string" ? b.reference : null });
+    return {};
   },
 
   async handoff_list(a, b) {

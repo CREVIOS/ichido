@@ -49,14 +49,14 @@ export const CITY_REPLIES: Record<string, PackReply> = {
     }),
   },
   CITY_APPOINTMENT: {
-    code: "M-5", title: "通訳付き相談の予約（職員がHelp Pointで予約）", rule: {},
+    code: "M-5", title: "通訳を依頼済み・時刻は未確定", rule: {},
     text: () => ({
-      ja: "係の 人が、つうやくの 人と はなせる 時間の よやくを ここで します。この Help Point で まって いて ください。",
-      en: "Staff will book a time for you with an interpreter, here at this Help Point. Please wait here.",
-      bn: "কর্মীরা এই Help Point-এই দোভাষীর সঙ্গে কথা বলার একটি সময় ঠিক করে দেবেন। এখানে অপেক্ষা করুন।",
-      vi: "Nhân viên sẽ đặt lịch hẹn với phiên dịch viên cho bạn ngay tại Help Point này. Hãy chờ ở đây.",
-      id: "Petugas akan membuatkan janji temu dengan penerjemah untuk Anda, di Help Point ini. Silakan tunggu di sini.",
-      ne: "कर्मचारीले यही Help Point मा दोभाषेसँग कुरा गर्ने समय मिलाइदिनुहुन्छ। यहीँ पर्खनुहोस्।",
+      ja: "つうやくを たのみました。まだ 時間は きまって いません。",
+      en: "The desk has requested an interpreter. A time has not been confirmed.",
+      bn: "ডেস্ক থেকে দোভাষীর অনুরোধ করা হয়েছে। সময় এখনও ঠিক হয়নি।",
+      vi: "Quầy đã yêu cầu phiên dịch. Chưa xác nhận thời gian.",
+      id: "Meja layanan sudah meminta penerjemah. Waktunya belum pasti.",
+      ne: "कक्षले दोभाषे मागेको छ। समय अझै तोकिएको छैन।",
     }),
   },
   CITY_STAFF_COMING: {

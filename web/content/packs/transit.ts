@@ -7,6 +7,9 @@ import { SHARED_TAPS } from "./common.ts";
 import { TRANSIT_REPLIES } from "./transit-replies.ts";
 
 const taps: Record<string, Tap> = {
+  // New caller wording in all non-English locales is awaiting native review.
+  leave_soon: { staff: "まもなく出発する必要あり", label: { ja: "もうすぐ ここを でます", en: "I need to leave soon", bn: "আমাকে শিগগিরই চলে যেতে হবে", vi: "Tôi cần đi sớm", id: "Saya harus segera pergi", ne: "म छिट्टै जानुपर्छ" } },
+  share_item: { staff: "鉄道会社に品物の選択内容を共有可", label: { ja: "えらんだ ものと 場所を 駅の 人に つたえて いいです", en: "Share the item and place I selected with the railway", bn: "আমার বেছে নেওয়া জিনিস ও জায়গা রেলকে জানান", vi: "Chia sẻ đồ vật và nơi tôi chọn với nhà ga", id: "Bagikan barang dan tempat yang saya pilih kepada petugas kereta", ne: "मैले छानेको सामान र ठाउँ रेल कर्मचारीलाई बताउनुहोस्" } },
   need_way: { group: "need", suggests: "transit_way", staff: "行き先が分からないとのこと", label: { ja: "みちが わかりません", en: "I don't know the way", bn: "পথ চিনতে পারছি না", vi: "Tôi không biết đường", id: "Saya tidak tahu jalannya", ne: "बाटो थाहा छैन" } },
   need_last: { group: "need", suggests: "transit_last_train", staff: "終電に乗り遅れたとのこと", label: { ja: "さいごの 電車に のれませんでした", en: "I missed the last train", bn: "শেষ ট্রেন ধরতে পারিনি", vi: "Tôi lỡ chuyến tàu cuối", id: "Saya ketinggalan kereta terakhir", ne: "मेरो अन्तिम रेल छुट्यो" } },
   need_item: { group: "need", suggests: "transit_lost_item", staff: "忘れ物・落とし物とのこと", label: { ja: "ものを なくしました", en: "I lost something", bn: "কিছু হারিয়ে ফেলেছি", vi: "Tôi bị mất đồ", id: "Saya kehilangan barang", ne: "मेरो सामान हरायो" } },
@@ -46,11 +49,11 @@ export const TRANSIT: Pack = {
     transit_access: { staff: "移動の介助が必要（車いす等）", name: { ja: "うごくのに てつだいが ほしい（車いす など）", en: "I need help getting around (wheelchair, stairs…)", bn: "চলাফেরায় সাহায্য দরকার (হুইলচেয়ার, সিঁড়ি…)", vi: "Tôi cần hỗ trợ di chuyển (xe lăn, cầu thang…)", id: "Saya butuh bantuan bergerak (kursi roda, tangga…)", ne: "हिँडडुलमा सहयोग चाहियो (ह्वीलचेयर, भर्‍याङ…)" } },
   },
   taps,
-  common: ["need_way", "need_last", "need_item", "need_access", "need_interpreter", "helper"],
+  common: ["leave_soon", "need_way", "need_last", "need_item", "need_access", "need_interpreter", "helper"],
   bySituation: {
     transit_way: ["way_platform", "way_exit", "way_ticket"],
     transit_last_train: ["night_nowhere", "night_far"],
-    transit_lost_item: ["item_bag", "item_wallet", "item_phone", "item_card", "item_other", "item_on_train", "item_in_station"],
+    transit_lost_item: ["share_item", "item_bag", "item_wallet", "item_phone", "item_card", "item_other", "item_on_train", "item_in_station"],
     transit_access: ["acc_wheel", "acc_stairs", "acc_sight"],
   },
   replies: TRANSIT_REPLIES,

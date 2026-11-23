@@ -36,3 +36,8 @@ export function looksLikeNumber(text: string): boolean {
   }
   return false;
 }
+
+// Staff summaries can also contain contact details or a name copied from the conversation.
+export function identifyingSummary(text: string) {
+  return looksLikeNumber(text) || /(?:[\w.+-]+@[\w.-]+\.[a-z]{2,}|https?:\/\/|(?:氏名|住所|電話番号|担当者名)\s*[:：]|[一-龯ァ-ン]{2,12}(?:さん|様)(?!子)|(?:my name is|named|lives at)\s+\S+)/iu.test(text);
+}

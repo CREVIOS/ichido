@@ -3,14 +3,14 @@ import type { PackReply } from "./types.ts";
 
 export const TRANSIT_REPLIES: Record<string, PackReply> = {
   TRANSIT_GUIDE: {
-    code: "T-1", title: "駅係員がHelp Pointへ向かい案内", rule: { faults: ["transit_way", "transit_access"] },
+    code: "T-1", title: "改札で行き先を伝える", rule: { faults: ["transit_way", "transit_access"] },
     text: () => ({
-      ja: "駅の 係の 人が この Help Point に きて、いく ところまで あんない します。ここで まって いて ください。",
-      en: "Station staff are coming to this Help Point and will take you where you need to go. Please wait here.",
-      bn: "স্টেশনের কর্মী এই Help Point-এ এসে আপনাকে গন্তব্যে নিয়ে যাবেন। এখানে অপেক্ষা করুন।",
-      vi: "Nhân viên nhà ga đang đến Help Point này và sẽ đưa bạn đến nơi cần đi. Hãy chờ ở đây.",
-      id: "Petugas stasiun sedang menuju Help Point ini dan akan mengantar Anda ke tujuan. Silakan tunggu di sini.",
-      ne: "स्टेसनका कर्मचारी यो Help Point मा आएर तपाईंलाई जानुपर्ने ठाउँसम्म पुर्‍याउनुहुन्छ। यहीँ पर्खनुहोस्।",
+      ja: "かいさつで 駅の 係の 人に、いきたい ところを つたえて ください。",
+      en: "At the ticket gate, tell station staff where you want to go.",
+      bn: "টিকিট গেটে কর্মীকে বলুন কোথায় যেতে চান।",
+      vi: "Tại cổng vé, hãy nói với nhân viên nơi bạn muốn đến.",
+      id: "Di gerbang tiket, beri tahu petugas tujuan Anda.",
+      ne: "टिकट गेटमा कर्मचारीलाई जान चाहेको ठाउँ बताउनुहोस्।",
     }),
   },
   TRANSIT_LAST_TRAIN: {
@@ -44,6 +44,19 @@ export const TRANSIT_REPLIES: Record<string, PackReply> = {
       vi: "Nếu bạn làm mất thẻ cư trú, hãy trình báo tại đồn cảnh sát nhỏ (交番) hoặc đồn cảnh sát. Sau đó, trong vòng 14 ngày, hãy xin cấp thẻ mới tại Cục Xuất nhập cảnh (入管). Đừng nhập số thẻ ở đây.",
       id: "Jika kartu izin tinggal Anda hilang, laporkan ke pos polisi (交番) atau kantor polisi. Lalu, dalam 14 hari, ajukan kartu baru di kantor Imigrasi (入管). Jangan ketik nomor kartu itu di sini.",
       ne: "रेसिडेन्स कार्ड हरायो भने प्रहरी चौकी (交番) वा प्रहरी कार्यालयमा खबर गर्नुहोस्। त्यसपछि १४ दिनभित्र अध्यागमन कार्यालय (入管) मा नयाँ कार्डका लागि आवेदन दिनुहोस्। कार्डको नम्बर यहाँ नलेख्नुहोस्।",
+    }),
+  },
+  // Fictional railway catalogue. Non-English drafts await native review.
+  TRANSIT_LEAVE: {
+    code: "T-6", title: "鉄道が照会を受諾・受付番号で後日確認", offersChoice: true,
+    rule: { faults: ["transit_lost_item"], needsFlags: ["leave_soon"] },
+    text: (s) => ({
+      ja: `もう ここを でても いいです。あとで 駅の まどぐちで この 番号を みせて ください。 ${s.reference ?? "—"}`,
+      en: `You can leave now. Show this railway reference at the ticket counter to follow up: ${s.reference ?? "—"}`,
+      bn: `এখন চলে যেতে পারেন। পরে টিকিট কাউন্টারে এই রেলের রেফারেন্স দেখান: ${s.reference ?? "—"}`,
+      vi: `Bạn có thể đi. Sau đó hãy đưa mã tiếp nhận này tại quầy vé để hỏi lại: ${s.reference ?? "—"}`,
+      id: `Anda boleh pergi. Tunjukkan referensi kereta ini di loket untuk menanyakan perkembangannya: ${s.reference ?? "—"}`,
+      ne: `अब जान सक्नुहुन्छ। पछि टिकट काउन्टरमा यो रेल सन्दर्भ देखाएर सोध्नुहोस्: ${s.reference ?? "—"}`,
     }),
   },
   TRANSIT_ACCESS: {

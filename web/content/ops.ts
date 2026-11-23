@@ -185,3 +185,15 @@ export function nextFieldStep(state: string, acknowledged: string | null) {
   if (state === "arrived") return "done";
   return null;
 }
+
+export const PARTNER = {
+  preview: "共有内容を確認", issue: "この内容でリンクを作成", due: "対応期限", desk: "発行窓口", asOf: "情報の時点",
+  tentative: "仮の申告（本人未確認）", action: "依頼すること", pending: "依頼準備中", sent: "依頼連絡済み",
+  request: "相手に依頼した", accept: "相手の受諾を記録", accepted: "相手が受諾", ref: "鉄道会社の受付番号",
+  verify: "氏名・連絡先・住所など、個人を特定する情報がないことを確認しました",
+  mine: "自分が担当する未完了の外部対応", late: "期限超過", field: "現場対応", partner: "外部窓口",
+  actions: { bank: "銀行での取扱いを確認する", police: "安全対応の引継ぎを確認する", security: "現地の安全を確認する",
+    department: "受診先を確認する", medical_interpreter: "医療通訳を手配する", city_section: "担当課で手続きを確認する",
+    consult_desk: "通訳の相談を受け付ける", railway: "忘れ物の照会を受け付ける", disaster_hq: "避難所の支援を調整する", health_team: "保健師による支援を確認する",
+  } as Record<string,string>,
+};

@@ -1,5 +1,5 @@
 import "server-only";
-import { CALLER_FLAGS, FACT_STAFF, PACKS, REMOTE_RELEASE, STAFF_JA, looksLikeNumber, packOfFault, packStaffField, replyOf, type Fact, type FieldState } from "@/content/catalogue";
+import { CALLER_FLAGS, FACT_STAFF, PACKS, REMOTE_RELEASE, STAFF_JA, identifyingSummary, packOfFault, packStaffField, replyOf, type Fact, type FieldState } from "@/content/catalogue";
 import { MODEL, respond } from "@/lib/extract";
 import { admin, fail } from "@/lib/server";
 
@@ -58,14 +58,14 @@ export async function draftSummary(op: Op, incident: string) {
   try { text = out ? String((JSON.parse(out) as { summary?: unknown }).summary ?? "").trim().slice(0, MAX) : ""; }
   catch (e) { if (!(e instanceof SyntaxError)) throw e; }   // malformed output: no draft
   // A draft that carries anything number-like is dropped, never shown.
-  if (!text || looksLikeNumber(text)) return { summary: null };
+  if (!text || identifyingSummary(text)) return { summary: null };
   return { summary: text, model: MODEL() };
 }
 
 export async function saveSummary(op: Op, incident: string, text: unknown) {
   await ownCase(op, incident);
   if (typeof text !== "string" || !text.trim() || text.length > 600) fail(400, "bad_request");
-  if (looksLikeNumber(text as string)) return { withheld: true };
+  if (identifyingSummary(text as string)) return { withheld: true };
   await admin.from("desk").update({ ai_summary: (text as string).trim(), ai_summary_by: op.name, ai_summary_at: new Date().toISOString() })
     .eq("id", incident).eq("operator_id", op.uid).throwOnError();
   return {};

@@ -47,8 +47,8 @@ export function PairCard({ incident }: { incident: string }) {
 // practice: the training console, where the held-card rule is scored in the debrief instead of hinted here.
 // flags: the caller's own taps, which some replies need (content/faults.ts REPLY_RULES). Only the case's pack's
 // replies are listed (content/packs).
-export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [] }: {
-  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; flags?: string[];
+export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [], work = [] }: {
+  d: Pick<Desk, "id" | "confirmed_rev" | "card_back" | "remote_release"> & { fault?: string }; lang: Lang; replies: Reply[]; run: Run; bundleTo?: Guard; practice?: boolean; work?: string[]; flags?: string[];
 }) {
   const INTENTS = intentsOf(packOfFault(d.fault ?? DEVICE_FAULT));
   const [intent, setIntent] = useState(INTENTS[0]);
@@ -57,7 +57,7 @@ export function ReplyCard({ d, lang, replies, run, bundleTo, practice, flags = [
   // Mirrors the server rules: "card is still inside" only when the caller confirmed it and no release succeeded,
   // and each reply only for its own fault types and caller statements.
   const ctx = { fault: d.fault ?? DEVICE_FAULT, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release };
-  const blockOf = (k: string) => replyBlock(k, REPLIES[k].needsHeld, ctx);
+  const blockOf = (k: string) => work.includes(k) ? "work" : replyBlock(k, REPLIES[k].needsHeld, ctx);
   const block = blockOf(intent);
   const blocked = block === "awaiting" ? DESK.reply.awaiting
     : practice || !block ? "" : block === "held" ? DESK.reply.mismatch : FAULT_DESK.blocked[block];

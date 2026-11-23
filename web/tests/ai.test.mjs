@@ -164,7 +164,7 @@ test("the hand-off summary is drafted from the record only, reviewed, saved, and
 
   const { path } = await ok(cmd(op, "handoff_create", { incident, recipient: "medical_interpreter" }));
   const html = await (await fetch(`${APP}${path}`)).text();
-  assert.ok(html.includes(HANDOFF.doc.aiSummary), "marked as an AI draft reviewed by the operator");
+  assert.ok(!html.includes(d.ai_summary), "medical interpreters see only the fields needed to interpret");
   assert.ok(!html.includes(d.ai_summary_by), "the reviewer's name stays inside");
   await ok(cmd(op, "abandon", { incident }));
 });

@@ -56,7 +56,8 @@ export async function runTool(name: string, ctx: Ctx): Promise<unknown> {
     }
     case "list_replies": {
       const { data: c } = await db.from("caller_card").select("flags").eq("id", ctx.incident).maybeSingle();
-      return eligibleReplies(d, c?.flags ?? []);
+      const { data: blocked } = await db.rpc("blocked_work_replies", { p_incident: ctx.incident }).throwOnError();
+      return eligibleReplies(d, c?.flags ?? []).map((r) => blocked?.includes(r.intent) ? { ...r, eligible: false, why_not: "required responder or partner action is pending" } : r);
     }
     case "list_guards": {
       const { data, error } = await db.rpc("available_responders", { p_incident: ctx.incident });

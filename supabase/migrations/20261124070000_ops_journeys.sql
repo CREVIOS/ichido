@@ -100,7 +100,7 @@ begin
   select * into c from public.caller_card where id = p_incident for update;
   select intent into i from public.reply where id = c.reply_id;
   select fault, remote_release is not distinct from 'released' into f, released from public.desk where id = p_incident;
-  if i is null or (ichido.reply_ok(i, f, c.flags) and not (released and i = 'HELD_WAIT_OR_LEAVE')) then return; end if;
+  if i is null or (ichido.reply_ok(i, f, c.flags) and ichido.work_fits(p_incident,i) and not (released and i = 'HELD_WAIT_OR_LEAVE')) then return; end if;
   update public.caller_card set notice = 'guidance_changed', notice_at = now(), reply_id = null, choice = null, teachback = null, teachback_ja = null,
          teachback_reply = null, teachback_result = null where id = p_incident;
   perform ichido.event(p_incident, 'system', 'reply_withdrawn', jsonb_build_object('intent', i));
@@ -126,7 +126,8 @@ begin
   if p_needs_held and (d.card_back <> 'no' or d.remote_release = 'released') then perform ichido.fail('conflict'); end if;
   select * into st from public.station where id = d.station;
   insert into public.reply (incident, intent, slots, manual_version, operator_id)
-    values (d.id, p_intent, jsonb_build_object('branch', st.branch, 'hours', st.counter_hours), p_manual, p_uid)
+    values (d.id, p_intent, jsonb_build_object('branch', st.branch, 'hours', st.counter_hours) || case when p_intent='TRANSIT_LEAVE'
+      then jsonb_build_object('reference',(select railway_ref from public.partner_work where incident=d.id and recipient='railway')) else '{}'::jsonb end, p_manual, p_uid)
     returning id into r;
   -- New guidance supersedes any earlier choice and teach-back.
   update public.caller_card set notice = case when notice <> 'guidance_changed' then notice end, reply_id = r, choice = null, teachback = null, teachback_ja = null, teachback_reply = null, teachback_result = null
@@ -291,3 +292,99 @@ create trigger live_update after update on ichido.staff referencing new table as
 drop policy if exists live_roster_read on realtime.messages;
 create policy live_roster_read on realtime.messages for select to authenticated
   using (extension='broadcast' and realtime.topic()='live:staff' and ichido.has_role('operator'));
+
+create table if not exists public.partner_work (
+  incident uuid not null references public.desk on delete cascade,
+  recipient text not null, owner_id uuid not null references ichido.staff,
+  due_at timestamptz not null, requested_at timestamptz, accepted_at timestamptz, railway_ref text,
+  primary key(incident,recipient)
+);
+alter table public.partner_work enable row level security;
+revoke all on public.partner_work from public,anon,authenticated;
+grant select on public.partner_work to authenticated;
+grant all on public.partner_work to service_role;
+drop policy if exists partner_ops on public.partner_work;
+create policy partner_ops on public.partner_work for select to authenticated using (ichido.has_role('operator'));
+drop trigger if exists live_update on public.partner_work;
+create trigger live_update after update on public.partner_work referencing new table as new_rows for each statement execute function ichido.live_send();
+drop trigger if exists live_insert on public.partner_work;
+create trigger live_insert after insert on public.partner_work referencing new table as new_rows for each statement execute function ichido.live_send();
+drop policy if exists live_partner on realtime.messages;
+create policy live_partner on realtime.messages for select to authenticated using
+  (extension='broadcast' and realtime.topic()='live:partner_work' and ichido.has_role('operator'));
+
+create or replace function public.prepare_handoff(p_uid uuid,p_incident uuid,p_hash text,p_recipient text,p_due timestamptz)
+returns table(id uuid, expires_at timestamptz) language plpgsql security definer set search_path='' as $$
+begin
+  if p_due is null or p_due<=now() or p_due>now()+interval '30 days' then perform ichido.fail('bad_request'); end if;
+  return query select h.id,h.expires_at from public.create_handoff(p_uid,p_incident,p_hash,p_recipient) h;
+  insert into public.partner_work(incident,recipient,owner_id,due_at)
+    select d.id,p_recipient,coalesce(d.operator_id,p_uid),p_due from public.desk d where d.id=p_incident
+    on conflict(incident,recipient) do nothing;
+end $$;
+create or replace function public.partner_progress(p_uid uuid,p_name text,p_incident uuid,p_recipient text,p_action text,p_ref text)
+returns void language plpgsql security definer set search_path='' as $$
+declare w public.partner_work;
+begin
+  perform 1 from public.desk where id=p_incident for update;
+  select * into w from public.partner_work where incident=p_incident and recipient=p_recipient for update;
+  if not found or w.owner_id<>p_uid or not exists(select from ichido.staff where uid=p_uid and role='operator') then perform ichido.fail('forbidden'); end if;
+  if p_action='request' and w.requested_at is null then
+    update public.partner_work set requested_at=now() where incident=w.incident and recipient=w.recipient;
+  elsif p_action='accept' and w.requested_at is not null and w.accepted_at is null then
+    if p_recipient='railway' and (p_ref is null or p_ref !~ '^[A-Z0-9][A-Z0-9-]{1,31}$') then perform ichido.fail('bad_request'); end if;
+    update public.partner_work set accepted_at=now(), railway_ref=case when p_recipient='railway' then p_ref end
+      where incident=w.incident and recipient=w.recipient;
+  else perform ichido.fail('conflict'); end if;
+  perform ichido.event(p_incident,'operator','partner_' || p_action,jsonb_build_object('recipient',p_recipient),p_name);
+end $$;
+revoke all on function public.prepare_handoff(uuid,uuid,text,text,timestamptz),public.partner_progress(uuid,text,uuid,text,text,text) from public,anon,authenticated;
+grant execute on function public.prepare_handoff(uuid,uuid,text,text,timestamptz),public.partner_progress(uuid,text,uuid,text,text,text) to service_role;
+
+alter table public.caller_card add column if not exists confirmed_flags text[] not null default '{}';
+create or replace function ichido.snapshot_flags() returns trigger language plpgsql set search_path='' as $$
+begin
+  new.confirmed_flags:=case when new.confirmed_rev is null then '{}'::text[] else new.flags end;
+  return new;
+end $$;
+create or replace trigger snapshot_flags before update of confirmed_rev on public.caller_card for each row execute function ichido.snapshot_flags();
+
+insert into ichido.reply_rule(intent,pack,faults,needs_flags) values ('TRANSIT_LEAVE','transit','{transit_lost_item}','{leave_soon}') on conflict do nothing;
+
+create or replace function ichido.work_fits(i uuid,intent text) returns boolean language sql stable security definer set search_path='' as $$
+ select case
+ when intent in ('HOSP_STAFF_COMING','CITY_STAFF_COMING','SHELTER_STAFF_COMING','TRANSIT_ACCESS')
+   then exists(select from public.field_job where incident=i and state='on_way' and declined_at is null and not case_closed)
+ when intent in ('SHELTER_NEEDS','SHELTER_FAMILY')
+   then exists(select from public.field_job where incident=i and acknowledged_at is not null and declined_at is null and not case_closed)
+ when intent in ('HOSP_INTERPRETER','CITY_APPOINTMENT')
+   then exists(select from public.partner_work where incident=i and recipient=case intent when 'HOSP_INTERPRETER' then 'medical_interpreter' else 'consult_desk' end and requested_at is not null)
+ when intent='TRANSIT_LEAVE' then exists(select from public.partner_work where incident=i and recipient='railway' and accepted_at is not null and railway_ref is not null)
+ else true end
+$$;
+revoke all on function ichido.work_fits(uuid,text) from public,anon,authenticated;
+create or replace function ichido.reply_allowed() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare f text; fl text[];
+begin
+  select d.fault, c.flags into f, fl from public.desk d left join public.caller_card c on c.id = d.id where d.id = new.incident;
+  if not ichido.work_fits(new.incident,new.intent) or not ichido.reply_ok(new.intent, f, fl) then perform ichido.fail('conflict'); end if;
+  return new;
+end $$;
+
+create or replace function ichido.check_field_reply() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+  if old.generation<>new.generation or old.state<>new.state or old.declined_at is distinct from new.declined_at then
+    perform ichido.withdraw_unfit_reply(new.incident);
+  end if;
+  return null;
+end $$;
+create or replace trigger check_field_reply after update on public.field_job for each row execute function ichido.check_field_reply();
+
+create or replace function public.blocked_work_replies(p_incident uuid) returns text[]
+language sql stable security definer set search_path='' as $$
+  select coalesce(array_agg(r.intent),'{}') from ichido.reply_rule r where
+    (auth.role()='service_role' or ichido.has_role('operator')) and not ichido.work_fits(p_incident,r.intent)
+$$;
+revoke all on function public.blocked_work_replies(uuid) from public,anon,authenticated;
+grant execute on function public.blocked_work_replies(uuid) to authenticated,service_role;

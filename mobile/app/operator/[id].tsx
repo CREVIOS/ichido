@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { sb, cmd } from "@/lib/supabase";
@@ -36,6 +36,7 @@ function CaseView({ me }: { me: Me }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [job, setJob] = useState<Job | null>(null);
+  const [work, setWork] = useState<string[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
   const [error, setError] = useState("");
 
@@ -60,8 +61,10 @@ function CaseView({ me }: { me: Me }) {
   const roster = useCallback(async () => {
     const r = await cmd<{ field: Guard[] }>("staff_list", { incident: id }).catch(() => null);
     setGuards(r?.field ?? []);
+    const { data } = await sb().rpc("blocked_work_replies", { p_incident: id });
+    setWork(data ?? []);
   }, [id]);
-  useLive(["field_job", "staff"], roster);
+  useLive(["field_job", "staff", "partner_work"], roster);
 
   const run: Run = (name, body = {}) =>
     cmd(name, body).then((r) => { setError(""); load(); return r; }).catch((e: Error) => { setError(errorJa(e.message)); load(); });
@@ -114,7 +117,7 @@ function CaseView({ me }: { me: Me }) {
           {packOfFault(d.fault) === "atm" && <Button label={d.fraud_at ? OPS.fraud.safe : OPS.fraud.warn} onPress={() => run(d.fraud_at ? "fraud_safe" : "fraud", { incident: d.id })} />}
           {card?.notice === "guidance_changed" && <Notice>{OPS.fraud.replacement}</Notice>}
           <SuggestCard d={d} run={run} />
-          <ReplyCard d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
+          <ReplyCard work={work} d={d} lang={lang} replies={replies} run={run} flags={card?.flags ?? []} />
           {job && <Notice>{job.declined_at ? SHIFT.declined : job.acknowledged_at ? SHIFT.accepted : SHIFT.unack}{job.provider_at && ` · ${SHIFT.provider}`}{job.help_at && ` · ${SHIFT.helpNeeded}`}</Notice>}
           <DispatchCard d={d} job={job} guards={guards} card={card} lang={lang} run={run} />
         </>
@@ -230,14 +233,14 @@ function PairCard({ incident }: { incident: string }) {
   );
 }
 
-function ReplyCard({ d, lang, replies, run, flags }: { d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
+function ReplyCard({ work, d, lang, replies, run, flags }: { work: string[]; d: Desk; lang: Lang; replies: Reply[]; run: Run; flags: string[] }) {
   // Only the case's pack's replies (content/packs).
   const intents = intentsOf(packOfFault(d.fault));
   const [intent, setIntent] = useState(intents[0]);
   const r = replyOf(intent) ?? REPLIES[intents[0]];
   const preview = r.text(replies.at(-1)?.slots ?? {});
   // Mirrors the server rules (web/content/faults.ts replyBlock): the held-card rule and each reply's fault types and caller taps.
-  const block = replyBlock(intent, r.needsHeld, { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release });
+  const block = work.includes(intent) ? "work" : replyBlock(intent, r.needsHeld, { fault: d.fault, flags, confirmed: d.confirmed_rev != null, card_back: d.card_back, remote_release: d.remote_release });
   const blocked = block === "awaiting" ? O.waitConfirm
     : block === "held" ? O.heldMismatch : block ? FAULT_DESK.blocked[block] : "";
   return (

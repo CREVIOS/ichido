@@ -124,7 +124,7 @@ export function etaText(eta: string | null | undefined, lang: Lang): string {
 }
 
 // Slots are filled on the server from the station row, per language.
-export type ReplySlots = { branch?: L10n; hours?: L10n };
+export type ReplySlots = { reference?: string; branch?: L10n; hours?: L10n };
 // needsHeld: the wording says the card is still inside, so the server sends it only when the caller
 // confirmed the card did not come back and no remote release succeeded.
 type Reply = { code: string; title: string; text: (s: ReplySlots) => L10n; offersChoice?: boolean; needsHeld?: boolean };
