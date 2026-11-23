@@ -105,7 +105,7 @@ const EMERGENCY = new Set(["32", "33", "35", "36", "37", "38"]);
 // The bulletin types worth fetching, from the feed entry's URL (…_VXSE53_010000.xml). Warnings only from the
 // Nagasaki Local Meteorological Office (420000).
 export function wantedBulletin(url: string): boolean {
-  return /_(VXSE51|VXSE53|VTSE41)_\d{6}\.xml$/.test(url) || /_VPWW54_420000\.xml$/.test(url);
+  return /_(VXSE51|VXSE53|VTSE41)_\d{6}\.xml$/.test(url) || url.endsWith("_VPWW54_420000.xml");
 }
 
 const xml = new XMLParser({
