@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { APP, staff, caller, cmd, ok } from "./helpers.mjs";
 import {
-  CONTENT_PACKS, FAULTS, LANGS, PACKS, REPLIES, REPLY_RULES, callerPack, defaultSituation, flagsFor, intentsOf, packOfFault, replyBlock, replyOf, situationsOf,
+  CALLER_FLAGS, PARTNER, CONTENT_PACKS, FAULTS, LANGS, PACKS, REPLIES, REPLY_RULES, callerPack, defaultSituation, flagsFor, intentsOf, packOfFault, replyBlock, replyOf, situationsOf,
 } from "../content/catalogue.ts";
 
 const service = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false } });
@@ -95,6 +95,14 @@ for (const p of CONTENT_PACKS) {
 
     // Hand-off only to the pack's own recipients; the record names the pack.
     assert.equal((await cmd(op, "handoff_create", { incident, recipient: "bank" })).status, 400);
+    if (p.id === "hospital") {
+      await ok(cmd(who,"flag",{ flag:"need_pay",on:true }));
+      await ok(cmd(who,"flag",{ flag:"need_interpreter",on:true }));
+      const { rows } = await ok(cmd(op,"handoff_preview",{ incident,recipient:path.recipient }));
+      assert.ok(rows.some(([label,value]) => label === PARTNER.tentative && value.includes(CALLER_FLAGS.need_interpreter.staff)));
+      assert.ok(!JSON.stringify(rows).includes(CALLER_FLAGS.need_pay.staff));
+      assert.deepEqual((await ok(cmd(op,"handoff_list",{ incident }))).links,[],"a preview issues no link");
+    }
     const { path: link } = await ok(cmd(op, "handoff_create", { incident, recipient: path.recipient }));
     const page = await (await fetch(`${APP}${link}`)).text();
     assert.ok(page.includes(PACKS[p.id].name.staff), "the hand-off record names the pack");

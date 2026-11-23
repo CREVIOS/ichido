@@ -111,7 +111,11 @@ test("finishing an in-progress guard assignment after abandonment retires its re
   const guard = await staff("guard1@ichido.demo");
   const station = randomUUID();
   await admin.from("station").insert({ id: station, label: {}, branch: {}, counter_hours: {}, security_company: "test" }).throwOnError();
+  const profile = admin.schema("ichido").from("staff");
+  const { data: prior } = await profile.select("duty_station,duty_function,available").eq("uid",guard.uid).single().throwOnError();
+  await profile.update({ duty_station:station,duty_function:"atm",available:true }).eq("uid",guard.uid).throwOnError();
   t.after(async () => {
+    await profile.update(prior).eq("uid",guard.uid).throwOnError();
     await admin.from("desk").delete().eq("station", station).throwOnError();
     await admin.from("light").delete().eq("station", station).throwOnError();
     await admin.from("station").delete().eq("id", station).throwOnError();

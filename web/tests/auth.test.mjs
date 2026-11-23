@@ -71,6 +71,9 @@ test("invite → email link sets the password (verifies the address) → forced 
   const invited = await adminApi(admin.jar, "invite", { email, name, role: "operator" });
   assert.equal(invited.status, 200, JSON.stringify(invited.body));
   state.uid = invited.body.id;
+  const invitation = async () => (await adminApi(admin.jar,"users")).body.users.find((u) => u.id === state.uid);
+  assert.equal((await invitation()).delivery,"invite_sent");
+  assert.equal((await invitation()).notifications,false);
   assert.equal((await adminApi(admin.jar, "invite", { email, name, role: "operator" })).body.error, "exists");
 
   // No password yet: signing in gives the same answer as a wrong password.
@@ -107,6 +110,8 @@ test("invite → email link sets the password (verifies the address) → forced 
   const s2 = await (await fetch(`${APP}/api/auth/get-session`, { headers: { cookie: j.header() } })).json();
   assert.equal(s2.session.aal, "aal2");
   assert.equal(s2.user.twoFactorEnabled, true);
+  assert.equal((await invitation()).totp,true);
+  assert.equal((await invitation()).verified,true);
 
   // The minted token: short, aal2, this session; PostgREST reads as this operator.
   const minted = await mint(j);

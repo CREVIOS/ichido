@@ -163,5 +163,5 @@ test("accepting sends the stored suggestion through the operator's own commands,
   const [ev] = await events(op, incident, "record_approved");
   assert.deepEqual(ev.data, {}, "the timeline never carries the note");
   assert.equal(await item(op, incident, "record"), undefined);
-  await ok(cmd(g, "field", { incident, generation: job.generation, state: "done" }));
+  await ok(cmd(g, "field", { incident, generation: job.generation, state: "correct_done" }));
 });

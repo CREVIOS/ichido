@@ -25,6 +25,7 @@ const until = async (what, f, ms = 15000) => {
 
 // The stub records every request; Expo answers with a ticket per message (DeviceNotRegistered for "gone" tokens).
 const seen = [];
+const refuseOnce = new Set();
 let server;
 before(async () => {
   if (!configured) return;
@@ -36,6 +37,7 @@ before(async () => {
       seen.push({ path: req.url, headers: req.headers, body });
       if (req.url === "/expo/push") {
         const msgs = JSON.parse(body.toString());
+        if (msgs.some((m) => refuseOnce.delete(m.to))) return res.writeHead(503).end();
         res.writeHead(200, { "content-type": "application/json" });
         return res.end(JSON.stringify({ data: msgs.map((m) => (m.to.includes("gone") ? { status: "error", details: { error: "DeviceNotRegistered" } } : { status: "ok", id: randomBytes(4).toString("hex") })) }));
       }
@@ -70,7 +72,9 @@ test("subscriptions: own rows only under RLS, refused without a session that rec
   const theirs = browser();
   await ok(cmd(op, "push_subscribe", mine.sub));
   await ok(cmd(op2, "push_subscribe", theirs.sub));
-  assert.equal(typeof (await ok(cmd(op, "push_key"))).key, "string");
+  const ready = await ok(cmd(op,"push_key"));
+  assert.equal(typeof ready.key,"string");
+  assert.equal(ready.endpoint,mine.sub.endpoint);
 
   const { data: rows } = await op.c.from("push_subscription").select("uid, endpoint");
   assert.ok(rows.length >= 1 && rows.every((r) => r.uid === op.uid), "an operator reads only their own subscriptions");
@@ -124,6 +128,7 @@ test("a new case goes to operators on duty only, a field job only to its guard, 
   assert.equal(newCase.url, `/operator#${incident}`);
   assert.deepEqual(Object.keys(newCase).sort(), ["body", "path", "tag", "title", "url"]);
 
+  refuseOnce.add(g1Expo);
   await ok(cmd(op, "assign", { incident, assignee: g1.uid }));
   const job = await until("field job push", () => g1b.received().find((m) => m.tag === `field_job:${incident}`));
   assert.equal(job.url, `/field?job=${incident}`);
@@ -131,7 +136,14 @@ test("a new case goes to operators on duty only, a field job only to its guard, 
   assert.deepEqual(expo.data, { path: `/field?job=${incident}` });
   assert.equal(seen.find((r) => r.path === "/expo/push").headers["content-type"], "application/json");
 
-  await flush();
+  await until("retry of the rejected Expo request",async () => {
+    await flush();
+    return seen.filter((r) => r.path === "/expo/push" && JSON.parse(r.body).some((m) => m.to === g1Expo)).length === 2;
+  },25000);
+  assert.equal(g1b.received().filter((m) => m.tag === `field_job:${incident}`).length,1,"accepted browser subscription was not retried");
+  const delivery = await op.c.from("field_job").select("provider_at,acknowledged_at").eq("incident",incident).single().throwOnError();
+  assert.ok(delivery.data.provider_at);
+  assert.equal(delivery.data.acknowledged_at,null);
   for (const [who, b] of [["guard1", g1b], ["guard2", g2b], ["manager", mb]]) {
     assert.ok(!b.received().some((m) => m.tag === `new_case:${incident}`), `${who} gets no new-case push`);
   }

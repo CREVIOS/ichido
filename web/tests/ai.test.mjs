@@ -157,7 +157,8 @@ test("the hand-off summary is drafted from the record only, reviewed, saved, and
   await stub.script("summary", { summary: "カード番号 4980-1234-5678 を確認しました。" });
   assert.equal((await ok(cmd(op, "summary_draft", { incident }))).summary, null);
   assert.equal((await ok(cmd(op, "summary_save", { incident, text: "番号 4980 1234 5678" }))).withheld, true);
-  await ok(cmd(op, "summary_save", { incident, text: `${summary}（確認済み）` }));
+  assert.equal((await cmd(op,"summary_save",{ incident,text:summary })).status,400);
+  await ok(cmd(op, "summary_save", { incident, checked:true, text: `${summary}（確認済み）` }));
   const { data: d } = await op.c.from("desk").select("ai_summary, ai_summary_by").eq("id", incident).single();
   assert.equal(d.ai_summary, `${summary}（確認済み）`);
   assert.ok(d.ai_summary_by);
