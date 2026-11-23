@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, isFault, packOfFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
+import { MANUAL_VERSION, LANGS, ETA_OPTIONS, CHOICE_INTENTS, FACT_KEYS, contentPack, isFault, packOfFault, replyOf, looksLikeNumber, readBackText, type Fact, type Lang } from "@/content/catalogue";
 import { extract, toJapanese } from "@/lib/extract";
 import { suggest } from "@/lib/decide";
+import { triage } from "@/lib/triage";
+import { draftSummary, saveSummary } from "@/lib/summary";
 import { createHandoff, listHandoffs, revokeHandoff } from "@/lib/handoff";
 import * as training from "@/lib/training";
 import * as faults from "@/lib/faults";
@@ -83,6 +85,10 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     await event(incident, "agent", "suggested", { intent: s.intent, dispatch: s.dispatch, guard: s.guard?.name ?? null, fraud: s.fraud, model: s.model });
     return { suggestion: s };
   },
+
+  // An AI draft of the staff-facing summary, from the case record only; the operator edits it and saves it (lib/summary.ts).
+  summary_draft: (a, b) => draftSummary(staff(a, "operator"), str(b, "incident")),
+  summary_save: (a, b) => saveSummary(staff(a, "operator"), str(b, "incident"), b.text),
 
   // Read-only hand-off links for the bank, the police or the security company (lib/handoff.ts).
   async handoff_create(a, b) {
@@ -194,11 +200,14 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (!cur || b.base_rev !== cur.rev) fail(409, "conflict");
     const text = typeof b.text === "string" ? b.text.trim().slice(0, MAX_TEXT) : "";
     if (text && looksLikeNumber(text)) return { withheld: true };
-    // Only the ATM has facts to extract and read back; any other pack's caller answers with taps, and their words
-    // are kept as they are for the person who decides.
-    const atm = packOfFault(desk?.fault) === "atm";
+    // The ATM has two facts to extract and read back. Any other pack's caller answers with taps; their words are
+    // kept as they are, and the model only suggests the pack's situation and taps for the caller to confirm (lib/triage.ts).
+    const pack = contentPack(desk?.fault);
+    const atm = !pack;
     if (!atm && (b.card_back !== undefined || b.cash_received !== undefined)) fail(400, "bad_request");
     const patch = text && atm ? await extract(text, lang, { card_back: cur!.card_back, cash_received: cur!.cash_received }) : null;
+    // A failed triage leaves the caller with the taps, as without a model.
+    const read = text && pack ? await triage(text, lang, pack).catch(() => null) : null;
     const pickFact = (k: (typeof FACT_KEYS)[number]): Fact | null => {
       const v = b[k];
       if (v === "yes" || v === "no" || v === "unknown") return v;
@@ -210,6 +219,7 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     const rev = await rpc<number>("cmd_draft", {
       p_uid: c.uid, p_rev: cur!.rev, p_card: card, p_cash: cash, p_words: text || null, p_clarify: Boolean(patch?.clarify) && !tapped,
     });
+    if (read) await admin.from("draft").update({ triage: read }).eq("incident", incident).eq("rev", rev).throwOnError();
     const said = atm ? readBackText(lang, { card_back: card ?? cur!.card_back, cash_received: cash ?? cur!.cash_received }) : null;
     return { rev, say: said && c.voiceRoom ? signSpeech(c.voiceRoom, c.uid, said) : null };
   },
@@ -219,6 +229,9 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
     if (typeof b.rev !== "number") fail(400, "bad_request");
     await rpc("cmd_confirm", { p_uid: c.uid, p_rev: b.rev });
     // The words stay in the caller's language; staff get a labelled machine translation beside them.
+    // The model's suggestion, as codes, labelled for the operator; what the caller tapped is what counts.
+    const { data: dr } = await admin.from("draft").select("triage").eq("incident", c.incident!).eq("rev", b.rev).maybeSingle();
+    if (dr?.triage) await admin.from("desk").update({ triage: dr.triage }).eq("id", c.incident!).eq("confirmed_rev", b.rev);
     const { data: d } = await admin.from("desk").select("id, lang, caller_words").eq("id", c.incident!).single();
     if (d?.caller_words && d.lang !== "ja") {
       const ja = await toJapanese(d.caller_words);

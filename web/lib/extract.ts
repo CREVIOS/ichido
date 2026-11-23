@@ -26,20 +26,31 @@ const SCHEMA = {
 
 export type Patch = { card_back: Fact | "unchanged"; cash_received: Fact | "unchanged"; clarify: boolean };
 
-const MODEL = () => process.env.OPENAI_MODEL ?? "gpt-6.1-terra";
+export const MODEL = () => process.env.OPENAI_MODEL ?? "gpt-6.1-terra";
+// Tests point this at a local stub of the Responses API; production uses the official endpoint.
+export const OPENAI_URL = () => `${process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"}/responses`;
 
-// One call to the Responses API; returns the model's output text, or null when it gave none.
-export async function respond(key: string, body: Record<string, unknown>): Promise<string | null> {
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST", redirect: "error", signal: AbortSignal.timeout(20_000),
+type Output = { type: string; content?: { type: string; text?: string }[] }[];
+export type Response = { output?: Output };
+
+// One call to the Responses API; returns the whole response (tool calls, MCP calls and messages).
+export async function responses(key: string, body: Record<string, unknown>, timeoutMs = 20_000): Promise<Response> {
+  const res = await fetch(OPENAI_URL(), {
+    method: "POST", redirect: "error", signal: AbortSignal.timeout(timeoutMs),
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({ model: MODEL(), max_output_tokens: 1200, store: false, ...body }),
   });
   if (!res.ok) throw new Error(`openai: HTTP ${res.status}`);
-  const json = (await res.json()) as { output?: { type: string; content?: { type: string; text?: string }[] }[] };
-  const text = json.output?.flatMap((o) => (o.type === "message" ? o.content ?? [] : [])).find((c) => c.type === "output_text")?.text;
-  return typeof text === "string" ? text : null;
+  return (await res.json()) as Response;
 }
+
+export const outputText = (r: Response): string | null => {
+  const text = r.output?.flatMap((o) => (o.type === "message" ? o.content ?? [] : [])).find((c) => c.type === "output_text")?.text;
+  return typeof text === "string" ? text : null;
+};
+
+// One call; returns the model's output text, or null when it gave none.
+export const respond = async (key: string, body: Record<string, unknown>) => outputText(await responses(key, body));
 
 export async function extract(text: string, lang: string, current: { card_back: Fact; cash_received: Fact }): Promise<Patch | null> {
   const key = process.env.OPENAI_API_KEY;
