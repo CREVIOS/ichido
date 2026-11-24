@@ -113,6 +113,7 @@ class FrontlineAgent(Agent):
         self.user_speaking = False
         self.turn_task = None
         self.end_of_speech = None
+        self.closing = None
 
     async def on_user_turn_completed(self, turn_ctx, new_message):
         # The SDK skips the default reply pipeline without an LLM. Invoke our server node on the final only.
@@ -135,6 +136,11 @@ class FrontlineAgent(Agent):
         try:
             result = await self.request("turn", request_id=request_id, text=message.text_content)
             speech = result.get("say")
+            if result.get("final"):
+                # The case went to a person and this voice lease is over: say the signed hand-off once, then leave.
+                self.closing = asyncio.ensure_future(self.farewell(speech))
+                await self.closing
+                return
             if speech and generation != self.interruptions:
                 await self.request("partial", seq=speech["seq"])
             elif speech:
@@ -154,10 +160,21 @@ class FrontlineAgent(Agent):
                     task.add_done_callback(played)
                 await asyncio.sleep(0.4 if self.pending_speech else 0.8)
         except (aiohttp.ClientError, TimeoutError):
+            if self.closing is not None:
+                await asyncio.wait({self.closing}, timeout=20)   # let the hand-off finish before the session ends
             self.interrupt()
             if self.turn_task:
                 self.turn_task.cancel()
             ctx.shutdown("voice grant ended")
+
+    async def farewell(self, envelope):
+        text = signed_text("case-" + self.scope["generation"], "c-" + self.scope["uid"], json.dumps(envelope or {}), self.seen, self.scope)
+        if not text:
+            return
+        try:
+            await self.session.say(text, allow_interruptions=False, add_to_chat_ctx=False).wait_for_playout()
+        except (RuntimeError, OSError):
+            log.warning("farewell_failed", extra={"event": "farewell_failed"})
 
     def interrupt(self):
         self.interruptions += 1
@@ -236,8 +253,12 @@ def make_tts(locale: str) -> elevenlabs.TTS:
 
 
 def turn_handling(turn_model: bool) -> dict:
-    """End-of-turn detection; no preemptive generation (the session has no LLM)."""
-    return {"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": {"enabled": False}}
+    """End-of-turn detection; no preemptive generation (the session has no LLM). Without the turn model (Bengali,
+    Vietnamese) a pause between two sentences must not end the caller's turn, so silence has to last longer."""
+    options = {"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": {"enabled": False}}
+    if not turn_model:
+        options["endpointing"] = {"min_delay": 1.2}
+    return options
 
 
 def noise_filter():

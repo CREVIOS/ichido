@@ -1,11 +1,12 @@
 // Live updates by Realtime Broadcast from the database (supabase/migrations/20261124010000_live_broadcast.sql):
 // who may join which private topic, that a command's writes arrive, and that the toast feed carries only its fields.
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import test from "node:test";
 import { frontlineCase } from "./frontline-fixture.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { caller, closeOpen, cmd, mint, ok, openPairedCase, signIn, staff } from "./helpers.mjs";
+import { APP, caller, closeOpen, cmd, mint, ok, openPairedCase, signIn, staff } from "./helpers.mjs";
+import { FRONTLINE } from "../content/frontline.ts";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(new URL(url).hostname));
@@ -131,4 +132,27 @@ test("a switched language revokes the voice job while text intake stays availabl
   assert.equal((await f.admin.rpc("voice_step",{p_scope:scope,p_action:"state"})).error.message,"forbidden");
   await ok(cmd(f.phone,"human"));
   assert.equal((await f.desk()).handler,"queued");
+});
+
+test("a voice turn that hands the case to a person returns the hand-off once, signed, in the words the screen shows", async (t) => {
+  const f = await frontlineCase(t);
+  await f.turn("start");
+  const { screen } = await ok(cmd(f.phone, "caller_screen"));
+  const { data: lease } = await f.admin.rpc("voice_begin", { p_uid: f.phone.uid, p_generation: screen.generation, p_lang: "en" }).throwOnError();
+  const scope = { ...lease, lang: "en", uid: f.phone.uid, generation: screen.generation, incident: f.incident, job: "local-job" };
+  // The worker's own request signature (agent/app.py wire_frontline).
+  const post = async (body) => {
+    const raw = JSON.stringify({ scope, ...body });
+    const issued = String(Math.floor(Date.now() / 1000));
+    const sig = createHmac("sha256", process.env.AGENT_BRIDGE_SECRET).update(`ichido-job/1\n${issued}\n${raw}`).digest("hex");
+    const r = await fetch(APP + "/api/livekit/frontline", { method: "POST", headers: { "x-issued": issued, "x-job-signature": sig }, body: raw });
+    return { status: r.status, body: await r.json() };
+  };
+  const r = await post({ action: "turn", request_id: randomUUID(), text: "I want to talk to a person" });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.final, true);
+  assert.equal(r.body.say.text, FRONTLINE.queued.en, "a caller who asked for a person hears what the screen shows");
+  assert.deepEqual([r.body.say.seq, r.body.say.lang, r.body.say.epoch], [r.body.seq, "en", scope.epoch], "bound to this AI turn and epoch");
+  assert.notEqual((await f.desk()).handler, "ai");
+  assert.equal((await post({ action: "state" })).status, 403, "the AI's voice lease is over");
 });

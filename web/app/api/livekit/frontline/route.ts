@@ -1,9 +1,10 @@
 import { type Lang } from "@/content/catalogue";
+import { FRONTLINE } from "@/content/frontline";
 import { approvedInfo, committedReadback, conversationText, type ReadbackFacts } from "@/content/frontline-policy";
 import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
 import { boundedText } from "@/lib/request-security";
-import { HttpError, reply, rpc } from "@/lib/server";
+import { HttpError, admin, reply, rpc } from "@/lib/server";
 import { signSpeech, verifyVoiceRequest } from "@/lib/speech";
 
 type State = {rev:number; seq:number|null; pending:boolean; wording:string; confirmed:boolean; fault:string; flags:string[];
@@ -14,6 +15,23 @@ function speech(s: State, lang: Lang) {
   if (s.wording === "withheld" || s.wording === "greeting") return conversationText(s.wording,lang);
   if (s.wording !== "readback") return null;
   return committedReadback(s.facts,lang);
+}
+
+// A turn that hands the case to a person ends the AI's voice lease. A voice caller would otherwise hear nothing:
+// return the hand-off once, in the approved words the screen shows, signed for this AI epoch. The agent says it and leaves.
+async function handoff(scope:{incident:string;generation:string;uid:string;epoch:number;lang:Lang}) {
+  const {data:d} = await admin.from("desk").select("handler").eq("id",scope.incident).single().throwOnError();
+  if (d.handler === "ai") return null;
+  // The AI's own line in this epoch ("I need a person's help" or the urgent notice) when it decided, then "I've asked a
+  // person to join" from the queue's epoch. A caller who asked for a person gets only the second, as on screen.
+  const {data:turns} = await admin.from("frontline_turn").select("seq,wording,epoch").eq("incident",scope.incident)
+    .eq("generation",scope.generation).eq("speaker","ai").in("epoch",[scope.epoch,scope.epoch+1])
+    .in("wording",["fallback","risk","queued"]).order("seq").throwOnError();
+  const said = (turns ?? []).filter((t) => t.wording === "queued" ? t.epoch === scope.epoch + 1 : t.epoch === scope.epoch).slice(-2);
+  if (!said.some((t) => t.wording === "queued")) return null;
+  const words = said.map((t) => FRONTLINE[t.wording as "fallback"|"risk"|"queued"][scope.lang]).join(" ");
+  const seq = said[said.length - 1].seq;
+  return {seq,final:true,say:signSpeech(scope.generation,scope.uid,words,{seq,epoch:scope.epoch,lang:scope.lang})};
 }
 
 export async function POST(req:Request) {
@@ -28,6 +46,8 @@ export async function POST(req:Request) {
       const state = await rpc<State>("voice_step",{...args,p_action:"state"});
       await frontlineTurn({kind:"caller",uid:scope.uid,lang:scope.lang,incident:scope.incident,voiceRoom:scope.generation,expires:null},
         {act:"text",request_id,text,base_rev:state.rev},scope,req.signal);
+      const said = await handoff(scope);
+      if (said) return reply(200,said);
     }
     if (action !== "state" && action !== "turn") {
       await rpc("voice_step",{...args,p_action:action});

@@ -60,6 +60,7 @@ class ProvidersTest(unittest.TestCase):
         loop = asyncio.new_event_loop()
         self.addCleanup(loop.close)
         AgentSession(turn_handling=app.turn_handling(False), stt=app.make_stt("en-US"), tts=app.make_tts("en-US"), loop=loop)
+        self.assertGreaterEqual(app.turn_handling(False)["endpointing"]["min_delay"], 1.0, "a pause between sentences is not a turn")
 
     def test_stt_is_held_to_the_callers_language(self):
         for locale, lang in (("bn-BD", "bn"), ("vi-VN", "vi"), ("id-ID", "id"), ("en-US", "en"), ("ja-JP", "ja")):

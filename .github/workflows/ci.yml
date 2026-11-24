@@ -73,6 +73,7 @@ jobs:
           echo 'OPENAI_BASE_URL=http://localhost:3198/v1' >> web/.env.local
           echo 'GEMINI_API_KEY=stub' >> web/.env.local
           echo 'GEMINI_BASE_URL=http://localhost:3198/v1beta' >> web/.env.local
+          echo "AGENT_BRIDGE_SECRET=$(openssl rand -hex 32)" >> web/.env.local
       - run: npm ci
         working-directory: web
       - run: node scripts/vapid-keys.mjs >> .env.local
