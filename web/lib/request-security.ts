@@ -56,9 +56,16 @@ export async function limitKey(scope: string, key: string, limit: number, second
   return res;
 }
 
+export function clientIp(headers: Headers): string | undefined {
+  if (process.env.VERCEL === "1") return headers.get("x-vercel-forwarded-for")?.trim();
+  const name = process.env.TRUSTED_IP_HEADER;
+  return name ? headers.get(name)?.split(",").pop()?.trim() : undefined;
+}
+
 export function limitSource(headers: Headers, scope: string, limit: number, seconds: number, checkOnly = false) {
-  // Vercel overwrites this header. Without a trusted ingress, share one bucket.
-  const ip = process.env.VERCEL === "1" ? headers.get("x-vercel-forwarded-for")?.trim() : undefined;
+  // Vercel overwrites its header. A self-hosted proxy in front of the app (Caddy) names the header it sets in
+  // TRUSTED_IP_HEADER; its own entry is the last one. Without a trusted ingress, share one bucket.
+  const ip = clientIp(headers);
   return limitKey(scope, ip && isIP(ip) ? ip : "shared", limit, seconds, checkOnly);
 }
 

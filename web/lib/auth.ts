@@ -123,7 +123,7 @@ export const auth = betterAuth({
     defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
     database: { generateId: "uuid" },
     // Vercel overwrites this header. Elsewhere no client header is trusted, and limits share one bucket.
-    ipAddress: { ipAddressHeaders: process.env.VERCEL === "1" ? ["x-vercel-forwarded-for"] : [] },
+    ipAddress: { ipAddressHeaders: process.env.VERCEL === "1" ? ["x-vercel-forwarded-for"] : process.env.TRUSTED_IP_HEADER ? [process.env.TRUSTED_IP_HEADER] : [] },
   },
   databaseHooks: {
     session: {
