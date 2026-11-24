@@ -129,7 +129,7 @@ keeps runs in `web/.workflow-data/` (git-ignored); inspect them with `npx workfl
 
 ```sh
 cd agent
-cp .env.example .env        # fill in: LiveKit keys, SONIOX_API_KEY, ELEVEN_API_KEY, AGENT_BRIDGE_SECRET, BETTERSTACK_*
+cp .env.example .env        # fill in: LiveKit keys, SONIOX_API_KEY, ELEVEN_API_KEY, AGENT_BRIDGE_SECRET, FRONTLINE_URL, BETTERSTACK_*
 lk cloud auth
 lk agent create --secrets-file .env     # builds agent/Dockerfile and deploys; first time only
 lk agent deploy                         # later releases
