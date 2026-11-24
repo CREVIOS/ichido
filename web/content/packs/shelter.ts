@@ -27,7 +27,7 @@ const taps: Record<string, Tap> = {
   diet_allergy: { group: "need", suggests: "shelter_needs", staff: "食物アレルギーの食事相談", label: { ja: "食べものの アレルギーの そうだん", en: "Food allergy · help with meals", bn: "খাবারে অ্যালার্জি · খাবার নিয়ে সাহায্য চাই", vi: "Dị ứng thực phẩm · cần giúp về bữa ăn", id: "Alergi makanan · bantuan untuk makan", ne: "खानेकुराको एलर्जी · खानामा सहयोग" } },
   allergy_me: { group: "who", staff: "アレルギー：本人", label: { ja: "わたし", en: "Me", bn: "আমার", vi: "Tôi", id: "Saya", ne: "मलाई" } },
   allergy_child: { group: "who", staff: "アレルギー：子ども", label: { ja: "わたしの こども", en: "My child", bn: "আমার সন্তানের", vi: "Con tôi", id: "Anak saya", ne: "मेरो बच्चालाई" } },
-  allergy_other: { group: "who", staff: "アレルギー：一緒にいる人", label: { ja: "いっしょに いる 人", en: "Someone with me", bn: "আমার সঙ্গীর", vi: "Người đi cùng tôi", id: "Orang yang bersama saya", ne: "मसँग भएको व्यक्तिलाई" } },
+  allergy_other: { group: "who", staff: "アレルギー：一緒にいる人", label: { ja: "いっしょに いる 人", en: "Someone with me", bn: "আমার সঙ্গে থাকা একজনের", vi: "Người đi cùng tôi", id: "Orang yang bersama saya", ne: "मसँग भएको व्यक्तिलाई" } },
   diet_veg: { staff: "肉を食べないとのこと", label: { ja: "肉を 食べません", en: "I don't eat meat", bn: "আমি মাংস খাই না", vi: "Tôi không ăn thịt", id: "Saya tidak makan daging", ne: "म मासु खान्नँ" } },
   need_infant: { staff: "乳児用ミルク・おむつが必要", label: { ja: "あかちゃんの ミルク・おむつ", en: "Baby milk or nappies", bn: "শিশুর দুধ বা ডায়াপার", vi: "Sữa hoặc tã cho em bé", id: "Susu atau popok bayi", ne: "शिशुको दूध वा डाइपर" } },
   need_wheelchair: { staff: "車いすが必要", label: { ja: "車いすが ひつよう", en: "I need a wheelchair", bn: "হুইলচেয়ার দরকার", vi: "Tôi cần xe lăn", id: "Saya butuh kursi roda", ne: "मलाई ह्वीलचेयर चाहियो" } },

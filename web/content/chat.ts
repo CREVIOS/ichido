@@ -6,7 +6,7 @@ import { canConfirm, type CallerCase, type Draft, type Reply, type Turn } from "
 export const CHAT = {
   settings: {en:"Reading settings", ja:"よみかた", bn:"পড়ার সেটিংস", vi:"Cài đặt đọc", id:"Pengaturan baca", ne:"पढ्ने सेटिङ"},
   details: {en:"Case details", ja:"そうだんの くわしい こと", bn:"কেসের বিবরণ", vi:"Chi tiết hỗ trợ", id:"Rincian kasus", ne:"केसको विवरण"},
-  operator: {en:"Operator", ja:"うけつけの 人", bn:"কর্মী", vi:"Nhân viên", id:"Petugas", ne:"कर्मचारी"},
+  operator: {en:"Operator", ja:"うけつけの 人", bn:"অপারেটর", vi:"Nhân viên", id:"Petugas", ne:"कर्मचारी"},
   asked: {en:"Person requested", ja:"人を よびました", bn:"কর্মীকে ডাকা হয়েছে", vi:"Đã gọi nhân viên", id:"Petugas dipanggil", ne:"कर्मचारी बोलाइयो"},
   joined: {en:"Person connected", ja:"人と つながりました", bn:"কর্মী যুক্ত হয়েছেন", vi:"Đã kết nối nhân viên", id:"Petugas terhubung", ne:"कर्मचारी जोडिनुभयो"},
   delivered: {en:"Delivered", ja:"とどきました", bn:"পৌঁছেছে", vi:"Đã chuyển", id:"Terkirim", ne:"पुग्यो"},

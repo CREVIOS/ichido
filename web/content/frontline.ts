@@ -2,12 +2,12 @@ import type { L10n } from "./catalogue.ts";
 
 // All non-English wording awaits native review. The pilot's only informational answer is in the shelter pack.
 export const FRONTLINE = {
-  voicePrivacy: { en: "Authorized operators can listen when your microphone is on. Completed speech is shared as a message.", ja: "声で はなす とき、係の 人は 声を きけます。はなし おわると 文を おくります。", bn: "মাইক্রোফোন চালু থাকলে অনুমোদিত কর্মীরা শুনতে পারেন। কথা শেষ হলে তা বার্তা হিসেবে পাঠানো হয়।", vi: "Khi micrô bật, nhân viên có quyền có thể nghe. Khi bạn nói xong, lời nói được gửi dưới dạng tin nhắn.", id: "Saat mikrofon aktif, petugas berwenang dapat mendengarkan. Ucapan yang selesai dikirim sebagai pesan.", ne: "माइक्रोफोन खुला हुँदा अधिकृत कर्मचारीले सुन्न सक्छन्। बोलिसकेपछि कुरा सन्देशका रूपमा पठाइन्छ।" },
+  voicePrivacy: { en: "Authorized operators can listen when your microphone is on. Completed speech is shared as a message.", ja: "声で はなす とき、係の 人は 声を きけます。はなし おわると 文を おくります。", bn: "মাইক্রোফোন চালু থাকলে অনুমোদিত অপারেটররা শুনতে পারেন। কথা শেষ হলে তা বার্তা হিসেবে পাঠানো হয়।", vi: "Khi micrô bật, nhân viên có quyền có thể nghe. Khi bạn nói xong, lời nói được gửi dưới dạng tin nhắn.", id: "Saat mikrofon aktif, petugas berwenang dapat mendengarkan. Ucapan yang selesai dikirim sebagai pesan.", ne: "माइक्रोफोन खुला हुँदा अधिकृत कर्मचारीले सुन्न सक्छन्। बोलिसकेपछि कुरा सन्देशका रूपमा पठाइन्छ।" },
   stillHelp: { en: "Still need help", ja: "まだ たすけが いります", bn: "এখনও সাহায্য চাই", vi: "Tôi vẫn cần giúp đỡ", id: "Masih perlu bantuan", ne: "अझै सहयोग चाहिन्छ" },
   greeting: {
     en: "Hello, I’m Ichido’s AI assistant. What do you need?",
     ja: "こんにちは。わたしは 一度の AIです。なにに こまっていますか？",
-    bn: "নমস্কার, আমি ইচিদোর এআই সহকারী। আপনার কী সাহায্য দরকার?",
+    bn: "হ্যালো, আমি ইচিদোর এআই সহকারী। আপনার কী সাহায্য দরকার?",
     ne: "नमस्ते, म इचिदोको एआई सहायक हुँ। तपाईंलाई कस्तो सहयोग चाहिन्छ?",
     vi: "Xin chào, tôi là trợ lý AI của Ichido. Bạn cần giúp gì?",
     id: "Halo, saya asisten AI Ichido. Anda perlu bantuan apa?",
@@ -15,7 +15,7 @@ export const FRONTLINE = {
   disclosure: {
     en: "Authorized operators can read messages you send. They cannot see what you are still typing. You can ask for a person at any time.",
     ja: "おくった 文は 係の 人が よめます。まだ おくって いない 文は みえません。いつでも 人と はなせます。",
-    bn: "আপনি পাঠালে অনুমোদিত কর্মীরা বার্তাটি পড়তে পারবেন। লেখার সময় তাঁরা তা দেখেন না। যেকোনো সময় একজন মানুষের সাহায্য চাইতে পারেন।",
+    bn: "আপনি পাঠালে অনুমোদিত অপারেটররা বার্তাটি পড়তে পারবেন। লেখার সময় তাঁরা তা দেখেন না। যেকোনো সময় একজন মানুষের সাহায্য চাইতে পারেন।",
     vi: "Nhân viên có quyền có thể đọc tin nhắn bạn đã gửi. Họ không thấy phần bạn đang gõ. Bạn có thể yêu cầu gặp nhân viên bất cứ lúc nào.",
     id: "Petugas yang berwenang dapat membaca pesan yang Anda kirim. Mereka tidak melihat tulisan yang belum dikirim. Anda bisa meminta petugas kapan saja.",
     ne: "तपाईंले पठाएका सन्देश अधिकृत कर्मचारीले पढ्न सक्छन्। टाइप गर्दै गरेको कुरा उनीहरूले देख्दैनन्। जुनसुकै बेला कर्मचारीसँग कुरा गर्न सक्नुहुन्छ।",
@@ -30,9 +30,9 @@ export const FRONTLINE = {
     id: "Saya telah meminta petugas untuk bergabung. Mereka bisa membaca pesan yang sudah Anda kirim.",
     ne: "मैले कर्मचारीलाई जोडिन अनुरोध गरेको छु। तपाईंले पठाएका सन्देश उहाँले पढ्न सक्नुहुन्छ।",
   },
-  connected: { en: "An operator has joined your case.", ja: "係の 人が つながりました。", bn: "একজন কর্মী আপনার কেসে যুক্ত হয়েছেন।", vi: "Một nhân viên đã tham gia hỗ trợ bạn.", id: "Petugas sudah bergabung.", ne: "एक जना कर्मचारी तपाईंको केसमा जोडिनुभएको छ।" },
+  connected: { en: "An operator has joined your case.", ja: "係の 人が つながりました。", bn: "একজন অপারেটর আপনার কেসে যুক্ত হয়েছেন।", vi: "Một nhân viên đã tham gia hỗ trợ bạn.", id: "Petugas sudah bergabung.", ne: "एक जना कर्मचारी तपाईंको केसमा जोडिनुभएको छ।" },
   fallback: { en: "I need a person’s help with this.", ja: "これは 係の 人に ききます。", bn: "এ বিষয়ে একজন কর্মীর সাহায্য দরকার।", vi: "Việc này cần nhân viên hỗ trợ.", id: "Saya perlu bantuan petugas untuk ini.", ne: "यसका लागि कर्मचारीको सहायता चाहिन्छ।" },
-  inPerson: { en: "Show this screen to a staff member or scan the Help Point sticker to request help by text.", ja: "この 画面を 係の 人に みせて ください。たすけを よぶ シールを よむと、文字でも たのめます。", bn: "কর্মীকে এই স্ক্রিন দেখান বা লিখে সাহায্য চাইতে হেল্প পয়েন্টের স্টিকার স্ক্যান করুন।", vi: "Hãy cho nhân viên xem màn hình này hoặc quét nhãn Help Point để yêu cầu hỗ trợ bằng chữ.", id: "Tunjukkan layar ini kepada petugas atau pindai stiker Help Point untuk meminta bantuan lewat teks.", ne: "कर्मचारीलाई यो स्क्रिन देखाउनुहोस् वा लेखेर मद्दत माग्न हेल्प पोइन्टको स्टिकर स्क्यान गर्नुहोस्।" },
+  inPerson: { en: "Show this screen to a staff member or scan the Help Point sticker to request help by text.", ja: "この 画面を 係の 人に みせて ください。たすけを よぶ シールを よむと、文字でも たのめます。", bn: "কর্মীকে এই স্ক্রিন দেখান বা লিখে সাহায্য চাইতে Help Point-এর স্টিকার স্ক্যান করুন।", vi: "Hãy cho nhân viên xem màn hình này hoặc quét nhãn Help Point để yêu cầu hỗ trợ bằng chữ.", id: "Tunjukkan layar ini kepada petugas atau pindai stiker Help Point untuk meminta bantuan lewat teks.", ne: "कर्मचारीलाई यो स्क्रिन देखाउनुहोस् वा लेखेर मद्दत माग्न हेल्प पोइन्टको स्टिकर स्क्यान गर्नुहोस्।" },
   requested: { en: "Your request was sent to the service team.", ja: "係の 人に おねがいを おくりました。", bn: "আপনার অনুরোধ কর্মীদের কাছে পাঠানো হয়েছে।", vi: "Yêu cầu của bạn đã được gửi cho nhân viên.", id: "Permintaan Anda sudah dikirim ke petugas.", ne: "तपाईंको अनुरोध कर्मचारीलाई पठाइएको छ।" },
   write: { en: "Continue in writing", ja: "文字で つづける", bn: "লিখে চালিয়ে যান", vi: "Tiếp tục bằng tin nhắn", id: "Lanjut dengan tulisan", ne: "लेखेर जारी राख्नुहोस्" },
   risk: { en: "Your message may be urgent. The service team has been alerted.", ja: "いそぐ ことかも しれません。係の 人に しらせました。", bn: "আপনার বার্তাটি জরুরি হতে পারে। কর্মীদের জানানো হয়েছে।", vi: "Tin nhắn của bạn có thể khẩn cấp. Nhân viên đã được thông báo.", id: "Pesan Anda mungkin mendesak. Petugas sudah diberi tahu.", ne: "तपाईंको सन्देश जरुरी हुन सक्छ। कर्मचारीलाई खबर गरिएको छ।" },

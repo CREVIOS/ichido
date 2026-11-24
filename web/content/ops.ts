@@ -23,7 +23,7 @@ export const OPS_CALLER = {
     title: { ja: "とまって ください", bn: "থামুন", en: "Stop", vi: "Dừng lại", id: "Berhenti", ne: "रोकिनुहोस्" } as L10n,
     body: {
       ja: "お金を かえす ために ATM を つかって ほしい と いう 市役所、年金の 事務所、銀行は ありません。電話を すぐ きって ください。",
-      bn: "কোনো সিটি অফিস, পেনশন অফিস বা ব্যাংক টাকা ফেরত দেওয়ার জন্য এটিএম ব্যবহার করতে বলে না। এখনই ফোন কেটে দিন।",
+      bn: "কোনো সিটি অফিস, পেনশন অফিস বা ব্যাংক টাকা ফেরত পাওয়ার জন্য আপনাকে এটিএম ব্যবহার করতে বলে না। এখনই ফোন কেটে দিন।",
       en: "No city office, pension office or bank asks you to use an ATM to get money back. End the call now.",
       vi: "Không có văn phòng thành phố, cơ quan lương hưu hay ngân hàng nào yêu cầu bạn dùng ATM để nhận lại tiền. Hãy tắt cuộc gọi ngay.",
       id: "Tidak ada kantor kota, kantor pensiun, atau bank yang meminta Anda memakai ATM untuk mendapatkan uang kembali. Akhiri telepon sekarang.",
@@ -50,7 +50,7 @@ export const OPS_CALLER = {
     },
     still_working: {
       ja: "係の 人が まだ たいおう して います。まって くれて ありがとう。",
-      bn: "আমরা এখনো বিষয়টি দেখছি। অপেক্ষা করার জন্য ধন্যবাদ।",
+      bn: "আমরা এখনও বিষয়টি দেখছি। অপেক্ষা করার জন্য ধন্যবাদ।",
       en: "Staff are still working on this. Thank you for waiting.",
       vi: "Nhân viên vẫn đang xử lý. Cảm ơn bạn đã chờ.",
       id: "Petugas masih menanganinya. Terima kasih sudah menunggu.",
