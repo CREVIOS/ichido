@@ -68,9 +68,9 @@ test("a forgotten or deliberately kept card can never get 'your card is inside, 
   assert.equal((await cmd(op, "send", { incident, intent: "CARD_FORGOTTEN" })).status, 409, "a reply for another fault type");
   await ok(cmd(op, "send", { incident, intent: "CARD_KEPT_RULE" }));
   const text = await shownText(a, incident);
-  assert.match(text.en, /not a machine fault/);
+  assert.match(text.en, /It is not broken.*Ask the bank that issued the card/);
   assert.doesNotMatch(text.en, /inside the machine|You can wait/);
-  assert.match(text.en, /do not need to wait/);
+  assert.match(text.en, /No need to wait here/);
   const kinds = (await op.c.from("case_event").select("kind").eq("incident", incident)).data.map((e) => e.kind);
   assert.ok(kinds.includes("fault_changed") && kinds.includes("reply_withdrawn"));
   await ok(cmd(op, "abandon", { incident }));
@@ -88,9 +88,9 @@ test("debited but no cash: the bank checks the record and corrects the balance; 
   }
   await ok(cmd(op, "send", { incident, intent: "CASH_DEBITED" }));
   const text = await shownText(a, incident);
-  assert.match(text.en, /checks the machine's record and corrects your balance/);
-  assert.match(text.en, /keep the slip/);
-  assert.match(text.en, /do not need to wait/);
+  assert.match(text.en, /the bank will check and fix your balance/);
+  assert.match(text.en, /Keep any slip/);
+  assert.match(text.en, /No need to wait here/);
   assert.equal((await cmd(a, "choose", { choice: "wait" })).status, 409, "no wait/leave choice");
   await ok(cmd(op, "abandon", { incident }));
 });
@@ -118,7 +118,7 @@ test("the stated amount (本人申告) is typed by the operator only, for cash f
   await ok(cmd(op, "abandon", { incident }));
 });
 
-test("residence-card restriction: the reply needs the caller's 'card can't be used' and names the branch and the 22-language desk", async () => {
+test("residence-card restriction: the reply needs the caller's 'card can't be used' and sends the caller to the bank that issued the card and names the 22-language desk", async () => {
   const op = await staff("operator@ichido.demo");
   const a = await caller();
   await closeOpen(op);
@@ -128,11 +128,13 @@ test("residence-card restriction: the reply needs the caller's 'card can't be us
   assert.equal((await cmd(op, "send", { incident, intent: "RESIDENCE_CARD" })).status, 409, "only once the caller said so");
   await ok(cmd(a, "flag", { flag: "card_cant_use", on: true }));
   await ok(cmd(op, "send", { incident, intent: "RESIDENCE_CARD" }));
-  const { data: st } = await op.c.from("station").select("branch, counter_hours").eq("id", "TABLE-A").single();
+  const { data: st } = await op.c.from("station").select("branch").eq("id", "TABLE-A").single();
   const text = await shownText(a, incident);
   assert.match(text.en, /residence period/);
   assert.match(text.en, /22 languages/);
-  assert.ok(text.en.includes(st.branch.en) && text.en.includes(st.counter_hours.en), "branch and hours from the station row");
+  // The new residence card goes to the bank that issued the card, not to whoever runs this ATM (often a convenience store).
+  assert.match(text.en, /the bank that issued your card/);
+  assert.ok(!text.en.includes(st.branch.en), "not the ATM's own help line");
   await ok(cmd(op, "abandon", { incident }));
 });
 

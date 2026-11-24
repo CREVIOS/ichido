@@ -95,7 +95,7 @@ export const HOME = {
     badge: "Help Point · TABLE-A",
     badgeState: "Caller confirmed",
     queue: [
-      { title: "長崎駅前 店舗外ATM", meta: "2分前", status: "review", lang: "bn" },
+      { title: "出島マート 長崎駅前店 ATM", meta: "2分前", status: "review", lang: "bn" },
       { title: "浜町アーケード ATM", meta: "14分前", status: "field", lang: "vi" },
       { title: "出島ワーフ ATM", meta: "31分前", status: "guided", lang: "ja" },
     ],
@@ -103,7 +103,7 @@ export const HOME = {
     head: ["ATM", "初回返答", "状態", "言語", "ID"],
     filter: "フィルター",
     rows: [
-      { id: "NGS-01", title: "長崎駅前 店舗外ATM", reply: 6, time: "48秒", status: "review", lang: "bn", live: true },
+      { id: "NGS-01", title: "出島マート 長崎駅前店 ATM", reply: 6, time: "48秒", status: "review", lang: "bn", live: true },
       { id: "HMC-02", title: "浜町アーケード ATM", reply: 6, time: "1.2分", status: "field", lang: "en" },
       { id: "DJM-03", title: "出島ワーフ ATM", reply: 5, time: "2.0分", status: "guided", lang: "ja" },
       { id: "OUR-04", title: "大浦天主堂下 ATM", reply: 5, time: "2.6分", status: "guided", lang: "vi" },
@@ -116,8 +116,8 @@ export const HOME = {
     ],
     words: "কার্ড বের হয়নি, টাকা পেয়েছি। আমি কি অপেক্ষা করব?",
     slots: {
-      branch: { ja: "出島銀行 駅前支店", bn: "দেজিমা ব্যাংক স্টেশন শাখা", en: "Dejima Bank Station branch" },
-      hours: { ja: "平日 9:00〜15:00", bn: "সোম–শুক্র, ৯:০০–১৫:০০", en: "weekdays 9:00–15:00" },
+      branch: { ja: "ATMの 電話で 出島ATMサービス", bn: "এটিএমের ফোনে দেজিমা এটিএম সার্ভিস", en: "Dejima ATM Service on the ATM's phone" },
+      hours: { ja: "24時間", bn: "২৪ ঘণ্টা", en: "24 hours" },
     },
   },
 };

@@ -9,7 +9,7 @@ import { ASSIST, FRONT_DESK } from "./frontline.ts";
 import { REVIEW } from "./review.ts";
 import { OPS_FAULTS, opsEventText } from "./ops.ts";
 
-export const MANUAL_VERSION = "retained-card/v2";
+export const MANUAL_VERSION = "retained-card/v3";
 
 // Picker order: Bengali first (the first community we built with), then the three largest foreign-worker
 // nationalities in Nagasaki Prefecture (Vietnam, Indonesia, Nepal; end-Oct 2025), then English and easy Japanese.
@@ -136,12 +136,12 @@ export const REPLIES: Record<string, Reply> = {
     offersChoice: true,
     needsHeld: true,
     text: (s) => ({
-      ja: `カードは ATM の 中に あります。ここで まっても、かえっても いいです。あとで この 画面で おしらせを みて ください。カードは 銀行の きまりに そって あつかいます。${s.branch?.ja} の まどぐちでも きけます。あいて いるのは ${s.hours?.ja} です。`,
-      bn: `আপনার কার্ড মেশিনের ভেতরে আছে। আপনি এখানে অপেক্ষা করতে পারেন, অথবা চলে যেতে পারেন। নতুন খবরের জন্য এই কেসটি এখানে দেখুন। কার্ডের বিষয়টি ব্যাংকের নিজস্ব নিয়মে হবে। ${pick(s.branch, "bn")}-এর কাউন্টারেও (${pick(s.hours, "bn")}) জানতে পারবেন।`,
-      en: `Your card is inside the machine. You can wait here, or you can leave. Check this case here for updates. The card is handled under the bank's own procedure. The ${pick(s.branch, "en")} counter (${pick(s.hours, "en")}) can also help.`,
-      vi: `Thẻ của bạn đang ở trong máy. Bạn có thể chờ ở đây, hoặc có thể ra về. Hãy xem lại hồ sơ tại đây để biết tin mới. Thẻ được xử lý theo quy trình riêng của ngân hàng. Quầy giao dịch của ${pick(s.branch, "vi")} (${pick(s.hours, "vi")}) cũng có thể giúp bạn.`,
-      id: `Kartu Anda ada di dalam mesin. Anda bisa menunggu di sini, atau Anda bisa pulang. Periksa kasus ini di sini untuk kabar terbaru. Kartu ditangani sesuai prosedur bank sendiri. Loket ${pick(s.branch, "id")} (${pick(s.hours, "id")}) juga dapat membantu.`,
-      ne: `तपाईंको कार्ड मेसिनभित्र छ। तपाईं यहीँ पर्खन सक्नुहुन्छ, वा जान सक्नुहुन्छ। नयाँ जानकारीका लागि यहीँ केस हेर्नुहोस्। कार्डको विषय बैंकको आफ्नै प्रक्रियाअनुसार हुन्छ। ${pick(s.branch, "ne")} को काउन्टरमा पनि सोध्न सक्नुहुन्छ (${pick(s.hours, "ne")})।`,
+      ja: `カードは ATM の 中に あります。ここで まっても、かえっても いいです。おしらせは この 画面に でます。${pick(s.branch, "ja")} にも きく ことが できます。${pick(s.hours, "ja")} きけます。`,
+      bn: `আপনার কার্ড মেশিনের ভেতরে আছে। এখানে অপেক্ষা করতে পারেন, বা চলে যেতে পারেন। খবর এখানেই দেখাবে। ${pick(s.branch, "bn")}-এর কাছেও জানতে পারবেন (${pick(s.hours, "bn")})।`,
+      en: `Your card is inside the machine. You can wait here or leave. Updates will show here. You can also ask ${pick(s.branch, "en")} (${pick(s.hours, "en")}).`,
+      vi: `Thẻ của bạn đang ở trong máy. Bạn có thể chờ ở đây hoặc ra về. Tin mới sẽ hiện ở đây. Bạn cũng có thể hỏi ${pick(s.branch, "vi")} (${pick(s.hours, "vi")}).`,
+      id: `Kartu Anda ada di dalam mesin. Anda bisa menunggu di sini atau pulang. Kabar terbaru akan muncul di sini. Anda juga bisa bertanya ke ${pick(s.branch, "id")} (${pick(s.hours, "id")}).`,
+      ne: `तपाईंको कार्ड मेसिनभित्र छ। यहीँ पर्खन वा जान सक्नुहुन्छ। नयाँ जानकारी यहीँ देखिन्छ। ${pick(s.branch, "ne")} मा पनि सोध्न सक्नुहुन्छ (${pick(s.hours, "ne")})।`,
     }),
   },
   HANDSET: {

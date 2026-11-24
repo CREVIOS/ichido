@@ -11,7 +11,7 @@ test("stored manuals retain historical promises and slot values in every languag
     assert.equal(sentText({intent,manual_version:MANUAL_VERSION,slots},l),r.text(slots)[l],intent+"."+l);
   const held = {intent:"HELD_WAIT_OR_LEAVE",slots};
   assert.match(sentText({...held,manual_version:"retained-card/v1"},"en"), /bank will contact you/);
-  assert.match(sentText({...held,manual_version:MANUAL_VERSION},"en"),/Check this case here/);
+  assert.match(sentText({...held,manual_version:MANUAL_VERSION},"en"),/Updates will show here/);
   assert.equal(sentText({...held,manual_version:"unknown"},"en"),null);
 });
 

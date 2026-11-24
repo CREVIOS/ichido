@@ -111,9 +111,9 @@ test("Vietnamese journey: pairs in vi, numbers withheld, read-back and approved 
   // What the caller's phone renders (app/caller/guidance.tsx): the catalogue text in vi with the station's vi slots.
   const { data: [r] } = await a.c.from("reply").select("intent, slots");
   const text = replyOf(r.intent).text(r.slots).vi;
-  assert.match(text, /^Thẻ của bạn đang ở trong máy\. Bạn có thể chờ ở đây, hoặc có thể ra về\./);
+  assert.match(text, /^Thẻ của bạn đang ở trong máy\. Bạn có thể chờ ở đây hoặc ra về\./);
   assert.ok(r.slots.branch.vi && r.slots.hours.vi, "the station row carries Vietnamese slots");
-  assert.ok(text.includes(`Quầy giao dịch của ${r.slots.branch.vi} (${r.slots.hours.vi})`), text);
+  assert.ok(text.includes(`Bạn cũng có thể hỏi ${r.slots.branch.vi} (${r.slots.hours.vi})`), text);
   await closeOpen(op);
 });
 

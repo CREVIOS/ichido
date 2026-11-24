@@ -4,9 +4,9 @@
 
 insert into public.station (id, label, branch, counter_hours, security_company, lat, lng) values (
   'TABLE-A',
-  '{"ja": "長崎駅前 店舗外ATM", "bn": "নাগাসাকি স্টেশনের সামনের এটিএম", "en": "Nagasaki Station front ATM", "vi": "Cây ATM trước ga Nagasaki", "id": "ATM depan Stasiun Nagasaki", "ne": "नागासाकी स्टेसन अगाडिको एटीएम"}',
-  '{"ja": "出島銀行 駅前支店", "bn": "দেজিমা ব্যাংক স্টেশন শাখা", "en": "Dejima Bank Station branch", "vi": "Ngân hàng Dejima, chi nhánh Nhà ga", "id": "Bank Dejima Cabang Stasiun", "ne": "देजिमा बैंक स्टेसन शाखा"}',
-  '{"ja": "平日 9:00〜15:00", "bn": "সোম–শুক্র, ৯:০০–১৫:০০", "en": "weekdays 9:00–15:00", "vi": "Thứ Hai–thứ Sáu, 9:00–15:00", "id": "Senin–Jumat, 9:00–15:00", "ne": "सोम–शुक्र, ९:००–१५:००"}',
+  '{"ja": "出島マート 長崎駅前店 ATM", "bn": "দেজিমা মার্ট (নাগাসাকি স্টেশনের সামনে) এটিএম", "en": "Dejima Mart Nagasaki Station store ATM", "vi": "Cây ATM tại cửa hàng Dejima Mart trước ga Nagasaki", "id": "ATM di Dejima Mart depan Stasiun Nagasaki", "ne": "देजिमा मार्ट (नागासाकी स्टेसन अगाडि) को एटीएम"}',
+  '{"ja": "ATMの 電話で 出島ATMサービス", "bn": "এটিএমের ফোনে দেজিমা এটিএম সার্ভিস", "en": "Dejima ATM Service on the ATM''s phone", "vi": "Dejima ATM Service qua điện thoại trên máy ATM", "id": "Dejima ATM Service lewat telepon di mesin ATM", "ne": "एटीएमको फोनबाट देजिमा एटीएम सर्भिस"}',
+  '{"ja": "24時間", "bn": "২৪ ঘণ্টা", "en": "24 hours", "vi": "24 giờ", "id": "24 jam", "ne": "२४ घण्टा"}',
   '出島警備株式会社',
   32.7522, 129.8702
 );
@@ -51,7 +51,7 @@ update public.station set jma_areas = array['pref:長崎県', 'eq:長崎県南�
 
 -- Printed identification at the fictional demo sites. New stations supply these when commissioned.
 update public.station s set host_org=v.host,short_address=v.place from (values
- ('TABLE-A','出島銀行','長崎駅前 店舗外ATM'),('HOSP-A','浦上みなと病院','浦上みなと病院 1階 外来受付'),
+ ('TABLE-A','出島ATMサービス','出島マート 長崎駅前店 店内'),('HOSP-A','浦上みなと病院','浦上みなと病院 1階 外来受付'),
  ('CITY-A','出島市役所','本館1階 市民課'),('RAIL-A','みなと鉄道','浦上駅 改札横'),
  ('SHELTER-A','稲佐小学校 避難所受付','稲佐小学校 体育館入口')
 ) v(id,host,place) where s.id=v.id;

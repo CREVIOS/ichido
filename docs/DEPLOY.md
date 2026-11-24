@@ -48,14 +48,17 @@ sign people out from `/admin`; every action is in the append-only audit log ther
 ### Stations
 
 Each Help Point needs a station row. Run this once per station in the SQL editor. The labels are shown to
-callers in their language, one key per caller language (`bn`, `vi`, `id`, `ne`, `en`, `ja`); a missing key shows the `en` text:
+callers in their language, one key per caller language (`bn`, `vi`, `id`, `ne`, `en`, `ja`); a missing key shows the `en` text. Most ATMs in Japan stand in
+convenience stores: there "where to ask" is the ATM operator's help line, reached with the phone on the ATM (often
+24 hours), since store staff cannot open the machine; at a bank's own ATM it is the branch counter. Replies about the
+card itself (unreadable, kept by the bank's rules, limits) send the caller to the bank that issued the card:
 
 ```sql
 insert into public.station (id, label, branch, counter_hours, security_company, lat, lng) values (
   'TABLE-A',
   '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- machine location
-  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- branch name
-  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- counter hours
+  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- where to ask: whoever runs the ATM
+  '{"ja": "…", "bn": "…", "en": "…", "vi": "…", "id": "…", "ne": "…"}',  -- when they answer
   '…',                                        -- security company
   32.75, 129.87                               -- location for the operator's map (optional)
 );
