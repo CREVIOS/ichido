@@ -55,6 +55,12 @@ class ProvidersTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_the_sdk_accepts_the_session_options(self):
+        from livekit.agents import AgentSession
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        AgentSession(turn_handling=app.turn_handling(False), stt=app.make_stt("en-US"), tts=app.make_tts("en-US"), loop=loop)
+
     def test_stt_is_held_to_the_callers_language(self):
         for locale, lang in (("bn-BD", "bn"), ("vi-VN", "vi"), ("id-ID", "id"), ("en-US", "en"), ("ja-JP", "ja")):
             params = app.make_stt(locale)._params

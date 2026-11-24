@@ -235,6 +235,11 @@ def make_tts(locale: str) -> elevenlabs.TTS:
     return elevenlabs.TTS(model=ELEVEN_MODEL, voice_id=VOICES[locale], language=LANGS[locale])
 
 
+def turn_handling(turn_model: bool) -> dict:
+    """End-of-turn detection; no preemptive generation (the session has no LLM)."""
+    return {"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": {"enabled": False}}
+
+
 def noise_filter():
     """BVC options for the caller's microphone, or None when off or not installed."""
     if noise_cancellation is None or os.getenv("NOISE_CANCELLATION", "bvc").lower() == "off":
@@ -416,7 +421,7 @@ async def run_intake(ctx: JobContext, room: str, locale: str, scope=None) -> Non
                                    "turn_detection": "multilingual" if turn_model else "vad", "noise_cancellation": nc is not None})
 
     session = AgentSession(
-        turn_handling={"turn_detection": MultilingualModel() if turn_model else "vad", "preemptive_generation": False},
+        turn_handling=turn_handling(turn_model),
         stt=make_stt(locale),
         tts=make_tts(locale),
         vad=ctx.proc.userdata["vad"],
