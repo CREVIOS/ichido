@@ -105,7 +105,7 @@ export const CALLER_FLAGS: Record<string, CallerFlag> = {
     suggests: "card_kept", staff: "紛失届済み、または有効期限切れの可能性があるとのこと",
     label: {
       ja: "この カードは なくした と とどけた か、きげんが きれて いる かもしれません", en: "I reported this card lost, or it may be expired",
-      bn: "আমি এই কার্ড হারানোর খবর দিয়েছিলাম, অথবা এর মেয়াদ শেষ হয়ে থাকতে পারে", vi: "Tôi đã báo mất thẻ này, hoặc thẻ có thể đã hết hạn",
+      bn: "আমি এই কার্ড হারিয়ে যাওয়ার কথা ব্যাংককে জানিয়েছিলাম, অথবা এর মেয়াদ শেষ হয়ে থাকতে পারে", vi: "Tôi đã báo mất thẻ này, hoặc thẻ có thể đã hết hạn",
       id: "Saya pernah melaporkan kartu ini hilang, atau kartunya mungkin sudah kedaluwarsa", ne: "मैले यो कार्ड हराएको खबर गरेको थिएँ, वा यसको म्याद सकिएको हुन सक्छ",
     },
   },
@@ -383,7 +383,7 @@ export const BANK_STATUS: Record<string, BankStatus> = {
     staff: (due) => `${dueText(due, "ja")}までにご連絡予定`,
     caller: (due, l) => {
       const d = dueText(due, l);
-      return ({ ja: `銀行から ${d}までに れんらくします。`, en: `The bank will contact you by ${d}.`, bn: `ব্যাংক ${d}-এর মধ্যে আপনার সাথে যোগাযোগ করবে।`, vi: `Ngân hàng sẽ liên lạc với bạn trước ngày ${d}.`, id: `Bank akan menghubungi Anda paling lambat ${d}.`, ne: `बैंकले ${d} भित्र तपाईंलाई सम्पर्क गर्नेछ।` })[l];
+      return ({ ja: `銀行から ${d}までに れんらくします。`, en: `The bank will contact you by ${d}.`, bn: `ব্যাংক ${d}-এর মধ্যে আপনার সঙ্গে যোগাযোগ করবে।`, vi: `Ngân hàng sẽ liên lạc với bạn trước ngày ${d}.`, id: `Bank akan menghubungi Anda paling lambat ${d}.`, ne: `बैंकले ${d} भित्र तपाईंलाई सम्पर्क गर्नेछ।` })[l];
     },
   },
   contacted: {
@@ -407,7 +407,7 @@ export const FAULT_UI = {
   bankTitle: { ja: "銀行からの おしらせ", en: "From the bank", bn: "ব্যাংকের কাছ থেকে", vi: "Thông báo từ ngân hàng", id: "Kabar dari bank", ne: "बैंकबाट" },
   bankNone: {
     ja: "銀行からの おしらせは まだ ありません。この 画面は あとで また 見られます。", en: "The bank has not posted an update yet. You can come back to this page later.",
-    bn: "ব্যাংক এখনো কোনো খবর দেয়নি। আপনি পরে আবার এই পাতাটি দেখতে পারবেন।", vi: "Ngân hàng chưa có thông báo mới. Bạn có thể mở lại trang này sau.",
+    bn: "ব্যাংক এখনও কোনো খবর দেয়নি। আপনি পরে আবার এই পাতাটি দেখতে পারবেন।", vi: "Ngân hàng chưa có thông báo mới. Bạn có thể mở lại trang này sau.",
     id: "Bank belum memberi kabar terbaru. Anda bisa membuka halaman ini lagi nanti.", ne: "बैंकले अहिलेसम्म कुनै जानकारी दिएको छैन। तपाईं पछि फेरि यो पेज हेर्न सक्नुहुन्छ।",
   },
   followTitle: { ja: "あなたの そうだん", en: "Your case", bn: "আপনার কেস", vi: "Hồ sơ của bạn", id: "Kasus Anda", ne: "तपाईंको केस" },

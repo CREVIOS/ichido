@@ -29,7 +29,7 @@ export const pick = (v: unknown, lang: Lang): string => (v && typeof v === "obje
 
 export const STATUS: Record<Status, L10n> = {
   received: { ja: "そうだんを うけつけました", bn: "আপনার অনুরোধ পাওয়া গেছে", en: "Request received", vi: "Đã nhận yêu cầu của bạn", id: "Permintaan Anda sudah diterima", ne: "तपाईंको अनुरोध प्राप्त भयो" },
-  review: { ja: "係の 人が しらべて います", bn: "একজন কর্মী দেখছেন", en: "An operator is reviewing", vi: "Nhân viên đang xem xét", id: "Petugas sedang memeriksa", ne: "एक जना कर्मचारीले हेर्दै हुनुहुन्छ" },
+  review: { ja: "係の 人が しらべて います", bn: "একজন অপারেটর দেখছেন", en: "An operator is reviewing", vi: "Nhân viên đang xem xét", id: "Petugas sedang memeriksa", ne: "एक जना कर्मचारीले हेर्दै हुनुहुन्छ" },
   field: { ja: "けいびの 人に ATM に 来て たしかめるよう たのみました", bn: "ঘটনাস্থলে পরীক্ষার অনুরোধ পাঠানো হয়েছে", en: "Site check requested", vi: "Đã yêu cầu kiểm tra tại chỗ", id: "Pemeriksaan di lokasi sudah diminta", ne: "घटनास्थलमा जाँचको अनुरोध गरियो" },
   guided: { ja: "つぎに することを いっしょに たしかめました", bn: "নির্দেশনা নিশ্চিত হয়েছে", en: "Guidance confirmed", vi: "Đã xác nhận hướng dẫn", id: "Panduan sudah dikonfirmasi", ne: "निर्देशन पुष्टि भयो" },
 };
@@ -79,7 +79,7 @@ export const FACT_KEYS = Object.keys(FACTS) as FactKey[];
 export const ANSWER: Record<Fact, L10n> = {
   yes: { bn: "হ্যাঁ", en: "Yes", ja: "はい", vi: "Có", id: "Ya", ne: "हो" },
   no: { bn: "না", en: "No", ja: "いいえ", vi: "Không", id: "Tidak", ne: "होइन" },
-  unknown: { bn: "জানি না", en: "Not sure", ja: "わからない", vi: "Không chắc", id: "Tidak tahu", ne: "थाहा छैन" },
+  unknown: { bn: "নিশ্চিত নই", en: "Not sure", ja: "わからない", vi: "Không chắc", id: "Tidak tahu", ne: "थाहा छैन" },
 };
 export const SENTENCE_SEP: L10n = { bn: "। ", en: ". ", ja: "。", vi: ". ", id: ". ", ne: "। " };
 
@@ -278,7 +278,7 @@ export const UI = {
   // A red-flag tap is only ever asked about, with the tap's own approved wording below this question.
   aiAsk: { ja: "いま、これが ありますか？", en: "Is this happening now?", bn: "এখন কি এমন হচ্ছে?", vi: "Việc này có đang xảy ra không?", id: "Apakah ini sedang terjadi?", ne: "के अहिले यस्तो भइरहेको छ?" },
   aiNotice: {
-    bn: "আমি একটি AI সহকারী। আপনার কথা জাপানি অপারেটরের কাছে পৌঁছে দেব। সিদ্ধান্ত নেবেন একজন মানুষ।",
+    bn: "আমি একটি এআই সহকারী। আপনার কথা জাপানি অপারেটরের কাছে পৌঁছে দেব। সিদ্ধান্ত নেবেন একজন মানুষ।",
     en: "I'm an AI assistant. I pass what you say to a Japanese operator. A person makes every decision.",
     ja: "わたしは AI です。あなたの 話を 日本語を 話す 係の 人に つたえます。どうするかは 人が 決めます。",
     vi: "Tôi là trợ lý AI. Tôi chuyển lời bạn nói đến nhân viên trực người Nhật. Mọi quyết định đều do con người đưa ra.",
@@ -298,7 +298,7 @@ export const UI = {
     vi: "Hãy kể điều đã xảy ra, bằng lời của bạn", id: "Ceritakan apa yang terjadi, dengan kata-kata Anda sendiri", ne: "के भयो, आफ्नै शब्दमा लेख्नुहोस्",
   },
   understood: { bn: "আমি যা বুঝেছি", en: "What I understood", ja: "わかったこと", vi: "Những gì tôi hiểu", id: "Yang saya pahami", ne: "मैले बुझेको कुरा" },
-  confirm: { bn: "কর্মীর কাছে পাঠান", en: "Send to the operator", ja: "係の 人に おくる", vi: "Gửi cho nhân viên", id: "Kirim ke petugas", ne: "कर्मचारीलाई पठाउनुहोस्" },
+  confirm: { bn: "অপারেটরের কাছে পাঠান", en: "Send to the operator", ja: "係の 人に おくる", vi: "Gửi cho nhân viên", id: "Kirim ke petugas", ne: "कर्मचारीलाई पठाउनुहोस्" },
   unsure: {
     bn: "আমি ঠিক বুঝতে পারিনি। নিচের প্রশ্নগুলোর উত্তর বেছে নিন।",
     en: "I wasn't sure what you meant. Please choose the answers below.",
@@ -330,7 +330,7 @@ export const UI = {
     vi: "Đã gửi — nhân viên đang kiểm tra", id: "Terkirim — petugas sedang memeriksa", ne: "पठाइयो — कर्मचारीले हेर्दै हुनुहुन्छ",
   },
   clarify: {
-    bn: "যে অংশটি বুঝতে অসুবিধা হয়েছে, সেটি কর্মীকে আবার জিজ্ঞেস করতে পারেন।", en: "You can ask the operator again about anything that is unclear.", ja: "わからない ところは 係の 人に もう一度 きけます。",
+    bn: "যে অংশটি বুঝতে অসুবিধা হয়েছে, সেটি অপারেটরকে আবার জিজ্ঞেস করতে পারেন।", en: "You can ask the operator again about anything that is unclear.", ja: "わからない ところは 係の 人に もう一度 きけます。",
     vi: "Bạn có thể hỏi lại nhân viên về bất cứ điều gì chưa rõ.", id: "Anda bisa bertanya lagi kepada petugas tentang hal yang belum jelas.", ne: "नबुझेको कुरा कर्मचारीलाई फेरि सोध्न सक्नुहुन्छ।",
   },
   human: { bn: "একজন কর্মীর সাহায্য চাই", en: "Ask for a person", ja: "係の 人に たのむ", vi: "Yêu cầu nhân viên hỗ trợ", id: "Minta bantuan petugas", ne: "कर्मचारीको सहायता माग्ने" },
@@ -351,12 +351,12 @@ export const UI = {
     vi: "Cảm ơn bạn. Câu trả lời của bạn đã được lưu.", id: "Terima kasih. Jawaban Anda sudah disimpan.", ne: "धन्यवाद। तपाईंको उत्तर सुरक्षित गरियो।",
   },
   showStaff: {
-    bn: "জাপানি কর্মীকে দেখান", en: "Show to staff", ja: "係の 人に みせる",
+    bn: "কর্মীকে দেখান", en: "Show to staff", ja: "係の 人に みせる",
     vi: "Cho nhân viên người Nhật xem", id: "Tunjukkan kepada petugas", ne: "जापानी कर्मचारीलाई देखाउनुहोस्",
   },
   caseNo: { bn: "কেস নম্বর", en: "Case", ja: "この そうだんの 番号", vi: "Mã hồ sơ", id: "Nomor kasus", ne: "केस नम्बर" },
   waiting: {
-    bn: `অপারেটর এখনো আপনার বিষয়টি দেখছেন। জরুরি হলে ${HANDSET_HINT.bn}`,
+    bn: `অপারেটর এখনও আপনার বিষয়টি দেখছেন। জরুরি হলে ${HANDSET_HINT.bn}`,
     en: `The operator is still looking at your case. If it is urgent, ${HANDSET_HINT.en}`,
     ja: `係の 人が まだ かくにん しています。いそぐ ときは ${HANDSET_HINT.ja}`,
     vi: `Nhân viên vẫn đang xem trường hợp của bạn. Nếu gấp, ${HANDSET_HINT.vi}`,
@@ -364,7 +364,7 @@ export const UI = {
     ne: `कर्मचारीले अझै तपाईंको विषय हेर्दै हुनुहुन्छ। जरुरी भए ${HANDSET_HINT.ne}`,
   },
   notConnected: {
-    bn: "এই ফোনটি কোনো কেসের সাথে যুক্ত নয়। অপারেটরের কাছে কোড চেয়ে Help Point আবার স্ক্যান করুন।",
+    bn: "এই ফোনটি কোনো কেসের সঙ্গে যুক্ত নয়। অপারেটরের কাছে কোড চেয়ে Help Point আবার স্ক্যান করুন।",
     en: "This phone is not connected to a case. Ask the operator for a code and scan the Help Point again.",
     ja: "この 電話は 案件に つながって いません。係の 人に コードを きいてください。",
     vi: "Điện thoại này chưa được kết nối với hồ sơ nào. Hãy xin mã từ nhân viên rồi quét lại Help Point.",
@@ -403,16 +403,16 @@ export * from "./alerts.ts";
 // Pairing page behind the Help Point sticker.
 export const STATION = {
   title: {
-    bn: "সহায়তা কেন্দ্রের সাথে যুক্ত হন", en: "Connect to the help desk", ja: "まどぐちに つなぐ",
+    bn: "সহায়তা কেন্দ্রের সঙ্গে যুক্ত হন", en: "Connect to the help desk", ja: "まどぐちに つなぐ",
     vi: "Kết nối với quầy hỗ trợ", id: "Hubungkan ke layanan bantuan", ne: "सहायता केन्द्रसँग जोडिनुहोस्",
   },
   code: {
-    bn: "হেল্প পয়েন্টের পর্দায় দেখানো বা কর্মীর দেওয়া কোড", en: "Code from the Help Point screen or a staff member", ja: "たすけを よぶ 画面か、係の 人の コード",
+    bn: "Help Point-এর স্ক্রিনে দেখানো বা কর্মীর দেওয়া কোড", en: "Code from the Help Point screen or a staff member", ja: "たすけを よぶ 画面か、係の 人の コード",
     vi: "Mã trên màn hình điểm trợ giúp hoặc do nhân viên đưa", id: "Kode dari layar titik bantuan atau dari petugas", ne: "सहायता केन्द्रको स्क्रिनमा देखिएको वा कर्मचारीले दिएको कोड",
   },
   go: { bn: "যুক্ত হন", en: "Connect", ja: "つなぐ", vi: "Kết nối", id: "Hubungkan", ne: "जोडिनुहोस्" },
   why: {
-    bn: "স্ক্রিন থাকলে কোড পেতে হেল্প পয়েন্টের বোতাম চাপুন। কর্মীর কাছেও কোড চাইতে পারেন।",
+    bn: "স্ক্রিন থাকলে কোড পেতে Help Point-এর বোতাম চাপুন। কর্মীর কাছেও কোড চাইতে পারেন।",
     en: "Press the button on a Help Point with a screen to see your code. You can also ask a staff member for a code.",
     ja: "たすけを よぶ ところを おすと、画面に コードが でます。係の 人にも きけます。",
     vi: "Nếu điểm trợ giúp có màn hình, nhấn nút để xem mã. Bạn cũng có thể hỏi nhân viên.",

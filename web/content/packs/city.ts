@@ -20,7 +20,7 @@ const taps: Record<string, Tap> = {
   mn_get: { staff: "マイナンバーカードの申請・交付を希望", label: { ja: "カードを つくりたい・もらいたい", en: "I want to apply for the card or get it", bn: "কার্ডের জন্য আবেদন করতে বা কার্ড নিতে চাই", vi: "Tôi muốn làm thẻ hoặc nhận thẻ", id: "Saya ingin mengajukan atau mendapatkan kartu", ne: "कार्डका लागि आवेदन दिन वा कार्ड लिन चाहन्छु" } },
   mn_lock: { staff: "暗証番号の失念・ロックとのこと", label: { ja: "カードの ひみつの 番号を わすれた", en: "I forgot the card's passcode", bn: "কার্ডের গোপন কোড ভুলে গেছি", vi: "Tôi quên mã bí mật của thẻ", id: "Saya lupa kode rahasia kartu", ne: "कार्डको गोप्य कोड बिर्सें" } },
   mn_lost: { staff: "マイナンバーカード紛失とのこと", label: { ja: "カードを なくした", en: "I lost my card", bn: "কার্ড হারিয়ে ফেলেছি", vi: "Tôi làm mất thẻ", id: "Kartu saya hilang", ne: "मेरो कार्ड हरायो" } },
-  letter_tax: { group: "letter", staff: "通知の種類：税", label: { ja: "ぜいきん", en: "Tax", bn: "কর", vi: "Thuế", id: "Pajak", ne: "कर" } },
+  letter_tax: { group: "letter", staff: "通知の種類：税", label: { ja: "ぜいきん", en: "Tax", bn: "কর (ট্যাক্স)", vi: "Thuế", id: "Pajak", ne: "कर" } },
   letter_health: { group: "letter", staff: "通知の種類：国民健康保険", label: { ja: "けんこう保険", en: "Health insurance", bn: "স্বাস্থ্যবিমা", vi: "Bảo hiểm y tế", id: "Asuransi kesehatan", ne: "स्वास्थ्य बीमा" } },
   letter_pension: { group: "letter", staff: "通知の種類：年金", label: { ja: "ねんきん", en: "Pension", bn: "পেনশন", vi: "Lương hưu", id: "Pensiun", ne: "पेन्सन" } },
   letter_child: { group: "letter", staff: "通知の種類：子ども（手当・学校）", label: { ja: "こどもの こと（てあて・学校）", en: "Children (allowance or school)", bn: "সন্তান (ভাতা বা স্কুল)", vi: "Con cái (trợ cấp hoặc trường học)", id: "Anak (tunjangan atau sekolah)", ne: "बच्चा (भत्ता वा विद्यालय)" } },
