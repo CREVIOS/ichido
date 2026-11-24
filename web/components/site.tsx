@@ -60,9 +60,8 @@ export function Footer() {
           </div>
         ))}
       </div>
-      <div className="mt-24 flex flex-col gap-3 text-[12px] text-muted-foreground lg:grid lg:grid-cols-[1fr_minmax(0,1.8fr)_auto] lg:gap-6">
+      <div className="mt-24 flex flex-col gap-3 text-[12px] text-muted-foreground lg:flex-row lg:justify-between lg:gap-6">
         <span>{f.legal}</span>
-        <span className="max-w-xl">{HOME.footer}</span>
         <span>{f.made}</span>
       </div>
     </footer>

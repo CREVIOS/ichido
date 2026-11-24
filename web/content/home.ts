@@ -50,7 +50,6 @@ export const HOME = {
     ],
   },
   cta: { title: "Start from the console", body: "Sign in with a staff account issued by your administrator.", button: "Open the console" },
-  footer: "The bank, branch and security company shown are fictional. Nothing here connects to a real bank or ATM network.",
   howTag: { left: "HOW IT WORKS", right: "1.0" },
   // Scenario packs (content/packs). Each card's name, responder and situations come from the pack itself.
   beyond: {

@@ -61,7 +61,6 @@ export default function Entry() {
         {staffName != null && <Button kind="ghost" label={STAFF.signOut} onPress={() => signOut().then(() => setStaffName(null))} />}
       </Section>
 
-      <T v="small">{HOME.footer}</T>
     </Screen>
   );
 }

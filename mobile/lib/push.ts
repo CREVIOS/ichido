@@ -42,6 +42,7 @@ const open = (r: Notifications.NotificationResponse | null) => {
 };
 export function usePushLinks() {
   useEffect(() => {
+    if (Platform.OS === "web") return;   // no notifications on web, as in registerPush
     open(Notifications.getLastNotificationResponse());
     const sub = Notifications.addNotificationResponseReceivedListener(open);
     return () => sub.remove();

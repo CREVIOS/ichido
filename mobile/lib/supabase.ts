@@ -74,7 +74,8 @@ export async function bearer(): Promise<string> {
 async function credentials(): Promise<Record<string, string>> {
   const auth = await bearer();
   if (auth !== "Bearer ") return { authorization: auth };
-  const cookie = await authClient.getCookie();
+  // The staff cookie lives in the OS keychain, which Expo web does not have: there a caller has no staff session.
+  const cookie = Platform.OS === "web" ? null : await authClient.getCookie();
   return cookie ? { cookie } : {};
 }
 
