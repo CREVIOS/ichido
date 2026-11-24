@@ -65,6 +65,10 @@ insert into public.station (id, label, branch, counter_hours, security_company, 
 insert into public.light (station) values ('TABLE-A');
 ```
 
+Designated evacuation sites (disaster mode, the caller's nearby sites and the `nearest_shelters` tool) come from the
+国土地理院 指定緊急避難場所データ. Load the demo subset with `supabase/seed-shelters.sql` in the SQL editor, or the whole
+prefecture with `scripts/import-gsi-shelters.mjs`. Without them the shelter lists are empty.
+
 A **mobile branch** (移動店舗) sent out after a disaster is a station row with `kind = 'mobile_branch'`, a location,
 and its opening hours in `counter_hours`. It has no Help Point device, so it needs no secret and no `light` row.
 Callers in a disaster area see it among the nearest working places while it is outside the area. Delete the row
