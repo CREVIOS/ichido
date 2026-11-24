@@ -12,8 +12,9 @@ export const light = cn(buttonVariants({ variant: "secondary", size: "sm" }), "h
 
 export function TopNav() {
   return (
-    <div className="fixed inset-x-0 top-4 z-30 flex justify-center px-4">
-      <nav className="flex h-[38px] items-center gap-1 rounded-[10px] bg-[oklch(0.95_0_0/0.85)] py-1 pr-1 pl-3.5 backdrop-blur-md" aria-label="Main">
+    // An opaque band, so the page never shows through or around the bar as it scrolls underneath.
+    <header className="fixed inset-x-0 top-0 z-30 flex justify-center bg-background px-4 pt-4 pb-3">
+      <nav className="flex h-[38px] items-center gap-1 rounded-[10px] bg-[oklch(0.95_0_0)] py-1 pr-1 pl-3.5" aria-label="Main">
         <Logo className="mr-3" />
         <div className="hidden items-center lg:flex">
           {HOME.nav.map((n) => <Link key={n.href} href={n.href} className="rounded-md px-2 py-1 text-[13px] text-soft transition-colors hover:text-foreground">{n.label}</Link>)}
@@ -23,7 +24,7 @@ export function TopNav() {
         <Link href="/operator" className="hidden px-2 text-[13px] text-soft hover:text-foreground md:block">{HOME.signIn}</Link>
         <Link href={HOME.primary.href} className={dark}>{HOME.primary.label}</Link>
       </nav>
-    </div>
+    </header>
   );
 }
 

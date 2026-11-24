@@ -88,9 +88,9 @@ function Admin({ me }: { me: Me }) {
         {manage && (
           <Panel title={ADMIN.users}>
             <div className="admin-table max-w-full overflow-x-auto">
-              <table className="w-full min-w-[860px] text-left text-[13px]">
+              <table className="w-full min-w-[1000px] text-left text-[13px]">
                 <thead className="border-b text-muted-foreground">
-                  <tr>{[ADMIN.head.name, ADMIN.head.role, ADMIN.head.mfa, ADMIN.head.status, ADMIN.head.active, ADMIN.head.actions].map((h, i) => <th key={i} scope="col" className="px-4 py-2.5 font-normal">{h}</th>)}</tr>
+                  <tr>{[ADMIN.head.name, ADMIN.head.role, ADMIN.head.mfa, ADMIN.head.status, ADMIN.head.active, ADMIN.head.actions].map((h, i) => <th key={i} scope="col" className="px-4 py-2.5 font-normal whitespace-nowrap">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y">
                   {(users ?? []).map((u) => {
@@ -99,11 +99,12 @@ function Admin({ me }: { me: Me }) {
                     return (
                       <tr key={u.id}>
                         <td className="px-4 py-2.5"><span className="flex flex-col leading-tight"><span className="text-[14px] text-foreground">{u.name}</span><span className="text-muted-foreground">{u.email}</span></span></td>
-                        <td className="px-4 py-2.5"><RoleSelect label={`${ADMIN.role}: ${u.name}`} value={u.role} disabled={self} onChange={(r) => void run("set_role", { userId: u.id, role: r })} /></td>
-                        <td className="px-4 py-2.5">{ADMIN.mfa(u.totp, u.passkeys)}</td>
-                        <td className="px-4 py-2.5"><Chip>{inviteState(u)}</Chip>
+                        <td className="px-4 py-2.5"><RoleSelect label={`${ADMIN.role}: ${u.name}`} value={u.role} disabled={self} onChange={(r) => void run("set_role", { userId: u.id, role: r })} />
+                          {self && <p className="mt-1.5 max-w-[13rem] text-[12px] leading-4 text-muted-foreground">{ADMIN.self}</p>}</td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">{ADMIN.mfa(u.totp, u.passkeys)}</td>
+                        <td className="min-w-[17rem] px-4 py-2.5"><Chip>{inviteState(u)}</Chip>
                           <div>{u.notifications ? FIRST_SHIFT.pushOn : FIRST_SHIFT.pushOff}</div>
-                          {u.role === "field" && <div className="flex gap-2">
+                          {u.role === "field" && <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             <select aria-label={SHIFT.duty} value={u.duty_station ?? ""} onChange={(e) => void run("set_duty",{ userId:u.id,station:e.target.value, dutyFunction:u.duty_function, available:u.available })}>
                               <option value="" disabled>{SHIFT.duty}</option>{sites.map((s) => <option key={s.id} value={s.id}>{s.label ?? s.id} · {s.kind}</option>)}
                             </select>
@@ -111,9 +112,9 @@ function Admin({ me }: { me: Me }) {
                               <option value="" disabled>{SHIFT.responder}</option>{Object.values(PACKS).map((pack) => <option key={pack.id} value={pack.id}>{pack.responder.staff}</option>)}
                             </select><Button size="sm" disabled={!u.duty_station || !u.duty_function} onClick={() => void run("set_duty",{userId:u.id,station:u.duty_station,dutyFunction:u.duty_function,available:!u.available})}>{u.available ? SHIFT.off : SHIFT.available}</Button>
                           </div>}</td>
-                        <td className="num px-4 py-2.5 text-muted-foreground">{when(u.active_at)}</td>
+                        <td className="num px-4 py-2.5 whitespace-nowrap text-muted-foreground">{when(u.active_at)}</td>
                         <td className="px-4 py-2.5 text-right">
-                          {self ? <span className="text-[12px] text-muted-foreground">{ADMIN.self}</span> : (
+                          {self ? null : (
                             <MoreMenu label={u.name} items={[
                               ...(state === "invited" ? [{ label: ADMIN.actions.resend, onClick: () => void run("resend_invite", { userId: u.id }, ADMIN.invited) }] : []),
                               { label: ADMIN.actions.revoke, onClick: () => void run("revoke_sessions", { userId: u.id }, ADMIN.saved, ADMIN.confirm.revoke) },
@@ -138,12 +139,12 @@ function Admin({ me }: { me: Me }) {
           <div className="admin-table max-w-full overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-[13px]" aria-label={ADMIN.audit}>
               <thead className="border-b text-muted-foreground">
-                <tr>{[ADMIN.auditHead.at, ADMIN.auditHead.actor, ADMIN.auditHead.action, ADMIN.auditHead.target].map((h) => <th key={h} scope="col" className="px-4 py-2.5 font-normal">{h}</th>)}</tr>
+                <tr>{[ADMIN.auditHead.at, ADMIN.auditHead.actor, ADMIN.auditHead.action, ADMIN.auditHead.target].map((h) => <th key={h} scope="col" className="px-4 py-2.5 font-normal whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y">
                 {(audit ?? []).map((r) => (
                   <tr key={r.id}>
-                    <td className="num px-4 py-2.5 text-muted-foreground">{when(r.at)}</td>
+                    <td className="num px-4 py-2.5 whitespace-nowrap text-muted-foreground">{when(r.at)}</td>
                     <td className="px-4 py-2.5">{r.actor_name ?? ADMIN.never}</td>
                     <td className="px-4 py-2.5">
                       {ADMIN.auditAction[r.action] ?? r.action}

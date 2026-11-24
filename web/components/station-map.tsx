@@ -90,7 +90,7 @@ export function StationMap({ stations, onToggle, shelters }: { stations: MapStat
           </Popup>
         )}
       </Map>
-      <div className="pointer-events-none absolute bottom-2 left-2 flex flex-wrap gap-3 rounded-md bg-background/90 px-2.5 py-1.5 text-[12px] text-muted-foreground shadow-sm">
+      <div className="pointer-events-none absolute top-2 left-2 flex max-w-[calc(100%-4rem)] flex-wrap gap-x-3 gap-y-1 rounded-md bg-background/90 px-2.5 py-1.5 text-[12px] text-muted-foreground shadow-sm">
         {([["online", DOT.online], ["offline", DOT.stale], ["disaster", DISASTER_DOT], ["mobile", MOBILE_DOT]] as const).map(([k, c]) => (
           <span key={k} className="inline-flex items-center gap-1.5"><span className={cn("size-2.5 rounded-full", c)} />{DISASTER_STAFF.legend[k]}</span>
         ))}
