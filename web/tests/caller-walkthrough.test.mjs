@@ -67,7 +67,13 @@ for (const lang of ["en","ne"]) test(`display-paired ${lang} caller sends words 
   const input = page.getByLabel(UI.whatHappened[lang],{exact:true});
   await input.fill(message);
   await page.setViewportSize({width:390,height:480});
-  const composer = await input.boundingBox();
+  // The page keeps the focused composer in view after the resize; give layout and that scroll up to 2 s to settle.
+  let composer = null;
+  for (const until = Date.now() + 2000; Date.now() < until;) {
+    composer = await input.boundingBox();
+    if (composer && composer.y + composer.height <= 480) break;
+    await page.waitForTimeout(100);
+  }
   assert.ok(composer && composer.y + composer.height <= 480,"the focused composer stays inside the shorter viewport");
   await page.setViewportSize({width:390,height:844});
   if (lang === "en") {
