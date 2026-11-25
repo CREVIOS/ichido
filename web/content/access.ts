@@ -194,6 +194,18 @@ export const ACCESS_STAFF = {
   offline: "Help Point が応答していません。画面に表示できないため、警備員による現地確認を検討してください。",
 };
 
+// Device voice (lib/device-voice.ts): the Help Point's microphone and speaker take the phone's place for an AI case.
+export const DEVICE_VOICE_STAFF = {
+  title: "Help Point で音声受付",
+  body: "受話器でお客様の言語を確認してから開始します。AI が Help Point のスピーカーで話し、お客様は内容が正しければボタンを押して確定します。",
+  lang: "お客様の言語",
+  start: "音声受付を開始",
+  started: "Help Point の音声受付を開始しました",
+  active: "Help Point で音声受付中",
+  stop: "音声受付を終了",
+  stopped: "Help Point の音声受付を終了しました",
+};
+
 export const DISASTER_STAFF = {
   title: "災害・障害モード",
   lead: "地図または一覧でステーションを選び、承認済みの告知を選んで設定します。対象ATMのお客様には告知と、近くで稼働中の Help Point・移動店舗が表示されます。",

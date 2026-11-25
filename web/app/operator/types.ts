@@ -2,7 +2,7 @@ import type { Lang, Status, Fact, FieldState, L10n } from "@/content/catalogue";
 
 export type Station = { id: string; label: L10n; kind?: string };
 export type Desk = {
-  binding_expires: string | null; caller_words_lang: Lang | null; assisted_source: "handset" | "in_person" | null;
+  binding_expires: string | null; device_voice?: boolean; caller_words_lang: Lang | null; assisted_source: "handset" | "in_person" | null;
   handler: "legacy" | "ai" | "queued" | "human"; handler_epoch: number; queued_at: string | null; priority: number | null; transfer_reason: string | null;
   id: string; station: string; source: string; fault: string; status: Status; operator_id: string | null; lang: Lang | null;
   card_back: Fact; cash_received: Fact; confirmed_rev: number | null; caller_words: string | null; caller_words_ja?: string | null; clarifying: boolean;

@@ -32,7 +32,9 @@ export function approvedInfo(intent: string, fault: string, flags: string[], con
 }
 
 export type ReadbackFacts = {card_back:Fact; cash_received:Fact; triage?:{taps:string[]}};
-export function committedReadback(facts:ReadbackFacts, lang:Lang) {
+// device: spoken through a Help Point, where a button press confirms (FRONTLINE.readbackDevice).
+export function committedReadback(facts:ReadbackFacts, lang:Lang, device = false) {
   const taps = facts.triage?.taps ?? [];
-  return [readBackText(lang,facts), ...taps.map(t => CALLER_FLAGS[t]?.label[lang]), FRONTLINE.readback[lang]].filter(Boolean).join(" ");
+  const ask = (device ? FRONTLINE.readbackDevice : FRONTLINE.readback)[lang];
+  return [readBackText(lang,facts), ...taps.map(t => CALLER_FLAGS[t]?.label[lang]), ask].filter(Boolean).join(" ");
 }

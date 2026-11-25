@@ -1,4 +1,5 @@
-import { admin, priv, reply } from "@/lib/server";
+import { HttpError, admin, priv, reply } from "@/lib/server";
+import { deviceConfirm } from "@/lib/device-voice";
 import { authenticateDevice, boundedText } from "@/lib/request-security";
 import { requestLog, errorFields } from "@/lib/log";
 import { isFault } from "@/content/catalogue";
@@ -18,6 +19,8 @@ export async function POST(req: Request): Promise<Response> {
   const body = await boundedText(req, 64);
   if (body instanceof Response) return body;
   const key = body.trim();
+  // X-Action: confirm — a press during a device voice session confirms the read-back (lib/device-voice.ts).
+  if (req.headers.get("x-action") === "confirm") return confirmPress(station, key, log);
   const fault = req.headers.get("x-fault") || await defaultFault(station);
   if (!isFault(fault)) {
     log.warn("device_fault", { station, status: 400, code: "bad_fault" });
@@ -42,6 +45,26 @@ export async function POST(req: Request): Promise<Response> {
   if (!seen) await startBot(incident as string);   // a second press on an open case finds its run already there
   after(flushAlerts);   // the new case's push to the operators on duty (lib/alerts.ts)
   log.info("device_fault", { station, fault, incident: incident as string, repeat: Boolean(seen), status: 204, duration_ms: log.ms() });
+  return new Response(null, { status: 204 });
+}
+
+// 204 when confirmed (or a retried press already was); 409 when there is no device session or nothing to confirm yet.
+async function confirmPress(station: string, key: string, log: ReturnType<typeof requestLog>): Promise<Response> {
+  if (!/^[0-9a-f]{32}$/.test(key)) {
+    log.warn("device_confirm", { station, status: 400, code: "bad_event_id" });
+    return reply(400, { error: "bad event id" });
+  }
+  try {
+    await deviceConfirm(station, key);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      log.warn("device_confirm", { station, status: error.status, code: error.message, duration_ms: log.ms() });
+      return reply(error.status, { error: error.message });
+    }
+    log.error("device_confirm", { station, status: 500, duration_ms: log.ms(), ...errorFields(error) });
+    return reply(500, { error: "not recorded" });
+  }
+  log.info("device_confirm", { station, status: 204, duration_ms: log.ms() });
   return new Response(null, { status: 204 });
 }
 

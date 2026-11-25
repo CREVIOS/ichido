@@ -58,7 +58,7 @@ export const COMMANDS: Record<string, Access> = {
   simulate: "case:act", suggest: "case:act", summary_draft: "case:act", summary_save: "case:act", handoff_create: "case:act", handoff_list: "case:act", handoff_revoke: "case:act",
   frontline_qa: "case:qa", report_safety_miss: "case:monitor", frontline_monitor: "case:monitor", frontline_qa_counts: "case:qa-counts", review: "case:act", staff_list: "case:act", claim: "case:act", remote_release: "case:act", send: "case:act", outcome: "case:act",
   reset_caller: "case:act", abandon: "case:act", set_fault: "case:act", stated_amount: "case:act", bank_status: "case:act",
-  issue_code: "case:act", show_code_on_device: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",
+  issue_code: "case:act", show_code_on_device: "case:act", device_voice: "case:act", device_voice_stop: "case:act", broadcast: "case:act", promise: "case:act", promise_done: "case:act",
   abusive: "case:act",
   assign: "case:dispatch", fraud: "case:dispatch",
   takeover: "case:takeover",

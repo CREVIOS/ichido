@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { EarOff, MonitorSmartphone } from "lucide-react";
+import { EarOff, Mic, MicOff, MonitorSmartphone } from "lucide-react";
 import { sb, cmd } from "@/lib/supabase";
 import { useLive } from "@/lib/live";
 import { Chip, Notice, Panel } from "@/components/kit";
 import { Button } from "@/components/ui/button";
-import { ACCESS_STAFF, DESK, STATIONS, staffError } from "@/content/catalogue";
+import { ACCESS_STAFF, DESK, DEVICE_VOICE_STAFF, LANG_NAME, STATIONS, VOICE_LANGS, staffError, type Lang } from "@/content/catalogue";
 import { useCountdown } from "./actions";
 
 // 文字対応: the caller pressed "I can't hear / I can't speak". Shown in the queue and over the case.
@@ -48,6 +48,35 @@ export function DeviceCodeCard({ incident, station }: { incident: string; statio
       {online === false && <Notice tone="warn">{ACCESS_STAFF.offline}</Notice>}
       {live && <span className="num text-[13px] text-foreground">{ACCESS_STAFF.showing(left)}</span>}
       <Button variant={live ? "secondary" : "default"} onClick={show}><MonitorSmartphone className="stroke-[1.5]" />{live ? ACCESS_STAFF.reshow : ACCESS_STAFF.show}</Button>
+    </Panel>
+  );
+}
+
+// Device voice: for an unclaimed AI case, the operator hears the language on the handset and starts the AI intake
+// on the Help Point's microphone and speaker (lib/device-voice.ts). The device confirms with its button.
+export function DeviceVoiceCard({ incident, active }: { incident: string; active: boolean }) {
+  const [lang, setLang] = useState<Lang>("en");
+  const [busy, setBusy] = useState(false);
+  const run = (name: "device_voice" | "device_voice_stop", done: string) => {
+    setBusy(true);
+    cmd(name, name === "device_voice" ? { incident, lang } : { incident })
+      .then(() => toast.success(done))
+      .catch((e: Error) => toast.error(staffError(e.message)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <Panel title={DEVICE_VOICE_STAFF.title} action={active ? <Chip>{DEVICE_VOICE_STAFF.active}</Chip> : undefined}>
+      <p className="text-[14px] leading-6">{DEVICE_VOICE_STAFF.body}</p>
+      {active
+        ? <Button variant="secondary" disabled={busy} onClick={() => run("device_voice_stop", DEVICE_VOICE_STAFF.stopped)}><MicOff className="stroke-[1.5]" />{DEVICE_VOICE_STAFF.stop}</Button>
+        : <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-[14px]">{DEVICE_VOICE_STAFF.lang}
+              <select className="h-9 rounded-md border bg-background px-2" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+                {VOICE_LANGS.map((l) => <option key={l} value={l}>{LANG_NAME[l]}</option>)}
+              </select>
+            </label>
+            <Button disabled={busy} onClick={() => run("device_voice", DEVICE_VOICE_STAFF.started)}><Mic className="stroke-[1.5]" />{DEVICE_VOICE_STAFF.start}</Button>
+          </div>}
     </Panel>
   );
 }

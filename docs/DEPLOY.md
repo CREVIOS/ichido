@@ -289,6 +289,23 @@ The RSA signature covers the version, exact HTTPS URL and SHA-256 digest. Device
 (`/api/device/firmware` then answers 204). The route logs `device_firmware` with `fw` (the device's version),
 `fw_target` and `code` = `offered` / `current` / `none` / `bad_manifest`.
 
+### Voice Point (device voice)
+
+`firmware/voice_point/` is the Help Point with a microphone and speaker (ESP32-S31 or ESP32-S3, ESP-IDF 6.1); build and
+provisioning steps are in its README. On the server it needs:
+
+1. The migration `supabase/migrations/20261126000000_device_voice.sql` (`supabase db push`).
+2. The web release with `/api/device/voice`, the `device_voice` / `device_voice_stop` commands and the agent's state-poll
+   hand-off; the agent release with the matching `watch()` change (section 3). Deploy the web app first: an older agent
+   still ends the session after a button confirm, only without the spoken hand-off.
+3. The station's entry in `DEVICE_SECRETS_JSON`, as for any Help Point.
+4. Anonymous sign-ins enabled (they are for phone callers already). Each device voice start creates one anonymous user
+   from the server's address: check Supabase's per-IP anonymous sign-in limit (Authentication → Rate limits) against the
+   number of device starts per hour you expect, together with phone callers behind the same NAT.
+
+The operator starts device voice in the AI case's panel (Help Point で音声受付), after hearing the caller's language on the
+handset. Logs: `device_voice` (grant: `code` = `agent` / `listen`, 404 `no_voice`) and `device_confirm` on `/api/device`.
+
 ## 5. Better Stack
 
 **Logs.** Telemetry → Sources → Connect source → HTTP. Copy the source token and the ingesting host into

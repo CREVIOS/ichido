@@ -4,17 +4,23 @@ import { approvedInfo, committedReadback, conversationText, type ReadbackFacts }
 import { frontlineNumber } from "@/content/numbers";
 import { frontlineTurn } from "@/lib/frontline";
 import { boundedText } from "@/lib/request-security";
-import { HttpError, admin, reply, rpc } from "@/lib/server";
+import { HttpError, admin, priv, reply, rpc } from "@/lib/server";
 import { signSpeech, verifyVoiceRequest } from "@/lib/speech";
 
 type State = {rev:number; seq:number|null; pending:boolean; wording:string; confirmed:boolean; fault:string; flags:string[];
   facts:ReadbackFacts};
-function speech(s: State, lang: Lang) {
+function speech(s: State, lang: Lang, device: boolean) {
   if (!s.pending || !s.seq) return null;
   if (s.wording === "SHELTER_INFO") return approvedInfo(s.wording,s.fault,s.flags,s.confirmed,lang);
   if (s.wording === "withheld" || s.wording === "greeting") return conversationText(s.wording,lang);
   if (s.wording !== "readback") return null;
-  return committedReadback(s.facts,lang);
+  return committedReadback(s.facts,lang,device);
+}
+
+// A Help Point's own caller (supabase/migrations/*_device_voice.sql) confirms with the device button.
+async function onDevice(scope:{incident:string;uid:string}) {
+  const {data} = await priv().from("binding").select("device").eq("incident",scope.incident).eq("uid",scope.uid).maybeSingle();
+  return Boolean(data?.device);
 }
 
 // A turn that hands the case to a person ends the AI's voice lease. A voice caller would otherwise hear nothing:
@@ -47,14 +53,28 @@ export async function POST(req:Request) {
       await frontlineTurn({kind:"caller",uid:scope.uid,lang:scope.lang,incident:scope.incident,voiceRoom:scope.generation,expires:null},
         {act:"text",request_id,text,base_rev:state.rev},scope,req.signal);
       const said = await handoff(scope);
-      if (said) return reply(200,said);
+      if (said) {
+        await rpc("voice_farewell",{p_generation:scope.generation,p_epoch:scope.epoch});
+        return reply(200,said);
+      }
     }
     if (action !== "state" && action !== "turn") {
       await rpc("voice_step",{...args,p_action:action});
       return reply(200,{});
     }
-    const state = await rpc<State>("voice_step",{...args,p_action:"state"});
-    const wording = speech(state,scope.lang);
+    let state: State;
+    try {
+      state = await rpc<State>("voice_step",{...args,p_action:"state"});
+    } catch (error) {
+      // The lease ended because the case went to a person without a spoken turn (a Help Point button confirm, a
+      // screen tap): the agent's poll gets the hand-off words once (voice_farewell), then the 403 as before.
+      if (action === "state" && error instanceof HttpError && error.status === 403) {
+        const said = await handoff(scope);
+        if (said && await rpc<boolean>("voice_farewell",{p_generation:scope.generation,p_epoch:scope.epoch})) return reply(200,said);
+      }
+      throw error;
+    }
+    const wording = speech(state,scope.lang,state.wording === "readback" && await onDevice(scope));
     const say = wording && state.seq && !frontlineNumber(wording)
       ? signSpeech(scope.generation,scope.uid,wording,{seq:state.seq,epoch:scope.epoch,lang:scope.lang}) : null;
     return reply(200,{seq:state.seq,say});

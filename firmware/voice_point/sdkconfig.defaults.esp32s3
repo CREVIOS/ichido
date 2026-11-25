@@ -1,0 +1,2 @@
+# Sparkle IoT XH-S3E-AI (ESP32-S3, 16 MB flash, 8 MB octal PSRAM): I2S amplifier and I2S MEMS mic, no codec chip.
+CONFIG_VP_BOARD_XH_S3E_AI=y

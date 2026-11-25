@@ -152,6 +152,14 @@ class FrontlineAgent(Agent):
         try:
             while True:
                 state = await self.request("state")
+                if state.get("final"):
+                    # The case went to a person without a spoken turn (a Help Point button confirm, a screen tap):
+                    # say the signed hand-off once, then end like any other revoked lease.
+                    self.interrupt()
+                    if self.closing is None:
+                        self.closing = asyncio.ensure_future(self.farewell(state.get("say")))
+                    await asyncio.wait({self.closing}, timeout=20)
+                    raise aiohttp.ClientError("voice grant ended")
                 if self.pending_speech and state["seq"] != self.pending_speech:
                     self.interrupt()
                 if state.get("say") and not self.pending_speech and not self.submitting:
