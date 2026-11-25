@@ -104,10 +104,11 @@ test("the button confirms the spoken read-back; the AI hands the ATM case to a p
   const agent = await agentFor(incident);
 
   assert.equal((await press(newKey(), { "x-action": "confirm" })).status, 409, "nothing to confirm before a read-back");
-  await script("patch", { card_back: "yes", cash_received: "unchanged", clarify: false });
-  const turn = await agent.post({ action: "turn", request_id: randomUUID(), text: "The machine kept my card" });
+  // A neutral sentence: screenTurn sends "kept my card" straight to a person, with no read-back.
+  await script("patch", { card_back: "no", cash_received: "unchanged", clarify: false });
+  const turn = await agent.post({ action: "turn", request_id: randomUUID(), text: "I was using the machine" });
   assert.equal(turn.status, 200, JSON.stringify(turn.body));
-  assert.ok(turn.body.say?.text.endsWith(FRONTLINE.readbackDevice.en), "the device read-back asks for the button");
+  assert.ok(turn.body.say?.text.endsWith(FRONTLINE.readbackDevice.en), `the device read-back asks for the button: ${JSON.stringify(turn.body)}`);
 
   const key = newKey();
   assert.equal((await press(key, { "x-action": "confirm" })).status, 204);
