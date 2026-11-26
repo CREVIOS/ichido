@@ -42,3 +42,6 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=y
 # Certificates are checked against the clock: SNTP sets it after Wi-Fi.
 CONFIG_LWIP_SNTP_MAX_SERVERS=2
+
+# The main loop makes the HTTPS calls (TLS handshakes): the default 3.5 KB main stack overflows.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288
