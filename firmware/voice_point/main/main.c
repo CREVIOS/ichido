@@ -161,9 +161,16 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ui_init();
-    if (!settings_load(&settings)) {
+    bool ready = settings_load(&settings);
+    if (!ready) {
         ui_show(UI_ERROR);
-        return;
+        if (!settings.ssid[0]) return;
+        // Wi-Fi only: join the network so it can be checked, but never call the server without credentials.
+        wifi_start();
+        for (bool shown = false;; vTaskDelay(pdMS_TO_TICKS(1000))) {
+            if (online && !shown) ESP_LOGW(TAG, "Wi-Fi works; waiting for the app URL, station and device secret");
+            shown = online;
+        }
     }
     ESP_LOGI(TAG, "Voice Point %s, station %s", FW_VERSION, settings.station);
     server_init(&settings);
