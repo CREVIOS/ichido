@@ -170,6 +170,19 @@ class FrontlinePlaybackTest(unittest.IsolatedAsyncioTestCase):
         ctx.shutdown.assert_called_once()
         self.request.assert_awaited_with("partial",seq=8)
 
+    async def test_hand_off_on_the_poll_is_said_once_then_the_session_ends(self):
+        # A Help Point button confirm (or a screen tap) hands the case to a person with no spoken turn: the state poll
+        # carries the signed hand-off, the agent says it without interruption and leaves.
+        front = self.agent()
+        handle = self.session.say.return_value
+        handle.wait_for_playout = mock.AsyncMock()
+        self.request.side_effect = [{"seq":9,"final":True,"say":{"seq":9,"text":"A person will join"}}]
+        ctx = mock.Mock()
+        await asyncio.wait_for(front.watch(ctx,set(),None), timeout=1)
+        self.session.say.assert_called_once_with("Approved", allow_interruptions=False, add_to_chat_ctx=False)
+        self.request.assert_awaited_once_with("state")
+        ctx.shutdown.assert_called_once()
+
     async def test_synthesis_failure_marks_the_text_only_turn_partial(self):
         front = self.agent()
         self.session.say.side_effect = RuntimeError("unavailable")

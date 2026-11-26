@@ -200,7 +200,8 @@ export function eventText(kind: string, d: Record<string, string | undefined>, f
     case "fault": return `障害通知：${isFault(d.fault) ? STAFF_JA.fault[d.fault] : "不明な障害"}${d.source === "simulator" ? "（手動登録）" : ""}`;
     case "assisted_intake": return `${ASSIST.title} · ${ASSIST[d.source as "handset" | "in_person"]} · ${ASSIST.consent}`;
     case "assisted_delivery": return `${ASSIST.finish} · ${ASSIST[d.source as "handset" | "in_person"]}`;
-    case "paired": return `お客様が多言語窓口に接続（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
+    case "paired": return `${d.device ? "Help Point の音声受付を開始" : "お客様が多言語窓口に接続"}（${LANG_NAME[d.lang as Lang] ?? d.lang}）`;
+    case "device_voice_stopped": return "Help Point の音声受付を終了";
     case "claimed": return "担当者が対応を開始";
     case "escalated": return `エスカレーション（レベル${d.level}）：${DESK.escalationReason[d.reason ?? ""] ?? "対応期限を超過"}`;
     case "remote_release": return `遠隔解除を試行 → ${REMOTE_RELEASE[d.result ?? ""] ?? d.result}`;

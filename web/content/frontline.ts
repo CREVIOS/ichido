@@ -22,6 +22,8 @@ export const FRONTLINE = {
   },
   start: { en: "Continue with AI", ja: "AIと つづける", bn: "এআইয়ের সঙ্গে চালিয়ে যান", vi: "Tiếp tục với AI", id: "Lanjut dengan AI", ne: "एआईसँग जारी राख्नुहोस्" },
   readback: { en: "Is this what you meant? You can change it.", ja: "これで あっていますか？ なおせます。", bn: "আপনি কি এটাই বোঝাতে চেয়েছেন? বদলাতে পারেন।", vi: "Đây có đúng ý bạn không? Bạn có thể sửa.", id: "Apakah ini maksud Anda? Anda bisa mengubahnya.", ne: "तपाईंले भन्न खोजेको यही हो? सच्याउन सक्नुहुन्छ।" },
+  // Spoken by the agent through a Help Point, which has a button instead of a screen (lib/device-voice.ts).
+  readbackDevice: { en: "Is this what you meant? If it is, press the button. If not, say it again.", ja: "これで あって いますか？ あって いたら ぼたんを おして ください。ちがう ときは もう いちど いって ください。", bn: "আপনি কি এটাই বোঝাতে চেয়েছেন? ঠিক হলে বোতামটি চাপুন। না হলে আবার বলুন।", vi: "Đây có đúng ý bạn không? Nếu đúng, hãy bấm nút. Nếu chưa đúng, hãy nói lại.", id: "Apakah ini maksud Anda? Jika benar, tekan tombolnya. Jika tidak, ucapkan sekali lagi.", ne: "तपाईंले भन्न खोजेको यही हो? ठीक भए बटन थिच्नुहोस्। नभए फेरि भन्नुहोस्।" },
   queued: {
     en: "I’ve asked a person to join. They can see what you’ve already sent.",
     ja: "係の 人に つなぐよう たのみました。係の 人は あなたが おくった 文を よめます。",

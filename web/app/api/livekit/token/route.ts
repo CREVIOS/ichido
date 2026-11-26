@@ -1,12 +1,10 @@
-import { RoomAgentDispatch, RoomConfiguration, TrackSource } from "@livekit/protocol";
-import { AccessToken, AgentDispatchClient } from "livekit-server-sdk";
+import { AccessToken } from "livekit-server-sdk";
 import { actorFrom, admin, rpc, reply, HttpError } from "@/lib/server";
 import { boundedText, limitKey, limitSource } from "@/lib/request-security";
 import { requestLog } from "@/lib/log";
 import { roomFor } from "@/lib/speech";
-import { LANG_LOCALE, VOICE_LANGS, type Lang } from "@/content/catalogue";
-
-const MAX_TTL_S = 600;
+import { VOICE_LANGS, type Lang } from "@/content/catalogue";
+import { callerVoiceGrant } from "@/lib/voice-token";
 
 // A caller bound to an open case gets a short token for that case's private room; the intake agent is dispatched into it.
 // The token never outlives the binding; the room is deleted when the case closes or the caller is reset (lib/livekit.ts).
@@ -54,37 +52,14 @@ export async function POST(req: Request): Promise<Response> {
     log.warn("voice_token", { role, incident: a.incident, status: 503, code: "voice_unavailable", duration_ms: log.ms() });
     return reply(503, { error: "voice_unavailable" });
   }
-  const ttl = Math.min(MAX_TTL_S, Math.floor((Date.parse(a.expires) - Date.now()) / 1000));
-  if (ttl <= 0) return refuse("binding_expired", a.incident);
-
-  const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: `c-${a.uid}`, ttl });
-  token.addGrant({
-    roomJoin: true, room: roomFor(a.voiceRoom), canSubscribe: true, canPublish: true, canPublishData: open.handler === "legacy",
-    canPublishSources: [TrackSource.MICROPHONE], canUpdateOwnMetadata: false,
-  });
-  let session: string | undefined;
-  let needsAgent = open.handler === "legacy";
-  if (open.handler !== "legacy") {
-    try {
-      const lease = await rpc<{session:string;epoch:number;handler:string}>("voice_begin",{p_uid:a.uid,p_generation:a.voiceRoom,p_lang:a.lang});
-      session = lease.session;
-      needsAgent = lease.handler === "ai";
-      if (needsAgent) {
-        if (!process.env.AGENT_BRIDGE_SECRET) throw new Error("missing_bridge");
-        const scope = {uid:a.uid,incident:a.incident,generation:a.voiceRoom,lang:a.lang,session,epoch:lease.epoch};
-        const dispatch = new AgentDispatchClient(LIVEKIT_URL.replace(/^ws/,"http"),LIVEKIT_API_KEY,LIVEKIT_API_SECRET);
-        await dispatch.createDispatch(roomFor(a.voiceRoom),process.env.AGENT_NAME ?? "ichido-intake",{
-          metadata:JSON.stringify({locale:LANG_LOCALE[a.lang],scope}),
-        });
-      }
-    } catch (error) {
-      if (session) await rpc("voice_end",{p_uid:a.uid,p_generation:a.voiceRoom,p_session:session});
-      return reply(error instanceof HttpError ? error.status : 503,{error:"voice_unavailable"});
-    }
-  } else token.roomConfig = new RoomConfiguration({
-    agents: [new RoomAgentDispatch({ agentName: process.env.AGENT_NAME ?? "ichido-intake", metadata: JSON.stringify({ locale: LANG_LOCALE[a.lang as Lang] }) })],
-  });
-  const jwt = await token.toJwt();
-  log.info("voice_token", { role, incident: a.incident, status: 200, ttl_s: ttl, duration_ms: log.ms() });
-  return reply(200, { url: LIVEKIT_URL, token: jwt, session, ttl, needsAgent });
+  let grant;
+  try {
+    grant = await callerVoiceGrant({ uid: a.uid, incident: a.incident, lang: a.lang as Lang, expires: a.expires, voiceRoom: a.voiceRoom }, open.handler);
+  } catch (error) {
+    if (error instanceof HttpError) return reply(error.status, { error: "voice_unavailable" });
+    throw error;
+  }
+  if (!grant) return refuse("binding_expired", a.incident);
+  log.info("voice_token", { role, incident: a.incident, status: 200, ttl_s: grant.ttl, duration_ms: log.ms() });
+  return reply(200, grant);
 }

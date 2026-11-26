@@ -1,0 +1,7 @@
+build*/
+managed_components/
+dependencies.lock
+sdkconfig
+sdkconfig.old
+# Local first-boot settings (Wi-Fi, device secret): never commit.
+sdkconfig.local

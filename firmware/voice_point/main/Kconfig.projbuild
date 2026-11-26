@@ -1,0 +1,54 @@
+menu "Ichido Voice Point"
+
+    choice VP_BOARD
+        prompt "Board"
+        default VP_BOARD_S31_COREBOARD if IDF_TARGET_ESP32S31
+        default VP_BOARD_XH_S3E_AI
+        config VP_BOARD_S31_COREBOARD
+            bool "ESP32-S31-Function-CoreBoard-1 (ES8311 codec, NS4150B amplifier)"
+        config VP_BOARD_XH_S3E_AI
+            bool "Sparkle IoT XH-S3E-AI (I2S amplifier and MEMS mic)"
+    endchoice
+
+    config VP_CODEC_BOARD
+        string
+        default "ESP32_S31_FUNCTION_COREBOARD_1" if VP_BOARD_S31_COREBOARD
+        default "XH_S3E_AI"
+
+    config VP_BUTTON_GPIO
+        int "Button GPIO (pressed = low)"
+        default 61 if VP_BOARD_S31_COREBOARD
+        default 0
+        help
+            The board's BOOT button. It is a strapping pin only while the chip resets; after boot it is an input.
+
+    config VP_LED_GPIO
+        int "WS2812 status LED GPIO (-1: none)"
+        default 60 if VP_BOARD_S31_COREBOARD
+        default 48
+
+    config VP_SPEAKER_VOLUME
+        int "Speaker volume (0-100)"
+        range 0 100
+        default 80
+
+    menu "First-boot settings"
+        comment "Written to NVS on the first boot only. Keep them in a local sdkconfig file; never commit them."
+        config VP_APP_URL
+            string "Ichido app origin (https://host, no path)"
+            default ""
+        config VP_STATION
+            string "Station id"
+            default ""
+        config VP_DEVICE_SECRET
+            string "Device secret (DEVICE_SECRETS_JSON on the server)"
+            default ""
+        config VP_WIFI_SSID
+            string "Wi-Fi SSID (2.4 GHz)"
+            default ""
+        config VP_WIFI_PASSWORD
+            string "Wi-Fi password"
+            default ""
+    endmenu
+
+endmenu

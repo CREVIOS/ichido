@@ -1,0 +1,12 @@
+dependencies:
+  idf: ">=5.4"
+  # LiveKit ESP32 SDK with ESP32-S31 support (livekit/client-sdk-esp32 PR #131), pinned until it is released.
+  livekit/livekit:
+    git: https://github.com/anujdeshpande/client-sdk-esp32.git
+    path: components/livekit
+    version: 3ab42f025897ac5cbac2a80224508e5cdb6253c7
+  tempotian/codec_board: ~2.0.2
+  espressif/led_strip: ^3.0.0
+  espressif/cjson:
+    version: "^1.7.19"
+    rules: [{if: "idf_version >=6.0"}]   # no longer bundled with IDF as of v6.0

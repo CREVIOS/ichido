@@ -18,6 +18,7 @@ import { requestLog, errorFields, entry, ship } from "@/lib/log";
 import { BOT_SIGNALS, signalBot, startBot } from "@/lib/bot";
 import { saveSuggestion } from "@/lib/bot-steps";
 import { accessCommands, str, digest } from "@/lib/access";
+import { deviceVoiceCommands } from "@/lib/device-voice";
 import { boundedJson, limitKey, limitSource } from "@/lib/request-security";
 import { disasterCommands } from "@/lib/disaster";
 import { OPS_COMMANDS, fieldPromise } from "@/lib/ops";
@@ -434,6 +435,8 @@ const commands: Record<string, (a: Actor, b: Body) => Promise<object>> = {
 
   // Text-only path and disaster mode (lib/access.ts, lib/disaster.ts).
   ...accessCommands,
+  // The Help Point as the voice caller (lib/device-voice.ts).
+  ...deviceVoiceCommands,
   ...disasterCommands,
   // Fraud mode, mass-incident broadcast, promises, harassment flag and takeover (lib/ops.ts).
   ...OPS_COMMANDS,
